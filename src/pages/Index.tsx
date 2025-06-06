@@ -139,13 +139,18 @@ const Index = () => {
             
             <TabsContent value="results" className="mt-6">
               <ClassificationErrorBoundary context="Results Display">
+                {/* Show the most recent batch summary if available */}
                 {batchSummary && batchResults.length > 0 && (
-                  <BatchProcessingSummary summary={batchSummary} />
+                  <div className="mb-6">
+                    <h3 className="text-lg font-medium mb-4">Latest Batch Summary</h3>
+                    <BatchProcessingSummary summary={batchSummary} />
+                  </div>
                 )}
                 
-                <div className="mt-6">
+                {/* Always show all historical results */}
+                <div>
                   <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold">All Classification Results</h2>
+                    <h2 className="text-xl font-bold">All Historical Classification Results</h2>
                     {allResults.length > 0 && (
                       <button
                         onClick={clearAllResults}
