@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,7 +37,6 @@ const FileUploadForm = ({
   const [fileError, setFileError] = useState<string | null>(null);
   const [validationStatus, setValidationStatus] = useState<'none' | 'validating' | 'valid' | 'error'>('none');
   const [fileInfo, setFileInfo] = useState<{ rowCount?: number; payeeCount?: number } | null>(null);
-  const [originalFileData, setOriginalFileData] = useState<any[]>([]);
   const { toast } = useToast();
 
   // Retry mechanism for batch job creation
@@ -53,7 +53,6 @@ const FileUploadForm = ({
     setFileError(null);
     setValidationStatus('none');
     setFileInfo(null);
-    setOriginalFileData([]);
     
     // Reset the file input
     const fileInput = document.getElementById('file-upload') as HTMLInputElement;
@@ -71,7 +70,6 @@ const FileUploadForm = ({
     setSelectedColumn("");
     setValidationStatus('none');
     setFileInfo(null);
-    setOriginalFileData([]);
     
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
@@ -124,46 +122,6 @@ const FileUploadForm = ({
     }
   };
 
-  const validateSelectedData = async () => {
-    if (!file || !selectedColumn) return null;
-
-    try {
-      setValidationStatus('validating');
-      
-      // Parse the full file and store original data
-      const data = await parseUploadedFile(file);
-      setOriginalFileData(data);
-      
-      // Validate payee data
-      const dataValidation = validatePayeeData(data, selectedColumn);
-      if (!dataValidation.isValid) {
-        setValidationStatus('error');
-        showErrorToast(dataValidation.error!, 'Data Validation');
-        return null;
-      }
-
-      // Extract and clean payee names
-      const rawPayeeNames = data
-        .map(row => row[selectedColumn])
-        .filter(name => name && typeof name === 'string' && name.trim() !== '');
-      
-      const cleanedPayeeNames = cleanPayeeNames(rawPayeeNames);
-      
-      setFileInfo({
-        rowCount: data.length,
-        payeeCount: cleanedPayeeNames.length
-      });
-
-      setValidationStatus('valid');
-      return cleanedPayeeNames;
-    } catch (error) {
-      const appError = handleError(error, 'Data Validation');
-      setValidationStatus('error');
-      showErrorToast(appError, 'Data Validation');
-      return null;
-    }
-  };
-
   const handleProcess = async () => {
     if (!file || !selectedColumn) {
       toast({
@@ -177,26 +135,50 @@ const FileUploadForm = ({
     setIsLoading(true);
     
     try {
-      const payeeNames = await validateSelectedData();
-      if (!payeeNames) {
-        setIsLoading(false);
+      setValidationStatus('validating');
+      
+      // Parse the full file to get original data
+      const originalFileData = await parseUploadedFile(file);
+      console.log('[FILE UPLOAD] Parsed original file data:', originalFileData.length, 'rows');
+      
+      // Validate payee data
+      const dataValidation = validatePayeeData(originalFileData, selectedColumn);
+      if (!dataValidation.isValid) {
+        setValidationStatus('error');
+        showErrorToast(dataValidation.error!, 'Data Validation');
         return;
       }
 
-      console.log(`[FILE UPLOAD] Creating batch job for ${payeeNames.length} names from column "${selectedColumn}" with original data`);
+      // Extract and clean payee names
+      const rawPayeeNames = originalFileData
+        .map(row => row[selectedColumn])
+        .filter(name => name && typeof name === 'string' && name.trim() !== '');
+      
+      const cleanedPayeeNames = cleanPayeeNames(rawPayeeNames);
+      
+      setFileInfo({
+        rowCount: originalFileData.length,
+        payeeCount: cleanedPayeeNames.length
+      });
+
+      setValidationStatus('valid');
+
+      console.log(`[FILE UPLOAD] Creating batch job for ${cleanedPayeeNames.length} names from column "${selectedColumn}" with ${originalFileData.length} original data rows`);
 
       const batchJob = await createBatchJobWithRetry(
-        payeeNames, 
-        `File upload batch: ${file.name}, ${payeeNames.length} payees`
+        cleanedPayeeNames, 
+        `File upload batch: ${file.name}, ${cleanedPayeeNames.length} payees`
       );
       
-      console.log(`[FILE UPLOAD] Batch job created with original data:`, batchJob);
+      console.log(`[FILE UPLOAD] Batch job created successfully:`, batchJob);
+      console.log(`[FILE UPLOAD] Calling onBatchJobCreated with ${originalFileData.length} original data rows`);
 
-      onBatchJobCreated(batchJob, payeeNames, originalFileData);
+      // Pass the actual original file data, not from state
+      onBatchJobCreated(batchJob, cleanedPayeeNames, originalFileData);
       
       toast({
         title: "Batch Job Created Successfully",
-        description: `Submitted ${payeeNames.length} payees from ${file.name} for processing with original data preserved. Job ID: ${batchJob.id.slice(-8)}`,
+        description: `Submitted ${cleanedPayeeNames.length} payees from ${file.name} for processing with ${originalFileData.length} original data rows preserved. Job ID: ${batchJob.id.slice(-8)}`,
       });
     } catch (error) {
       const appError = handleError(error, 'Batch Job Creation');
