@@ -6,7 +6,6 @@ import ClassificationResultTable from "@/components/ClassificationResultTable";
 import BatchProcessingSummary from "@/components/BatchProcessingSummary";
 import OpenAIKeySetup from "@/components/OpenAIKeySetup";
 import KeywordExclusionManager from "@/components/KeywordExclusionManager";
-import SampleBatchExport from "@/components/SampleBatchExport";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ClassificationErrorBoundary from "@/components/ClassificationErrorBoundary";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
@@ -23,6 +22,9 @@ const Index = () => {
   useEffect(() => {
     setHasApiKey(isOpenAIInitialized());
     logMemoryUsage('Index component mount');
+    
+    // Load stored results on component mount
+    loadStoredResults();
   }, []);
 
   // Log memory usage on tab changes
@@ -30,19 +32,54 @@ const Index = () => {
     logMemoryUsage(`Tab change to ${activeTab}`);
   }, [activeTab]);
 
+  const loadStoredResults = () => {
+    try {
+      const storedResults = localStorage.getItem('all_classification_results');
+      if (storedResults) {
+        const parsedResults = JSON.parse(storedResults);
+        setAllResults(parsedResults);
+        console.log(`[INDEX] Loaded ${parsedResults.length} stored results`);
+      }
+    } catch (error) {
+      console.error('[INDEX] Error loading stored results:', error);
+    }
+  };
+
+  const saveResults = (results: PayeeClassification[]) => {
+    try {
+      localStorage.setItem('all_classification_results', JSON.stringify(results));
+      console.log(`[INDEX] Saved ${results.length} results to storage`);
+    } catch (error) {
+      console.error('[INDEX] Error saving results:', error);
+    }
+  };
+
   const handleBatchComplete = (
     results: PayeeClassification[],
     summary: BatchProcessingResult
   ) => {
     setBatchResults(results);
     setBatchSummary(summary);
-    setAllResults(prev => [...results, ...prev]);
+    
+    // Add new results to all results and store them
+    const updatedResults = [...results, ...allResults];
+    setAllResults(updatedResults);
+    saveResults(updatedResults);
+    
     setActiveTab("results");
     logMemoryUsage('Batch processing complete');
   };
 
   const handleKeySet = () => {
     setHasApiKey(true);
+  };
+
+  const clearAllResults = () => {
+    setAllResults([]);
+    setBatchResults([]);
+    setBatchSummary(null);
+    localStorage.removeItem('all_classification_results');
+    console.log('[INDEX] Cleared all stored results');
   };
 
   if (!hasApiKey) {
@@ -82,11 +119,10 @@ const Index = () => {
 
         <main className="container px-4 pb-8">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="batch">File Processing</TabsTrigger>
               <TabsTrigger value="keywords">Keyword Management</TabsTrigger>
-              <TabsTrigger value="sample">Sample Export</TabsTrigger>
-              <TabsTrigger value="results">Results</TabsTrigger>
+              <TabsTrigger value="results">All Results ({allResults.length})</TabsTrigger>
             </TabsList>
             
             <TabsContent value="batch" className="mt-6">
@@ -100,12 +136,6 @@ const Index = () => {
                 <KeywordExclusionManager />
               </ClassificationErrorBoundary>
             </TabsContent>
-
-            <TabsContent value="sample" className="mt-6">
-              <ClassificationErrorBoundary context="Sample Export">
-                <SampleBatchExport />
-              </ClassificationErrorBoundary>
-            </TabsContent>
             
             <TabsContent value="results" className="mt-6">
               <ClassificationErrorBoundary context="Results Display">
@@ -114,7 +144,17 @@ const Index = () => {
                 )}
                 
                 <div className="mt-6">
-                  <h2 className="text-xl font-bold mb-4">Classification Results</h2>
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">All Classification Results</h2>
+                    {allResults.length > 0 && (
+                      <button
+                        onClick={clearAllResults}
+                        className="text-sm text-muted-foreground hover:text-destructive"
+                      >
+                        Clear All Results
+                      </button>
+                    )}
+                  </div>
                   {allResults.length > 0 ? (
                     <ClassificationResultTable results={allResults} />
                   ) : (
