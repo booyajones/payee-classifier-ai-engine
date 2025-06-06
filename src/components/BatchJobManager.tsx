@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -350,6 +351,14 @@ const BatchJobManager = ({
                       <span className="text-xs text-muted-foreground">
                         Created: {formatDate(job.created_at)}
                       </span>
+                      {job.completed_at && (
+                        <>
+                          <br />
+                          <span className="text-xs text-muted-foreground">
+                            Completed: {formatDate(job.completed_at)}
+                          </span>
+                        </>
+                      )}
                     </CardDescription>
                     {pollingState?.lastError && (
                       <p className="text-xs text-red-600 mt-1">
