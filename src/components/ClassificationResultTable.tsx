@@ -23,6 +23,11 @@ const ClassificationResultTable = ({ results }: ClassificationResultTableProps) 
   // Filter out any potentially invalid results
   const validResults = results.filter(result => result && result.result);
   
+  console.log('[CLASSIFICATION TABLE] Debug - validResults:', validResults.length);
+  console.log('[CLASSIFICATION TABLE] Debug - first result:', validResults[0]);
+  console.log('[CLASSIFICATION TABLE] Debug - originalData structure:', validResults[0]?.originalData);
+  console.log('[CLASSIFICATION TABLE] Debug - keyword exclusion:', validResults[0]?.result?.keywordExclusion);
+  
   if (validResults.length === 0) {
     return (
       <div className="text-center py-8 border rounded-md">
@@ -31,20 +36,26 @@ const ClassificationResultTable = ({ results }: ClassificationResultTableProps) 
     );
   }
 
-  // Get all original data columns from the first result
-  const firstResult = validResults[0];
-  const originalColumns = firstResult.originalData ? Object.keys(firstResult.originalData) : [];
+  // Get all original data columns from ALL results (not just first one)
+  const allOriginalColumns = new Set<string>();
+  validResults.forEach(result => {
+    if (result.originalData) {
+      Object.keys(result.originalData).forEach(key => allOriginalColumns.add(key));
+    }
+  });
+  const originalColumns = Array.from(allOriginalColumns);
   
   console.log('[CLASSIFICATION TABLE] Original columns detected:', originalColumns);
-  console.log('[CLASSIFICATION TABLE] Sample original data:', firstResult.originalData);
   
-  // Define classification and keyword exclusion columns
+  // Define classification columns
   const classificationColumns = [
     { key: 'classification', label: 'Classification' },
     { key: 'confidence', label: 'Confidence' },
     { key: 'processingTier', label: 'Processing Tier' },
+    { key: 'reasoning', label: 'Reasoning' }
   ];
   
+  // Define keyword exclusion columns - these are MANDATORY
   const keywordColumns = [
     { key: 'keywordExclusion', label: 'Excluded by Keywords' },
     { key: 'matchedKeywords', label: 'Matched Keywords' },
@@ -58,6 +69,8 @@ const ClassificationResultTable = ({ results }: ClassificationResultTableProps) 
     ...keywordColumns.map(col => ({ ...col, isOriginal: false })),
     { key: 'details', label: 'Details', isOriginal: false }
   ];
+  
+  console.log('[CLASSIFICATION TABLE] All columns for table:', allColumns.map(c => c.label));
   
   const handleSort = (field: string) => {
     if (field === sortField) {
@@ -109,8 +122,12 @@ const ClassificationResultTable = ({ results }: ClassificationResultTableProps) 
   };
   
   const renderCellValue = (result: PayeeClassification, column: any) => {
+    console.log('[CLASSIFICATION TABLE] Rendering cell for column:', column.key, 'isOriginal:', column.isOriginal);
+    
     if (column.isOriginal) {
-      return result.originalData?.[column.key] || '';
+      const value = result.originalData?.[column.key];
+      console.log('[CLASSIFICATION TABLE] Original data value for', column.key, ':', value);
+      return value || '';
     }
     
     switch (column.key) {
@@ -124,8 +141,15 @@ const ClassificationResultTable = ({ results }: ClassificationResultTableProps) 
         return <ClassificationBadge confidence={result.result.confidence} />;
       case 'processingTier':
         return result.result.processingTier || 'N/A';
+      case 'reasoning':
+        return (
+          <div className="max-w-xs truncate" title={result.result.reasoning}>
+            {result.result.reasoning}
+          </div>
+        );
       case 'keywordExclusion':
         const isExcluded = result.result.keywordExclusion?.isExcluded;
+        console.log('[CLASSIFICATION TABLE] Keyword exclusion for result:', isExcluded, result.result.keywordExclusion);
         return (
           <Badge variant={isExcluded ? 'destructive' : 'secondary'}>
             {isExcluded ? 'Yes' : 'No'}
@@ -133,9 +157,12 @@ const ClassificationResultTable = ({ results }: ClassificationResultTableProps) 
         );
       case 'matchedKeywords':
         const keywords = result.result.keywordExclusion?.matchedKeywords || [];
+        console.log('[CLASSIFICATION TABLE] Matched keywords:', keywords);
         return keywords.length > 0 ? keywords.join(', ') : '-';
       case 'keywordReasoning':
-        return result.result.keywordExclusion?.reasoning || '-';
+        const reasoning = result.result.keywordExclusion?.reasoning;
+        console.log('[CLASSIFICATION TABLE] Keyword reasoning:', reasoning);
+        return reasoning || '-';
       case 'details':
         return (
           <Button variant="ghost" size="sm" onClick={() => setSelectedResult(result)}>
@@ -151,7 +178,7 @@ const ClassificationResultTable = ({ results }: ClassificationResultTableProps) 
     <div>
       <div className="flex justify-between items-center mb-4">
         <div className="text-sm text-muted-foreground">
-          Showing {validResults.length} results with {originalColumns.length} original columns + classification data
+          Showing {validResults.length} results with {originalColumns.length} original columns + classification data + keyword exclusions
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => downloadCSV(results)}>
@@ -177,6 +204,9 @@ const ClassificationResultTable = ({ results }: ClassificationResultTableProps) 
                     {column.label} {sortIcon(column.key)}
                     {column.isOriginal && (
                       <span className="text-xs text-blue-600 font-normal">(Original)</span>
+                    )}
+                    {column.key.startsWith('keyword') && (
+                      <span className="text-xs text-orange-600 font-normal">(Exclusion)</span>
                     )}
                   </div>
                 </TableHead>
