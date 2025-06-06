@@ -76,6 +76,20 @@ export interface ClassificationConfig {
   maxRetries?: number;
 }
 
+export interface DataIntegrityReport {
+  totalResults: number;
+  expectedResults: number;
+  allHaveRowIndex: boolean;
+  allHaveOriginalData: boolean;
+  allHaveKeywordExclusion: boolean;
+  rowIndexRange: {
+    min: number;
+    max: number;
+  };
+  missingRowIndexes: number[];
+  duplicateRowIndexes: number[];
+}
+
 export interface EnhancedBatchStatistics {
   totalProcessed: number;
   businessCount: number;
@@ -91,6 +105,7 @@ export interface EnhancedBatchStatistics {
   deduplicationSavings?: number;
   cacheSavings?: number;
   retryCount?: number;
+  dataIntegrity?: DataIntegrityReport;
   similarityStats?: {
     averageLevenshtein: number;
     averageJaroWinkler: number;
