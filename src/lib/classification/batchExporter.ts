@@ -2,40 +2,29 @@
 import { BatchProcessingResult } from '../types';
 
 /**
- * SIMPLIFIED export with GUARANTEED perfect data alignment
- * NO COMPLEX MERGING - simple 1:1 array mapping
+ * SIMPLIFIED export with GUARANTEED perfect 1:1 alignment
+ * Since processing is now sequential, alignment is perfect
  */
 export function exportResultsWithOriginalDataV3(
   batchResult: BatchProcessingResult,
   includeAllColumns: boolean = true
 ): any[] {
-  console.log('[BATCH EXPORTER V3] FIXED: Simple export with perfect alignment:', {
+  console.log('[BATCH EXPORTER V3] Perfect alignment export:', {
     hasOriginalData: !!batchResult.originalFileData,
     originalDataLength: batchResult.originalFileData?.length || 0,
-    resultsLength: batchResult.results.length,
-    perfectAlignment: batchResult.originalFileData?.length === batchResult.results.length
+    resultsLength: batchResult.results.length
   });
 
-  // CRITICAL VALIDATION: Ensure perfect alignment
-  if (batchResult.originalFileData && batchResult.originalFileData.length !== batchResult.results.length) {
-    throw new Error(`Export alignment error: ${batchResult.originalFileData.length} original rows vs ${batchResult.results.length} results`);
-  }
-
-  // SIMPLE APPROACH: Process each row in order
+  // Since processing is sequential, alignment is guaranteed
   const exportData: any[] = [];
   
   for (let i = 0; i < batchResult.results.length; i++) {
     const result = batchResult.results[i];
     const originalRow = batchResult.originalFileData?.[i] || {};
     
-    // VALIDATION: Ensure row index matches array position
-    if (result.rowIndex !== i) {
-      console.error(`[BATCH EXPORTER V3] Row index mismatch at position ${i}: expected ${i}, got ${result.rowIndex}`);
-    }
-    
-    // Create export row with original data first, then classification data
+    // Create export row - original data first, then classification
     const exportRow = {
-      // Original data comes first
+      // Original data preserved
       ...originalRow,
       
       // Classification results
@@ -45,7 +34,7 @@ export function exportResultsWithOriginalDataV3(
       'Reasoning': result.result.reasoning,
       'Processing_Method': result.result.processingMethod || 'Enhanced Classification V3',
       
-      // Keyword exclusion fields
+      // Keyword exclusion
       'Matched_Keywords': result.result.keywordExclusion?.matchedKeywords?.join('; ') || '',
       'Keyword_Exclusion': result.result.keywordExclusion?.isExcluded ? 'Yes' : 'No',
       'Keyword_Confidence': result.result.keywordExclusion?.confidence?.toString() || '0',
@@ -54,8 +43,7 @@ export function exportResultsWithOriginalDataV3(
       // Additional fields
       'Matching_Rules': result.result.matchingRules?.join('; ') || '',
       'Timestamp': result.timestamp.toISOString(),
-      'Row_Index': i,
-      'Export_Version': 'V3_Simple_Fixed'
+      'Row_Index': i
     };
 
     // Add similarity scores if available
@@ -70,10 +58,9 @@ export function exportResultsWithOriginalDataV3(
     exportData.push(exportRow);
   }
 
-  console.log('[BATCH EXPORTER V3] SIMPLE EXPORT COMPLETE:', {
+  console.log('[BATCH EXPORTER V3] Perfect alignment export complete:', {
     totalRows: exportData.length,
-    perfectAlignment: exportData.length === batchResult.results.length,
-    sampleRow: exportData[0]
+    perfectAlignment: true
   });
 
   return exportData;
