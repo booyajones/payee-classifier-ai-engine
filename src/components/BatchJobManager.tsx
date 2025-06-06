@@ -1,5 +1,3 @@
-
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -251,7 +249,7 @@ const BatchJobManager = ({
                 classification: rawResult?.classification || 'Individual',
                 confidence: rawResult?.confidence || 50,
                 reasoning: 'Safe processing applied due to errors',
-                processingTier: 'Safe Mode',
+                processingTier: 'Failed',
                 processingMethod: 'Safe Fallback Processing',
                 keywordExclusion: safeKeywordExclusion(name)
               },
@@ -563,4 +561,3 @@ const BatchJobManager = ({
 };
 
 export default BatchJobManager;
-
