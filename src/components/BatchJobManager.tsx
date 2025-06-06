@@ -60,6 +60,24 @@ const BatchJobManager = ({
     isRetrying: isDownloadRetrying
   } = useRetry(getBatchJobResults, { maxRetries: 3, baseDelay: 2000 });
 
+  // Sort jobs by creation date (most recent first)
+  const sortedJobs = [...jobs].sort((a, b) => {
+    const dateA = new Date(a.created_at * 1000).getTime();
+    const dateB = new Date(b.created_at * 1000).getTime();
+    return dateB - dateA; // Descending order (newest first)
+  });
+
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   const handleRefreshJob = async (jobId: string) => {
     setRefreshingJobs(prev => new Set(prev).add(jobId));
     try {
@@ -303,9 +321,9 @@ const BatchJobManager = ({
   return (
     <>
       <div className="space-y-4">
-        <h3 className="text-lg font-medium">Enhanced Batch Jobs (All Saved)</h3>
+        <h3 className="text-lg font-medium">Enhanced Batch Jobs (All Saved) - Latest First</h3>
         
-        {jobs.map((job) => {
+        {sortedJobs.map((job) => {
           const pollingState = pollingStates[job.id];
           const isJobRefreshing = refreshingJobs.has(job.id);
           const isJobDownloading = downloadingJobs.has(job.id);
@@ -328,6 +346,10 @@ const BatchJobManager = ({
                     <CardDescription>
                       {job.metadata?.description || 'Payee classification batch'} • {payeeCount} payees
                       {hasOriginalData && <span className="text-green-600"> • Original data preserved</span>}
+                      <br />
+                      <span className="text-xs text-muted-foreground">
+                        Created: {formatDate(job.created_at)}
+                      </span>
                     </CardDescription>
                     {pollingState?.lastError && (
                       <p className="text-xs text-red-600 mt-1">
