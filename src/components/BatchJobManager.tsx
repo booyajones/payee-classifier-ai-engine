@@ -46,8 +46,8 @@ const BatchJobManager = ({
   });
   const { toast } = useToast();
 
-  // Use the centralized polling hook
-  const { pollingStates } = useBatchJobPolling(jobs, onJobUpdate);
+  // Use the simplified polling hook for manual refresh only
+  const { pollingStates, refreshSpecificJob } = useBatchJobPolling(jobs, onJobUpdate);
 
   // Retry mechanism for operations
   const {
@@ -79,32 +79,37 @@ const BatchJobManager = ({
   };
 
   const handleRefreshJob = async (jobId: string) => {
-    setRefreshingJobs(prev => new Set(prev).add(jobId));
-    try {
-      console.log(`[BATCH MANAGER] Refreshing job ${jobId}`);
-      const updatedJob = await refreshJobWithRetry(jobId);
-      onJobUpdate(updatedJob);
-      
-      toast({
-        title: "Job Status Updated",
-        description: `Job ${jobId.slice(-8)} status refreshed to "${updatedJob.status}".`,
-      });
-    } catch (error) {
-      const appError = handleError(error, 'Job Status Refresh');
-      console.error(`[BATCH MANAGER] Error refreshing job ${jobId}:`, error);
-      
-      showRetryableErrorToast(
-        appError, 
-        () => handleRefreshJob(jobId),
-        'Job Refresh'
-      );
-    } finally {
-      setRefreshingJobs(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(jobId);
-        return newSet;
-      });
-    }
+    const refreshFunction = async () => {
+      setRefreshingJobs(prev => new Set(prev).add(jobId));
+      try {
+        console.log(`[BATCH MANAGER] Manual refresh for job ${jobId}`);
+        const updatedJob = await refreshJobWithRetry(jobId);
+        onJobUpdate(updatedJob);
+        
+        toast({
+          title: "Job Status Updated",
+          description: `Job ${jobId.slice(-8)} status refreshed to "${updatedJob.status}".`,
+        });
+      } catch (error) {
+        const appError = handleError(error, 'Job Status Refresh');
+        console.error(`[BATCH MANAGER] Error refreshing job ${jobId}:`, error);
+        
+        showRetryableErrorToast(
+          appError, 
+          () => handleRefreshJob(jobId),
+          'Job Refresh'
+        );
+        throw error; // Re-throw to let polling hook handle the error state
+      } finally {
+        setRefreshingJobs(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(jobId);
+          return newSet;
+        });
+      }
+    };
+
+    await refreshSpecificJob(jobId, refreshFunction);
   };
 
   const handleDownloadResults = async (job: BatchJob) => {
@@ -337,11 +342,6 @@ const BatchJobManager = ({
                   <div>
                     <CardTitle className="text-sm">
                       Job {job.id.slice(-8)}
-                      {pollingState?.isPolling && (
-                        <span className="ml-2 text-xs text-blue-600">
-                          (Auto-refreshing #{pollingState.pollCount})
-                        </span>
-                      )}
                     </CardTitle>
                     <CardDescription>
                       {job.metadata?.description || 'Payee classification batch'} • {payeeCount} payees
@@ -353,7 +353,7 @@ const BatchJobManager = ({
                     </CardDescription>
                     {pollingState?.lastError && (
                       <p className="text-xs text-red-600 mt-1">
-                        Polling error: {pollingState.lastError}
+                        Last refresh error: {pollingState.lastError}
                       </p>
                     )}
                   </div>
@@ -390,12 +390,12 @@ const BatchJobManager = ({
                     onClick={() => handleRefreshJob(job.id)}
                     disabled={isJobRefreshing || pollingState?.isPolling}
                   >
-                    {isJobRefreshing ? (
+                    {isJobRefreshing || pollingState?.isPolling ? (
                       <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                     ) : (
                       <RefreshCw className="h-3 w-3 mr-1" />
                     )}
-                    {isJobRefreshing ? 'Refreshing...' : 'Refresh'}
+                    {isJobRefreshing || pollingState?.isPolling ? 'Refreshing...' : 'Refresh Status'}
                   </Button>
 
                   {job.status === 'completed' && (
