@@ -7,7 +7,6 @@ import { useToast } from "@/components/ui/use-toast";
 import { CheckCircle, XCircle, Clock, Download, RefreshCw, Trash, Loader2, AlertTriangle } from "lucide-react";
 import { BatchJob, checkBatchJobStatus, getBatchJobResults, cancelBatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
-import { enhancedClassifyPayeeV3 } from "@/lib/classification/enhancedClassificationV3";
 import { useBatchJobPolling } from "@/hooks/useBatchJobPolling";
 import { handleError, showErrorToast, showRetryableErrorToast } from "@/lib/errorHandler";
 import { useRetry } from "@/hooks/useRetry";
@@ -79,38 +78,28 @@ const BatchJobManager = ({
     });
   };
 
-  // Enhanced original data recovery function
-  const recoverOriginalData = (payeeNames: string[]): any[] => {
-    console.log(`[RECOVERY] Generating fallback original data for ${payeeNames.length} payees`);
+  // FIXED: Safe original data recovery without complex fallbacks
+  const ensureOriginalData = (payeeNames: string[], existingData?: any[]): any[] => {
+    if (existingData && existingData.length === payeeNames.length) {
+      console.log(`[RECOVERY] Using preserved original data: ${existingData.length} rows`);
+      return existingData;
+    }
+    
+    console.log(`[RECOVERY] Creating minimal fallback for ${payeeNames.length} payees`);
     return payeeNames.map((name, index) => ({
       PayeeName: name,
       RowIndex: index,
-      DataSource: 'Recovered',
-      RecoveryNote: 'Original data was missing - basic structure generated'
+      RecoveryApplied: true
     }));
   };
 
-  // Safe keyword exclusion processing
-  const safeKeywordExclusion = (name: string) => {
-    try {
-      const result = {
-        isExcluded: false,
-        matchedKeywords: [],
-        confidence: 0,
-        reasoning: 'Safe processing - no exclusion applied'
-      };
-      console.log(`[SAFE EXCLUSION] Processed "${name}" safely`);
-      return result;
-    } catch (error) {
-      console.warn(`[SAFE EXCLUSION] Error processing "${name}":`, error);
-      return {
-        isExcluded: false,
-        matchedKeywords: [],
-        confidence: 0,
-        reasoning: 'Error in exclusion check - defaulted to not excluded'
-      };
-    }
-  };
+  // FIXED: Safe keyword exclusion processing (simplified)
+  const safeKeywordExclusion = () => ({
+    isExcluded: false,
+    matchedKeywords: [],
+    confidence: 0,
+    reasoning: 'Safe processing applied'
+  });
 
   const handleRefreshJob = async (jobId: string) => {
     const refreshFunction = async () => {
@@ -146,12 +135,13 @@ const BatchJobManager = ({
     await refreshSpecificJob(jobId, refreshFunction);
   };
 
+  // FIXED: Single pipeline processing - no dual classification conflicts
   const handleDownloadResults = async (job: BatchJob) => {
     setDownloadingJobs(prev => new Set(prev).add(job.id));
     setDownloadProgress(prev => ({ ...prev, [job.id]: { current: 0, total: 0 } }));
     
     try {
-      console.log(`[BATCH MANAGER] Starting enhanced download for job ${job.id}`);
+      console.log(`[BATCH MANAGER] FIXED: Single pipeline download for job ${job.id}`);
       const payeeNames = payeeNamesMap[job.id] || [];
       let originalFileData = originalFileDataMap[job.id] || [];
       
@@ -159,146 +149,95 @@ const BatchJobManager = ({
         throw new Error('No payee names found for this job. The job data may be corrupted.');
       }
 
-      // Data recovery if original data is missing
-      if (originalFileData.length === 0) {
-        console.warn(`[BATCH MANAGER] Missing original data for job ${job.id}, implementing recovery`);
-        originalFileData = recoverOriginalData(payeeNames);
-        
-        toast({
-          title: "Data Recovery Applied",
-          description: `Original file data was missing for job ${job.id.slice(-8)}. Generated fallback structure.`,
-          variant: "destructive",
-        });
-      }
-
-      console.log(`[BATCH MANAGER] Processing ${payeeNames.length} payees with ${originalFileData.length} data rows`);
+      // FIXED: Ensure original data alignment
+      originalFileData = ensureOriginalData(payeeNames, originalFileData);
+      
+      console.log(`[BATCH MANAGER] FIXED: Processing ${payeeNames.length} payees with ${originalFileData.length} aligned data rows`);
       setDownloadProgress(prev => ({ ...prev, [job.id]: { current: 0, total: payeeNames.length } }));
 
-      // Get raw OpenAI results with timeout
-      const startTime = Date.now();
-      const rawResults = await Promise.race([
-        downloadResultsWithRetry(job, payeeNames),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Download timeout after 30 seconds')), 30000)
-        )
-      ]) as any[];
+      // STEP 1: Get OpenAI Batch Results (single source of truth)
+      console.log(`[BATCH MANAGER] FIXED: Downloading OpenAI batch results (single pipeline)`);
+      const rawResults = await downloadResultsWithRetry(job, payeeNames);
       
-      console.log(`[BATCH MANAGER] Retrieved ${rawResults.length} raw results in ${Date.now() - startTime}ms`);
-      
-      // Process classifications with progress updates and safe processing
+      if (rawResults.length !== payeeNames.length) {
+        throw new Error(`OpenAI results misalignment: expected ${payeeNames.length}, got ${rawResults.length}`);
+      }
+
+      // STEP 2: Create PayeeClassification array with perfect alignment
       const classifications: PayeeClassification[] = [];
-      const batchSize = 100; // Process in batches of 100
       
-      for (let batchStart = 0; batchStart < payeeNames.length; batchStart += batchSize) {
-        const batchEnd = Math.min(batchStart + batchSize, payeeNames.length);
-        console.log(`[BATCH MANAGER] Processing batch ${Math.floor(batchStart/batchSize) + 1}/${Math.ceil(payeeNames.length/batchSize)}`);
+      for (let i = 0; i < payeeNames.length; i++) {
+        const payeeName = payeeNames[i];
+        const rawResult = rawResults[i];
+        const originalData = originalFileData[i];
         
-        for (let index = batchStart; index < batchEnd; index++) {
-          const name = payeeNames[index];
-          const rawResult = rawResults[index];
-          const originalData = originalFileData[index] || { PayeeName: name, RowIndex: index };
-          
-          try {
-            // Safe enhanced classification with timeout
-            const enhancedResult = await Promise.race([
-              enhancedClassifyPayeeV3(name, {
-                aiThreshold: 80,
-                bypassRuleNLP: true,
-                useEnhanced: true,
-                offlineMode: false,
-                useFuzzyMatching: true,
-                similarityThreshold: 85
-              }),
-              new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Classification timeout')), 5000)
-              )
-            ]) as any;
-            
-            // Safe keyword exclusion processing
-            const safeKeywordResult = safeKeywordExclusion(name);
-            enhancedResult.keywordExclusion = safeKeywordResult;
-            
-            // Use OpenAI result if available and not excluded
-            if (rawResult?.status === 'success' && !safeKeywordResult.isExcluded) {
-              enhancedResult.classification = rawResult.classification;
-              enhancedResult.confidence = Math.max(rawResult.confidence, enhancedResult.confidence);
-              enhancedResult.reasoning = `OpenAI: ${rawResult.reasoning}. Enhanced: ${enhancedResult.reasoning}`;
-              enhancedResult.processingTier = 'AI-Powered';
-              enhancedResult.processingMethod = 'OpenAI Batch API + Enhanced Analysis (Recovered)';
-            }
-            
-            const payeeClassification: PayeeClassification = {
-              id: `safe-${job.id}-${index}`,
-              payeeName: name,
-              result: enhancedResult,
-              timestamp: new Date(),
-              originalData,
-              rowIndex: index
-            };
-            
-            classifications.push(payeeClassification);
-            
-          } catch (enhancementError) {
-            console.warn(`[BATCH MANAGER] Safe fallback for "${name}":`, enhancementError);
-            
-            // Ultra-safe fallback
-            const safeFallback: PayeeClassification = {
-              id: `safe-fallback-${job.id}-${index}`,
-              payeeName: name,
-              result: {
-                classification: rawResult?.classification || 'Individual',
-                confidence: rawResult?.confidence || 50,
-                reasoning: 'Safe processing applied due to errors',
-                processingTier: 'Failed',
-                processingMethod: 'Safe Fallback Processing',
-                keywordExclusion: safeKeywordExclusion(name)
-              },
-              timestamp: new Date(),
-              originalData,
-              rowIndex: index
-            };
-            
-            classifications.push(safeFallback);
-          }
-          
-          // Update progress
-          setDownloadProgress(prev => ({ 
-            ...prev, 
-            [job.id]: { current: index + 1, total: payeeNames.length } 
-          }));
+        // FIXED: Use OpenAI results directly, no dual processing
+        const classification: PayeeClassification = {
+          id: `openai-${job.id}-${i}`,
+          payeeName: payeeName,
+          result: {
+            classification: rawResult?.classification || 'Individual',
+            confidence: rawResult?.confidence || 50,
+            reasoning: rawResult?.reasoning || 'OpenAI batch processing result',
+            processingTier: rawResult?.status === 'success' ? 'AI-Powered' : 'Failed',
+            processingMethod: 'OpenAI Batch API (Single Pipeline)',
+            keywordExclusion: safeKeywordExclusion()
+          },
+          timestamp: new Date(),
+          originalData: originalData,
+          rowIndex: i
+        };
+        
+        classifications.push(classification);
+        
+        // Update progress
+        setDownloadProgress(prev => ({ 
+          ...prev, 
+          [job.id]: { current: i + 1, total: payeeNames.length } 
+        }));
+      }
+
+      // VALIDATION: Ensure perfect alignment
+      if (classifications.length !== payeeNames.length) {
+        throw new Error(`Classification alignment error: expected ${payeeNames.length}, got ${classifications.length}`);
+      }
+
+      for (let i = 0; i < classifications.length; i++) {
+        if (classifications[i].rowIndex !== i) {
+          throw new Error(`Row index mismatch at position ${i}`);
         }
-        
-        // Brief pause between batches to prevent UI freezing
-        await new Promise(resolve => setTimeout(resolve, 10));
+        if (classifications[i].payeeName !== payeeNames[i]) {
+          throw new Error(`Payee name mismatch at position ${i}`);
+        }
       }
 
       const successCount = classifications.filter(c => c.result.processingTier !== 'Failed').length;
       const failureCount = classifications.length - successCount;
 
-      // Create summary with guaranteed original data
+      // FIXED: Create summary with guaranteed alignment
       const summary: BatchProcessingResult = {
         results: classifications,
         successCount,
         failureCount,
-        originalFileData
+        originalFileData: originalFileData
       };
 
-      console.log(`[BATCH MANAGER] Safe processing complete: ${successCount} successes, ${failureCount} failures`);
+      console.log(`[BATCH MANAGER] FIXED: Single pipeline processing complete - perfect alignment guaranteed`);
 
       onJobComplete(classifications, summary, job.id);
 
       toast({
-        title: "Download Complete with Recovery",
-        description: `Downloaded ${successCount} classifications successfully${failureCount > 0 ? ` (${failureCount} required fallback)` : ''}.`,
+        title: "Download Complete (Single Pipeline)",
+        description: `Downloaded ${successCount} classifications using OpenAI Batch API${failureCount > 0 ? ` (${failureCount} failed)` : ''}.`,
       });
       
     } catch (error) {
       const appError = handleError(error, 'Results Download');
-      console.error(`[BATCH MANAGER] Download error for job ${job.id}:`, error);
+      console.error(`[BATCH MANAGER] FIXED: Download error for job ${job.id}:`, error);
       
       toast({
         title: "Download Failed",
-        description: `Job ${job.id.slice(-8)} download failed: ${appError.message}. The job may be too large or have corrupted data.`,
+        description: `Job ${job.id.slice(-8)} download failed: ${appError.message}`,
         variant: "destructive",
       });
       
@@ -394,7 +333,7 @@ const BatchJobManager = ({
   return (
     <>
       <div className="space-y-4">
-        <h3 className="text-lg font-medium">Enhanced Batch Jobs (All Saved) - Latest First</h3>
+        <h3 className="text-lg font-medium">Batch Jobs (Single Pipeline) - Latest First</h3>
         
         {sortedJobs.map((job) => {
           const pollingState = pollingStates[job.id];
@@ -417,7 +356,7 @@ const BatchJobManager = ({
                       {hasOriginalData ? (
                         <span className="text-green-600"> • Original data preserved</span>
                       ) : (
-                        <span className="text-orange-600"> • Original data missing (recovery available)</span>
+                        <span className="text-orange-600"> • Fallback data available</span>
                       )}
                       <br />
                       <span className="text-xs text-muted-foreground">
@@ -436,14 +375,6 @@ const BatchJobManager = ({
                       <p className="text-xs text-red-600 mt-1">
                         Last refresh error: {pollingState.lastError}
                       </p>
-                    )}
-                    {!hasOriginalData && job.status === 'completed' && (
-                      <div className="flex items-center gap-1 mt-1">
-                        <AlertTriangle className="h-3 w-3 text-orange-500" />
-                        <span className="text-xs text-orange-600">
-                          Data recovery will be applied during download
-                        </span>
-                      </div>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
@@ -475,7 +406,7 @@ const BatchJobManager = ({
                 {progress && (
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span>Processing payees...</span>
+                      <span>Processing results...</span>
                       <span>{progress.current}/{progress.total}</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
@@ -515,7 +446,7 @@ const BatchJobManager = ({
                       )}
                       {isJobDownloading 
                         ? (progress ? `Processing ${progress.current}/${progress.total}...` : 'Processing...')
-                        : (hasOriginalData ? 'Download Complete Results' : 'Download with Recovery')
+                        : 'Download Results (Single Pipeline)'
                       }
                     </Button>
                   )}
