@@ -2,41 +2,42 @@
 import { BatchProcessingResult } from '../types';
 
 /**
- * Export results with original file data for V3 (Enhanced with keyword exclusion)
+ * GUARANTEED export with ALL original data + enhanced fields including keyword exclusions
  */
 export function exportResultsWithOriginalDataV3(
   batchResult: BatchProcessingResult,
   includeAllColumns: boolean = true
 ): any[] {
-  console.log('[BATCH EXPORTER V3] Processing enhanced batch result:', {
+  console.log('[BATCH EXPORTER V3] GUARANTEE: Processing batch result with complete data:', {
     hasOriginalData: !!batchResult.originalFileData,
     originalDataLength: batchResult.originalFileData?.length || 0,
     resultsLength: batchResult.results.length,
-    hasEnhancedResults: batchResult.results.some(r => !!r.result.keywordExclusion)
+    allResultsHaveOriginalData: batchResult.results.every(r => !!r.originalData),
+    allResultsHaveKeywordExclusion: batchResult.results.every(r => !!r.result.keywordExclusion)
   });
 
   if (!batchResult.originalFileData || batchResult.originalFileData.length === 0) {
-    console.log('[BATCH EXPORTER V3] No original file data, creating comprehensive enhanced export');
-    // If no original file data, create a comprehensive export with enhanced fields
+    console.log('[BATCH EXPORTER V3] No batch-level original data, using row-level original data');
+    // Use individual row original data
     return batchResult.results.map(result => {
-      console.log('[BATCH EXPORTER V3] Processing enhanced result:', {
-        payeeName: result.payeeName,
-        hasKeywordExclusion: !!result.result.keywordExclusion,
-        hasOriginalData: !!result.originalData,
-        keywordExclusionData: result.result.keywordExclusion
-      });
-
       const exportRow = {
-        'Original_Name': result.payeeName,
+        // GUARANTEE: Original data from the row
+        ...result.originalData,
+        
+        // GUARANTEE: Enhanced classification fields
         'Classification': result.result.classification,
         'Confidence_%': result.result.confidence,
         'Processing_Tier': result.result.processingTier,
         'Reasoning': result.result.reasoning,
         'Processing_Method': result.result.processingMethod || 'Enhanced Classification V3',
+        
+        // GUARANTEE: Keyword exclusion fields (always present)
         'Matched_Keywords': result.result.keywordExclusion?.matchedKeywords?.join('; ') || '',
         'Keyword_Exclusion': result.result.keywordExclusion?.isExcluded ? 'Yes' : 'No',
         'Keyword_Confidence': result.result.keywordExclusion?.confidence?.toString() || '0',
         'Keyword_Reasoning': result.result.keywordExclusion?.reasoning || 'No keyword exclusion applied',
+        
+        // Enhanced analysis fields
         'Matching_Rules': result.result.matchingRules?.join('; ') || '',
         'Timestamp': result.timestamp.toISOString()
       };
@@ -48,30 +49,25 @@ export function exportResultsWithOriginalDataV3(
         exportRow['Dice_Coefficient'] = result.result.similarityScores.dice?.toFixed(2) || '';
         exportRow['Token_Sort_Ratio'] = result.result.similarityScores.tokenSort?.toFixed(2) || '';
         exportRow['Combined_Similarity'] = result.result.similarityScores.combined?.toFixed(2) || '';
-      } else {
-        exportRow['Levenshtein_Score'] = '';
-        exportRow['Jaro_Winkler_Score'] = '';
-        exportRow['Dice_Coefficient'] = '';
-        exportRow['Token_Sort_Ratio'] = '';
-        exportRow['Combined_Similarity'] = '';
       }
 
-      // Include original data if present
-      if (result.originalData) {
-        Object.assign(exportRow, result.originalData);
-      }
+      console.log('[BATCH EXPORTER V3] Row export includes:', {
+        originalDataKeys: Object.keys(result.originalData || {}),
+        hasKeywordExclusion: !!result.result.keywordExclusion,
+        keywordExclusionStatus: exportRow['Keyword_Exclusion']
+      });
 
       return exportRow;
     });
   }
 
-  console.log('[BATCH EXPORTER V3] Merging original data with enhanced classification results');
-  // Merge original data with enhanced classification results
+  console.log('[BATCH EXPORTER V3] GUARANTEE: Merging batch-level original data with enhanced results');
+  // Merge batch-level original data with enhanced classification results
   return batchResult.originalFileData.map((originalRow, index) => {
     const result = batchResult.results.find(r => r.rowIndex === index);
 
     if (!result) {
-      console.log('[BATCH EXPORTER V3] No result found for row index:', index);
+      console.error('[BATCH EXPORTER V3] CRITICAL: No result found for row index:', index);
       // Emergency fallback with proper enhanced structure
       return {
         ...originalRow,
@@ -85,33 +81,33 @@ export function exportResultsWithOriginalDataV3(
         'Keyword_Confidence': '0',
         'Keyword_Reasoning': 'No result found',
         'Matching_Rules': '',
-        'Levenshtein_Score': '',
-        'Jaro_Winkler_Score': '',
-        'Dice_Coefficient': '',
-        'Token_Sort_Ratio': '',
-        'Combined_Similarity': '',
         'Timestamp': new Date().toISOString()
       };
     }
 
-    console.log('[BATCH EXPORTER V3] Processing enhanced result for row', index, ':', {
+    console.log('[BATCH EXPORTER V3] GUARANTEE: Merging data for row', index, ':', {
       payeeName: result.payeeName,
       hasKeywordExclusion: !!result.result.keywordExclusion,
-      keywordExclusionData: result.result.keywordExclusion,
-      hasOriginalData: !!result.originalData,
-      processingTier: result.result.processingTier
+      isExcluded: result.result.keywordExclusion?.isExcluded,
+      matchedKeywords: result.result.keywordExclusion?.matchedKeywords,
+      originalDataKeys: Object.keys(originalRow)
     });
 
     const enhancedData = {
+      // GUARANTEE: All enhanced classification fields
       'Classification': result.result.classification,
       'Confidence_%': result.result.confidence,
       'Processing_Tier': result.result.processingTier,
       'Reasoning': result.result.reasoning,
       'Processing_Method': result.result.processingMethod || 'Enhanced Classification V3',
+      
+      // GUARANTEE: Keyword exclusion fields (mandatory)
       'Matched_Keywords': result.result.keywordExclusion?.matchedKeywords?.join('; ') || '',
       'Keyword_Exclusion': result.result.keywordExclusion?.isExcluded ? 'Yes' : 'No',
       'Keyword_Confidence': result.result.keywordExclusion?.confidence?.toString() || '0',
       'Keyword_Reasoning': result.result.keywordExclusion?.reasoning || 'No keyword exclusion applied',
+      
+      // Additional analysis fields
       'Matching_Rules': result.result.matchingRules?.join('; ') || '',
       'Timestamp': result.timestamp.toISOString()
     };
@@ -123,24 +119,21 @@ export function exportResultsWithOriginalDataV3(
       enhancedData['Dice_Coefficient'] = result.result.similarityScores.dice?.toFixed(2) || '';
       enhancedData['Token_Sort_Ratio'] = result.result.similarityScores.tokenSort?.toFixed(2) || '';
       enhancedData['Combined_Similarity'] = result.result.similarityScores.combined?.toFixed(2) || '';
-    } else {
-      enhancedData['Levenshtein_Score'] = '';
-      enhancedData['Jaro_Winkler_Score'] = '';
-      enhancedData['Dice_Coefficient'] = '';
-      enhancedData['Token_Sort_Ratio'] = '';
-      enhancedData['Combined_Similarity'] = '';
     }
 
+    // GUARANTEE: Merge original data with enhanced data
     const finalRow = includeAllColumns 
       ? { ...originalRow, ...enhancedData }
       : enhancedData;
 
-    console.log('[BATCH EXPORTER V3] Final enhanced row data for index', index, ':', {
-      hasOriginalColumns: Object.keys(originalRow).length,
-      hasEnhancedColumns: Object.keys(enhancedData).length,
+    console.log('[BATCH EXPORTER V3] FINAL ROW:', {
+      index,
+      originalColumns: Object.keys(originalRow).length,
+      enhancedColumns: Object.keys(enhancedData).length,
       totalColumns: Object.keys(finalRow).length,
       keywordExclusion: finalRow['Keyword_Exclusion'],
-      matchedKeywords: finalRow['Matched_Keywords']
+      matchedKeywords: finalRow['Matched_Keywords'],
+      hasAllOriginalData: Object.keys(originalRow).every(key => finalRow.hasOwnProperty(key))
     });
     
     return finalRow;

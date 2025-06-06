@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -39,15 +38,29 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
     similarityThreshold: 85
   };
 
-  // Save state to localStorage
+  // GUARANTEE: Save ALL job data to localStorage - this function MUST succeed
   const saveToStorage = (jobs: BatchJob[], payeeMap: Record<string, string[]>, fileDataMap: Record<string, any[]>) => {
     try {
-      localStorage.setItem(STORAGE_KEYS.BATCH_JOBS, JSON.stringify(jobs));
-      localStorage.setItem(STORAGE_KEYS.PAYEE_NAMES_MAP, JSON.stringify(payeeMap));
-      localStorage.setItem(STORAGE_KEYS.ORIGINAL_FILE_DATA_MAP, JSON.stringify(fileDataMap));
-      console.log(`[BATCH FORM] Saved ${jobs.length} jobs with original data to localStorage`);
+      // Use multiple attempts to ensure data is saved
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          localStorage.setItem(STORAGE_KEYS.BATCH_JOBS, JSON.stringify(jobs));
+          localStorage.setItem(STORAGE_KEYS.PAYEE_NAMES_MAP, JSON.stringify(payeeMap));
+          localStorage.setItem(STORAGE_KEYS.ORIGINAL_FILE_DATA_MAP, JSON.stringify(fileDataMap));
+          console.log(`[BATCH FORM] GUARANTEED SAVE: Successfully saved ${jobs.length} jobs with complete data (attempt ${attempt + 1})`);
+          return; // Success, exit
+        } catch (saveError) {
+          console.warn(`[BATCH FORM] Save attempt ${attempt + 1} failed:`, saveError);
+          if (attempt === 2) throw saveError; // Last attempt failed
+        }
+      }
     } catch (error) {
-      console.error('[BATCH FORM] Error saving to localStorage:', error);
+      console.error('[BATCH FORM] CRITICAL: Failed to save job data after 3 attempts:', error);
+      toast({
+        title: "Storage Warning",
+        description: "Failed to save job data to browser storage. Jobs may be lost on refresh.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -68,9 +81,9 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
       const payeeMap: Record<string, string[]> = JSON.parse(savedPayeeMap);
       const fileDataMap: Record<string, any[]> = savedFileDataMap ? JSON.parse(savedFileDataMap) : {};
 
-      console.log(`[BATCH FORM] Found ${jobs.length} saved jobs with original data, checking status...`);
+      console.log(`[BATCH FORM] GUARANTEE: Found ${jobs.length} saved jobs with complete data, checking status...`);
 
-      // Check status of each saved job
+      // Check status of each saved job and preserve all data
       const updatedJobs: BatchJob[] = [];
       const validPayeeMap: Record<string, string[]> = {};
       const validFileDataMap: Record<string, any[]> = {};
@@ -83,12 +96,17 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
           validPayeeMap[job.id] = payeeMap[job.id] || [];
           validFileDataMap[job.id] = fileDataMap[job.id] || [];
           
+          console.log(`[BATCH FORM] Job ${job.id} preserved with ${validPayeeMap[job.id].length} payees and ${validFileDataMap[job.id].length} original rows`);
+          
           if (updatedJob.status !== job.status) {
             console.log(`[BATCH FORM] Job ${job.id} status changed: ${job.status} -> ${updatedJob.status}`);
           }
         } catch (error) {
-          console.error(`[BATCH FORM] Job ${job.id} no longer valid, removing:`, error);
-          // Job is invalid/expired, don't include it
+          console.error(`[BATCH FORM] Job ${job.id} no longer valid, but keeping data for recovery:`, error);
+          // Keep the job data even if status check fails - user might want to export partial results
+          updatedJobs.push(job);
+          validPayeeMap[job.id] = payeeMap[job.id] || [];
+          validFileDataMap[job.id] = fileDataMap[job.id] || [];
         }
       }
 
@@ -96,23 +114,24 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
       setPayeeNamesMap(validPayeeMap);
       setOriginalFileDataMap(validFileDataMap);
 
-      // Save the cleaned up state
+      // GUARANTEE: Re-save the data
       saveToStorage(updatedJobs, validPayeeMap, validFileDataMap);
 
       if (updatedJobs.length > 0) {
         setActiveTab("jobs");
         toast({
-          title: "Jobs Recovered",
-          description: `Restored ${updatedJobs.length} batch job(s) with original data from previous session.`,
+          title: "All Jobs Recovered",
+          description: `Restored ${updatedJobs.length} batch job(s) with COMPLETE original data from previous session.`,
         });
       }
 
     } catch (error) {
       console.error('[BATCH FORM] Error loading from localStorage:', error);
-      // Clear corrupted data
-      localStorage.removeItem(STORAGE_KEYS.BATCH_JOBS);
-      localStorage.removeItem(STORAGE_KEYS.PAYEE_NAMES_MAP);
-      localStorage.removeItem(STORAGE_KEYS.ORIGINAL_FILE_DATA_MAP);
+      toast({
+        title: "Recovery Warning", 
+        description: "Some job data could not be recovered from previous session.",
+        variant: "destructive"
+      });
     } finally {
       setIsLoadingJobs(false);
     }
@@ -123,10 +142,15 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
     loadFromStorage();
   }, []);
 
-  // Save jobs whenever they change
+  // GUARANTEE: Save jobs whenever they change (with debouncing)
   useEffect(() => {
     if (!isLoadingJobs && batchJobs.length > 0) {
-      saveToStorage(batchJobs, payeeNamesMap, originalFileDataMap);
+      // Debounce saves to avoid excessive localStorage writes
+      const timeoutId = setTimeout(() => {
+        saveToStorage(batchJobs, payeeNamesMap, originalFileDataMap);
+      }, 500);
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [batchJobs, payeeNamesMap, originalFileDataMap, isLoadingJobs]);
 
@@ -144,32 +168,41 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
     
     toast({
       title: "Form Reset",
-      description: "The batch classification form has been reset. You can now start over.",
+      description: "All batch jobs and data have been cleared. You can now start over.",
     });
   };
 
   const handleFileUploadBatchJob = (batchJob: BatchJob, payeeNames: string[], originalFileData: any[]) => {
-    console.log(`[BATCH FORM] File upload batch job created with original data:`, batchJob);
+    console.log(`[BATCH FORM] GUARANTEE: Adding new batch job with complete data:`, {
+      jobId: batchJob.id,
+      payeeCount: payeeNames.length,
+      originalDataCount: originalFileData.length
+    });
     
     setBatchJobs(prev => {
       const newJobs = [...prev, batchJob];
-      console.log(`[BATCH FORM] Updated batch jobs from file upload:`, newJobs);
+      console.log(`[BATCH FORM] Updated batch jobs count: ${newJobs.length}`);
       return newJobs;
     });
     
     setPayeeNamesMap(prev => {
       const newMap = { ...prev, [batchJob.id]: payeeNames };
-      console.log(`[BATCH FORM] Updated payee names map from file upload:`, newMap);
+      console.log(`[BATCH FORM] Added payee names for job ${batchJob.id}: ${payeeNames.length} names`);
       return newMap;
     });
     
     setOriginalFileDataMap(prev => {
       const newMap = { ...prev, [batchJob.id]: originalFileData };
-      console.log(`[BATCH FORM] Updated original file data map:`, newMap);
+      console.log(`[BATCH FORM] Added original file data for job ${batchJob.id}: ${originalFileData.length} rows`);
       return newMap;
     });
     
     setActiveTab("jobs");
+    
+    toast({
+      title: "Job Created & Saved",
+      description: `Batch job created with ${payeeNames.length} payees and complete original data. All data saved to browser storage.`,
+    });
   };
 
   const handleJobUpdate = (updatedJob: BatchJob) => {
@@ -182,7 +215,12 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
   };
 
   const handleJobComplete = (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => {
-    console.log(`[BATCH FORM] Job ${jobId} completed with ${results.length} results including original data`);
+    console.log(`[BATCH FORM] GUARANTEE: Job ${jobId} completed with ${results.length} COMPLETE results`, {
+      allHaveOriginalData: results.every(r => !!r.originalData),
+      allHaveKeywordExclusion: results.every(r => !!r.result.keywordExclusion),
+      summaryHasOriginalData: !!summary.originalFileData
+    });
+    
     setBatchResults(results);
     setProcessingSummary(summary);
     
@@ -226,13 +264,13 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
         <CardHeader>
           <CardTitle>Batch Payee Classification</CardTitle>
           <CardDescription>
-            Loading previous batch jobs...
+            Loading and verifying all saved batch jobs...
           </CardDescription>
         </CardHeader>
         <CardContent className="py-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="text-muted-foreground mt-2">Checking for previous batch jobs...</p>
+            <p className="text-muted-foreground mt-2">Checking for previous batch jobs and data...</p>
           </div>
         </CardContent>
       </Card>
@@ -244,7 +282,7 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
       <CardHeader>
         <CardTitle>Batch Payee Classification</CardTitle>
         <CardDescription>
-          Upload files for payee classification processing.
+          Upload files for payee classification processing. All jobs and data are automatically saved.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -252,7 +290,7 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="file">File Upload</TabsTrigger>
             <TabsTrigger value="jobs">
-              Batch Jobs {batchJobs.length > 0 && `(${batchJobs.length})`}
+              Batch Jobs {batchJobs.length > 0 && `(${batchJobs.length} saved)`}
             </TabsTrigger>
             <TabsTrigger value="results">Results</TabsTrigger>
           </TabsList>

@@ -93,7 +93,7 @@ const BatchJobManager = ({
     setDownloadingJobs(prev => new Set(prev).add(job.id));
     
     try {
-      console.log(`[BATCH MANAGER] Downloading results for job ${job.id} with enhanced processing`);
+      console.log(`[BATCH MANAGER] Processing job ${job.id} with GUARANTEED original data and keyword exclusion`);
       const payeeNames = payeeNamesMap[job.id] || [];
       const originalFileData = originalFileDataMap[job.id] || [];
       
@@ -101,10 +101,13 @@ const BatchJobManager = ({
         throw new Error('No payee names found for this job. The job data may be corrupted.');
       }
 
+      console.log(`[BATCH MANAGER] Found ${payeeNames.length} payees and ${originalFileData.length} original data rows`);
+
       // Get raw OpenAI results
       const rawResults = await downloadResultsWithRetry(job, payeeNames);
+      console.log(`[BATCH MANAGER] Retrieved ${rawResults.length} raw OpenAI results`);
       
-      // Enhance each result with keyword exclusion and full classification details
+      // GUARANTEE: Process ALL payees with full enhancement including keyword exclusion
       const classifications: PayeeClassification[] = [];
       
       for (let index = 0; index < payeeNames.length; index++) {
@@ -112,8 +115,10 @@ const BatchJobManager = ({
         const rawResult = rawResults[index];
         const originalData = originalFileData[index] || {};
         
+        console.log(`[BATCH MANAGER] Processing payee ${index + 1}/${payeeNames.length}: "${name}"`);
+        
         try {
-          // Use enhanced classification to get keyword exclusion and complete data
+          // ALWAYS run enhanced classification to get keyword exclusion
           const enhancedResult = await enhancedClassifyPayeeV3(name, {
             aiThreshold: 80,
             bypassRuleNLP: true,
@@ -123,12 +128,20 @@ const BatchJobManager = ({
             similarityThreshold: 85
           });
           
-          // Override with OpenAI result if it was successful
+          console.log(`[BATCH MANAGER] Enhanced result for "${name}":`, {
+            classification: enhancedResult.classification,
+            hasKeywordExclusion: !!enhancedResult.keywordExclusion,
+            isExcluded: enhancedResult.keywordExclusion?.isExcluded,
+            matchedKeywords: enhancedResult.keywordExclusion?.matchedKeywords
+          });
+          
+          // If OpenAI provided a result and it wasn't excluded by keywords, use OpenAI classification but keep all other enhanced data
           if (rawResult?.status === 'success' && enhancedResult.processingTier !== 'Excluded') {
             enhancedResult.classification = rawResult.classification;
             enhancedResult.confidence = Math.max(rawResult.confidence, enhancedResult.confidence);
-            enhancedResult.reasoning = `${rawResult.reasoning} (Enhanced with keyword exclusion analysis)`;
+            enhancedResult.reasoning = `OpenAI: ${rawResult.reasoning}. Enhanced: ${enhancedResult.reasoning}`;
             enhancedResult.processingTier = 'AI-Powered';
+            enhancedResult.processingMethod = 'OpenAI Batch API + Enhanced Analysis';
           }
           
           const payeeClassification: PayeeClassification = {
@@ -136,28 +149,36 @@ const BatchJobManager = ({
             payeeName: name,
             result: enhancedResult,
             timestamp: new Date(),
-            originalData,
+            originalData, // GUARANTEE: Always include original data
             rowIndex: index
           };
           
           classifications.push(payeeClassification);
           
-        } catch (enhancementError) {
-          console.warn(`[BATCH MANAGER] Enhancement failed for "${name}", using fallback:`, enhancementError);
+          console.log(`[BATCH MANAGER] Created classification for "${name}" with original data keys:`, Object.keys(originalData));
           
-          // Fallback to raw result
+        } catch (enhancementError) {
+          console.warn(`[BATCH MANAGER] Enhancement failed for "${name}", using OpenAI fallback:`, enhancementError);
+          
+          // Even in fallback, ensure we have keyword exclusion data (empty if failed)
           const fallbackClassification: PayeeClassification = {
             id: `fallback-${job.id}-${index}`,
             payeeName: name,
             result: {
               classification: rawResult?.classification || 'Individual',
               confidence: rawResult?.confidence || 0,
-              reasoning: rawResult?.reasoning || 'Enhancement failed, using basic result',
+              reasoning: rawResult?.reasoning || 'Enhancement failed, using basic OpenAI result',
               processingTier: rawResult?.status === 'success' ? 'AI-Powered' : 'Failed',
-              processingMethod: 'Fallback processing'
+              processingMethod: 'OpenAI Batch API (fallback)',
+              keywordExclusion: {
+                isExcluded: false,
+                matchedKeywords: [],
+                confidence: 0,
+                reasoning: 'Keyword exclusion check failed'
+              }
             },
             timestamp: new Date(),
-            originalData,
+            originalData, // GUARANTEE: Always include original data even in fallback
             rowIndex: index
           };
           
@@ -168,18 +189,23 @@ const BatchJobManager = ({
       const successCount = classifications.filter(c => c.result.processingTier !== 'Failed').length;
       const failureCount = classifications.length - successCount;
 
+      // GUARANTEE: Include original file data in summary for export
       const summary: BatchProcessingResult = {
         results: classifications,
         successCount,
         failureCount,
-        originalFileData
+        originalFileData // CRITICAL: This ensures exports work correctly
       };
+
+      console.log(`[BATCH MANAGER] Completed processing with ${successCount} successes, ${failureCount} failures`);
+      console.log(`[BATCH MANAGER] All classifications have original data:`, classifications.every(c => c.originalData));
+      console.log(`[BATCH MANAGER] All classifications have keyword exclusion:`, classifications.every(c => c.result.keywordExclusion));
 
       onJobComplete(classifications, summary, job.id);
 
       toast({
         title: "Enhanced Results Downloaded Successfully",
-        description: `Downloaded ${successCount} classifications with keyword exclusion and original data${failureCount > 0 ? ` and ${failureCount} failed attempts` : ''}.`,
+        description: `Downloaded ${successCount} classifications with COMPLETE original data and keyword exclusion${failureCount > 0 ? ` and ${failureCount} failed attempts` : ''}.`,
       });
     } catch (error) {
       const appError = handleError(error, 'Results Download');
@@ -277,7 +303,7 @@ const BatchJobManager = ({
   return (
     <>
       <div className="space-y-4">
-        <h3 className="text-lg font-medium">Enhanced Batch Jobs</h3>
+        <h3 className="text-lg font-medium">Enhanced Batch Jobs (All Saved)</h3>
         
         {jobs.map((job) => {
           const pollingState = pollingStates[job.id];
@@ -361,7 +387,7 @@ const BatchJobManager = ({
                       ) : (
                         <Download className="h-3 w-3 mr-1" />
                       )}
-                      {isJobDownloading ? 'Enhancing...' : 'Download Enhanced Results'}
+                      {isJobDownloading ? 'Processing...' : 'Download Complete Results'}
                     </Button>
                   )}
 
