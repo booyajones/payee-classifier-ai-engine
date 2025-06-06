@@ -13,114 +13,184 @@ interface ClassificationResultTableProps {
   results: PayeeClassification[];
 }
 
-type SortField = 'payeeName' | 'classification' | 'confidence' | 'processingTier';
 type SortDirection = 'asc' | 'desc';
 
 const ClassificationResultTable = ({ results }: ClassificationResultTableProps) => {
-  const [sortField, setSortField] = useState<SortField>('payeeName');
+  const [sortField, setSortField] = useState<string>('payeeName');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [selectedResult, setSelectedResult] = useState<PayeeClassification | null>(null);
   
-  const handleSort = (field: SortField) => {
+  // Filter out any potentially invalid results
+  const validResults = results.filter(result => result && result.result);
+  
+  if (validResults.length === 0) {
+    return (
+      <div className="text-center py-8 border rounded-md">
+        <p className="text-muted-foreground">No valid results to display.</p>
+      </div>
+    );
+  }
+
+  // Get all original data columns from the first result
+  const firstResult = validResults[0];
+  const originalColumns = firstResult.originalData ? Object.keys(firstResult.originalData) : [];
+  
+  console.log('[CLASSIFICATION TABLE] Original columns detected:', originalColumns);
+  console.log('[CLASSIFICATION TABLE] Sample original data:', firstResult.originalData);
+  
+  // Define classification and keyword exclusion columns
+  const classificationColumns = [
+    { key: 'classification', label: 'Classification' },
+    { key: 'confidence', label: 'Confidence' },
+    { key: 'processingTier', label: 'Processing Tier' },
+  ];
+  
+  const keywordColumns = [
+    { key: 'keywordExclusion', label: 'Excluded by Keywords' },
+    { key: 'matchedKeywords', label: 'Matched Keywords' },
+    { key: 'keywordReasoning', label: 'Keyword Reasoning' }
+  ];
+  
+  // All columns for the table
+  const allColumns = [
+    ...originalColumns.map(col => ({ key: col, label: col, isOriginal: true })),
+    ...classificationColumns.map(col => ({ ...col, isOriginal: false })),
+    ...keywordColumns.map(col => ({ ...col, isOriginal: false })),
+    { key: 'details', label: 'Details', isOriginal: false }
+  ];
+  
+  const handleSort = (field: string) => {
     if (field === sortField) {
-      // Toggle direction if clicking the same field
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
-      // Set new field and reset to ascending
       setSortField(field);
       setSortDirection('asc');
     }
   };
   
-  // Filter out any potentially invalid results and add safe comparisons
-  const validResults = results.filter(result => result && result.result);
-  
   const sortedResults = [...validResults].sort((a, b) => {
     let comparison = 0;
     
-    switch (sortField) {
-      case 'payeeName':
-        comparison = a.payeeName.localeCompare(b.payeeName);
-        break;
-      case 'classification':
-        // Add null checks to avoid accessing undefined properties
-        if (a.result && b.result) {
+    // Handle original data columns
+    if (originalColumns.includes(sortField)) {
+      const aValue = a.originalData?.[sortField] || '';
+      const bValue = b.originalData?.[sortField] || '';
+      comparison = String(aValue).localeCompare(String(bValue));
+    } else {
+      // Handle classification columns
+      switch (sortField) {
+        case 'classification':
           comparison = a.result.classification.localeCompare(b.result.classification);
-        }
-        break;
-      case 'confidence':
-        // Add null checks to avoid accessing undefined properties
-        if (a.result && b.result) {
+          break;
+        case 'confidence':
           comparison = a.result.confidence - b.result.confidence;
-        }
-        break;
-      case 'processingTier':
-        // Add null checks to avoid accessing undefined properties
-        if (a.result && b.result && a.result.processingTier && b.result.processingTier) {
-          comparison = a.result.processingTier.localeCompare(b.result.processingTier);
-        }
-        break;
+          break;
+        case 'processingTier':
+          comparison = (a.result.processingTier || '').localeCompare(b.result.processingTier || '');
+          break;
+        case 'keywordExclusion':
+          const aExcluded = a.result.keywordExclusion?.isExcluded ? 'Yes' : 'No';
+          const bExcluded = b.result.keywordExclusion?.isExcluded ? 'Yes' : 'No';
+          comparison = aExcluded.localeCompare(bExcluded);
+          break;
+        default:
+          comparison = a.payeeName.localeCompare(b.payeeName);
+      }
     }
     
     return sortDirection === 'asc' ? comparison : -comparison;
   });
   
-  const sortIcon = (field: SortField) => {
+  const sortIcon = (field: string) => {
     if (field === sortField) {
       return sortDirection === 'asc' ? <ArrowUp className="inline w-4 h-4" /> : <ArrowDown className="inline w-4 h-4" />;
     }
     return null;
   };
   
+  const renderCellValue = (result: PayeeClassification, column: any) => {
+    if (column.isOriginal) {
+      return result.originalData?.[column.key] || '';
+    }
+    
+    switch (column.key) {
+      case 'classification':
+        return (
+          <Badge variant={result.result.classification === 'Business' ? 'default' : 'secondary'}>
+            {result.result.classification}
+          </Badge>
+        );
+      case 'confidence':
+        return <ClassificationBadge confidence={result.result.confidence} />;
+      case 'processingTier':
+        return result.result.processingTier || 'N/A';
+      case 'keywordExclusion':
+        const isExcluded = result.result.keywordExclusion?.isExcluded;
+        return (
+          <Badge variant={isExcluded ? 'destructive' : 'secondary'}>
+            {isExcluded ? 'Yes' : 'No'}
+          </Badge>
+        );
+      case 'matchedKeywords':
+        const keywords = result.result.keywordExclusion?.matchedKeywords || [];
+        return keywords.length > 0 ? keywords.join(', ') : '-';
+      case 'keywordReasoning':
+        return result.result.keywordExclusion?.reasoning || '-';
+      case 'details':
+        return (
+          <Button variant="ghost" size="sm" onClick={() => setSelectedResult(result)}>
+            View Details
+          </Button>
+        );
+      default:
+        return '';
+    }
+  };
+  
   return (
     <div>
-      <div className="flex justify-end mb-4 gap-2">
-        <Button variant="outline" size="sm" onClick={() => downloadCSV(results)}>
-          <Download className="w-4 h-4 mr-2" /> Export CSV
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => downloadJSON(results)}>
-          <Download className="w-4 h-4 mr-2" /> Export JSON
-        </Button>
+      <div className="flex justify-between items-center mb-4">
+        <div className="text-sm text-muted-foreground">
+          Showing {validResults.length} results with {originalColumns.length} original columns + classification data
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => downloadCSV(results)}>
+            <Download className="w-4 h-4 mr-2" /> Export CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => downloadJSON(results)}>
+            <Download className="w-4 h-4 mr-2" /> Export JSON
+          </Button>
+        </div>
       </div>
-      <div className="border rounded-md">
+
+      <div className="border rounded-md overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="cursor-pointer" onClick={() => handleSort('payeeName')}>
-                Payee Name {sortIcon('payeeName')}
-              </TableHead>
-              <TableHead className="cursor-pointer" onClick={() => handleSort('classification')}>
-                Classification {sortIcon('classification')}
-              </TableHead>
-              <TableHead className="cursor-pointer" onClick={() => handleSort('confidence')}>
-                Confidence {sortIcon('confidence')}
-              </TableHead>
-              <TableHead className="cursor-pointer" onClick={() => handleSort('processingTier')}>
-                Processing Tier {sortIcon('processingTier')}
-              </TableHead>
-              <TableHead>Details</TableHead>
+              {allColumns.map((column) => (
+                <TableHead 
+                  key={column.key} 
+                  className="cursor-pointer whitespace-nowrap min-w-[120px]" 
+                  onClick={() => handleSort(column.key)}
+                >
+                  <div className="flex items-center gap-1">
+                    {column.label} {sortIcon(column.key)}
+                    {column.isOriginal && (
+                      <span className="text-xs text-blue-600 font-normal">(Original)</span>
+                    )}
+                  </div>
+                </TableHead>
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedResults.map((result) => (
               <TableRow key={result.id}>
-                <TableCell className="font-medium">{result.payeeName}</TableCell>
-                <TableCell>
-                  {result.result && (
-                    <Badge variant={result.result.classification === 'Business' ? 'default' : 'secondary'}>
-                      {result.result.classification}
-                    </Badge>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {result.result && <ClassificationBadge confidence={result.result.confidence} />}
-                </TableCell>
-                <TableCell>{result.result ? result.result.processingTier : 'N/A'}</TableCell>
-                <TableCell>
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedResult(result)}>
-                    View Details
-                  </Button>
-                </TableCell>
+                {allColumns.map((column) => (
+                  <TableCell key={column.key} className="whitespace-nowrap">
+                    {renderCellValue(result, column)}
+                  </TableCell>
+                ))}
               </TableRow>
             ))}
           </TableBody>
@@ -133,7 +203,7 @@ const ClassificationResultTable = ({ results }: ClassificationResultTableProps) 
             <>
               <DialogHeader>
                 <DialogTitle>{selectedResult.payeeName}</DialogTitle>
-                <DialogDescription>Classification Details</DialogDescription>
+                <DialogDescription>Complete Classification Details</DialogDescription>
               </DialogHeader>
               
               <div className="space-y-4 py-4">
@@ -158,6 +228,19 @@ const ClassificationResultTable = ({ results }: ClassificationResultTableProps) 
                   <h4 className="font-medium mb-1">Reasoning:</h4>
                   <p className="text-sm">{selectedResult.result.reasoning}</p>
                 </div>
+                
+                {selectedResult.result.keywordExclusion && (
+                  <div>
+                    <h4 className="font-medium mb-1">Keyword Exclusion:</h4>
+                    <div className="text-sm space-y-1">
+                      <div>Excluded: {selectedResult.result.keywordExclusion.isExcluded ? 'Yes' : 'No'}</div>
+                      {selectedResult.result.keywordExclusion.matchedKeywords.length > 0 && (
+                        <div>Keywords: {selectedResult.result.keywordExclusion.matchedKeywords.join(', ')}</div>
+                      )}
+                      <div>Reasoning: {selectedResult.result.keywordExclusion.reasoning}</div>
+                    </div>
+                  </div>
+                )}
                 
                 {selectedResult.result.matchingRules && selectedResult.result.matchingRules.length > 0 && (
                   <div>
