@@ -17,12 +17,18 @@ export function exportResultsWithOriginalDataV3(
   });
 
   if (!batchResult.originalFileData || batchResult.originalFileData.length === 0) {
-    console.log('[BATCH EXPORTER V3] No batch-level original data, using row-level original data');
+    console.log('[BATCH EXPORTER V3] Using row-level original data (batch-level missing)');
     // Use individual row original data
-    return batchResult.results.map(result => {
+    return batchResult.results.map((result, index) => {
+      const originalData = result.originalData || { 
+        PayeeName: result.payeeName, 
+        RowIndex: index,
+        DataSource: 'Row-level recovery'
+      };
+
       const exportRow = {
-        // GUARANTEE: Original data from the row
-        ...result.originalData,
+        // GUARANTEE: Original data comes first
+        ...originalData,
         
         // GUARANTEE: Enhanced classification fields
         'Classification': result.result.classification,
@@ -51,10 +57,12 @@ export function exportResultsWithOriginalDataV3(
         exportRow['Combined_Similarity'] = result.result.similarityScores.combined?.toFixed(2) || '';
       }
 
-      console.log('[BATCH EXPORTER V3] Row export includes:', {
-        originalDataKeys: Object.keys(result.originalData || {}),
+      console.log('[BATCH EXPORTER V3] Row export:', {
+        index,
+        originalDataKeys: Object.keys(originalData),
         hasKeywordExclusion: !!result.result.keywordExclusion,
-        keywordExclusionStatus: exportRow['Keyword_Exclusion']
+        keywordExclusionStatus: exportRow['Keyword_Exclusion'],
+        totalColumns: Object.keys(exportRow).length
       });
 
       return exportRow;
@@ -73,7 +81,7 @@ export function exportResultsWithOriginalDataV3(
         ...originalRow,
         'Classification': 'Individual' as const,
         'Confidence_%': 50,
-        'Processing_Tier': 'Rule-Based' as const,
+        'Processing_Tier': 'Failed' as const,
         'Reasoning': 'Result not found - emergency fallback',
         'Processing_Method': 'Emergency fallback V3',
         'Matched_Keywords': '',
@@ -121,10 +129,10 @@ export function exportResultsWithOriginalDataV3(
       enhancedData['Combined_Similarity'] = result.result.similarityScores.combined?.toFixed(2) || '';
     }
 
-    // GUARANTEE: Merge original data with enhanced data
+    // GUARANTEE: Original data comes FIRST, then enhanced data
     const finalRow = includeAllColumns 
       ? { ...originalRow, ...enhancedData }
-      : enhancedData;
+      : { ...originalRow, ...enhancedData }; // Always include original columns
 
     console.log('[BATCH EXPORTER V3] FINAL ROW:', {
       index,
@@ -133,7 +141,8 @@ export function exportResultsWithOriginalDataV3(
       totalColumns: Object.keys(finalRow).length,
       keywordExclusion: finalRow['Keyword_Exclusion'],
       matchedKeywords: finalRow['Matched_Keywords'],
-      hasAllOriginalData: Object.keys(originalRow).every(key => finalRow.hasOwnProperty(key))
+      hasAllOriginalData: Object.keys(originalRow).every(key => finalRow.hasOwnProperty(key)),
+      firstFewKeys: Object.keys(finalRow).slice(0, 5)
     });
     
     return finalRow;
