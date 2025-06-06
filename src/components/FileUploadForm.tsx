@@ -14,7 +14,7 @@ import { handleError, showErrorToast, showRetryableErrorToast } from "@/lib/erro
 import { useRetry } from "@/hooks/useRetry";
 
 interface FileUploadFormProps {
-  onBatchJobCreated: (batchJob: BatchJob, payeeNames: string[]) => void;
+  onBatchJobCreated: (batchJob: BatchJob, payeeNames: string[], originalFileData: any[]) => void;
   config?: ClassificationConfig;
 }
 
@@ -36,6 +36,7 @@ const FileUploadForm = ({
   const [fileError, setFileError] = useState<string | null>(null);
   const [validationStatus, setValidationStatus] = useState<'none' | 'validating' | 'valid' | 'error'>('none');
   const [fileInfo, setFileInfo] = useState<{ rowCount?: number; payeeCount?: number } | null>(null);
+  const [originalFileData, setOriginalFileData] = useState<any[]>([]);
   const { toast } = useToast();
 
   // Retry mechanism for batch job creation
@@ -52,6 +53,7 @@ const FileUploadForm = ({
     setFileError(null);
     setValidationStatus('none');
     setFileInfo(null);
+    setOriginalFileData([]);
     
     // Reset the file input
     const fileInput = document.getElementById('file-upload') as HTMLInputElement;
@@ -69,6 +71,7 @@ const FileUploadForm = ({
     setSelectedColumn("");
     setValidationStatus('none');
     setFileInfo(null);
+    setOriginalFileData([]);
     
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
@@ -127,8 +130,9 @@ const FileUploadForm = ({
     try {
       setValidationStatus('validating');
       
-      // Parse the full file
+      // Parse the full file and store original data
       const data = await parseUploadedFile(file);
+      setOriginalFileData(data);
       
       // Validate payee data
       const dataValidation = validatePayeeData(data, selectedColumn);
@@ -179,20 +183,20 @@ const FileUploadForm = ({
         return;
       }
 
-      console.log(`[FILE UPLOAD] Creating batch job for ${payeeNames.length} names from column "${selectedColumn}"`);
+      console.log(`[FILE UPLOAD] Creating batch job for ${payeeNames.length} names from column "${selectedColumn}" with original data`);
 
       const batchJob = await createBatchJobWithRetry(
         payeeNames, 
         `File upload batch: ${file.name}, ${payeeNames.length} payees`
       );
       
-      console.log(`[FILE UPLOAD] Batch job created:`, batchJob);
+      console.log(`[FILE UPLOAD] Batch job created with original data:`, batchJob);
 
-      onBatchJobCreated(batchJob, payeeNames);
+      onBatchJobCreated(batchJob, payeeNames, originalFileData);
       
       toast({
         title: "Batch Job Created Successfully",
-        description: `Submitted ${payeeNames.length} payees from ${file.name} for processing. Job ID: ${batchJob.id.slice(-8)}`,
+        description: `Submitted ${payeeNames.length} payees from ${file.name} for processing with original data preserved. Job ID: ${batchJob.id.slice(-8)}`,
       });
     } catch (error) {
       const appError = handleError(error, 'Batch Job Creation');

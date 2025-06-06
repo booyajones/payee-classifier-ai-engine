@@ -16,7 +16,8 @@ interface BatchClassificationFormProps {
 
 const STORAGE_KEYS = {
   BATCH_JOBS: 'batch_classification_jobs',
-  PAYEE_NAMES_MAP: 'batch_classification_payee_names'
+  PAYEE_NAMES_MAP: 'batch_classification_payee_names',
+  ORIGINAL_FILE_DATA_MAP: 'batch_classification_original_data'
 };
 
 const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassificationFormProps) => {
@@ -25,6 +26,7 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
   const [activeTab, setActiveTab] = useState<string>("file");
   const [batchJobs, setBatchJobs] = useState<BatchJob[]>([]);
   const [payeeNamesMap, setPayeeNamesMap] = useState<Record<string, string[]>>({});
+  const [originalFileDataMap, setOriginalFileDataMap] = useState<Record<string, any[]>>({});
   const [isLoadingJobs, setIsLoadingJobs] = useState(true);
   const { toast } = useToast();
 
@@ -38,11 +40,12 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
   };
 
   // Save state to localStorage
-  const saveToStorage = (jobs: BatchJob[], payeeMap: Record<string, string[]>) => {
+  const saveToStorage = (jobs: BatchJob[], payeeMap: Record<string, string[]>, fileDataMap: Record<string, any[]>) => {
     try {
       localStorage.setItem(STORAGE_KEYS.BATCH_JOBS, JSON.stringify(jobs));
       localStorage.setItem(STORAGE_KEYS.PAYEE_NAMES_MAP, JSON.stringify(payeeMap));
-      console.log(`[BATCH FORM] Saved ${jobs.length} jobs to localStorage`);
+      localStorage.setItem(STORAGE_KEYS.ORIGINAL_FILE_DATA_MAP, JSON.stringify(fileDataMap));
+      console.log(`[BATCH FORM] Saved ${jobs.length} jobs with original data to localStorage`);
     } catch (error) {
       console.error('[BATCH FORM] Error saving to localStorage:', error);
     }
@@ -53,6 +56,7 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
     try {
       const savedJobs = localStorage.getItem(STORAGE_KEYS.BATCH_JOBS);
       const savedPayeeMap = localStorage.getItem(STORAGE_KEYS.PAYEE_NAMES_MAP);
+      const savedFileDataMap = localStorage.getItem(STORAGE_KEYS.ORIGINAL_FILE_DATA_MAP);
 
       if (!savedJobs || !savedPayeeMap) {
         console.log('[BATCH FORM] No saved jobs found');
@@ -62,12 +66,14 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
 
       const jobs: BatchJob[] = JSON.parse(savedJobs);
       const payeeMap: Record<string, string[]> = JSON.parse(savedPayeeMap);
+      const fileDataMap: Record<string, any[]> = savedFileDataMap ? JSON.parse(savedFileDataMap) : {};
 
-      console.log(`[BATCH FORM] Found ${jobs.length} saved jobs, checking status...`);
+      console.log(`[BATCH FORM] Found ${jobs.length} saved jobs with original data, checking status...`);
 
       // Check status of each saved job
       const updatedJobs: BatchJob[] = [];
       const validPayeeMap: Record<string, string[]> = {};
+      const validFileDataMap: Record<string, any[]> = {};
 
       for (const job of jobs) {
         try {
@@ -75,6 +81,7 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
           const updatedJob = await checkBatchJobStatus(job.id);
           updatedJobs.push(updatedJob);
           validPayeeMap[job.id] = payeeMap[job.id] || [];
+          validFileDataMap[job.id] = fileDataMap[job.id] || [];
           
           if (updatedJob.status !== job.status) {
             console.log(`[BATCH FORM] Job ${job.id} status changed: ${job.status} -> ${updatedJob.status}`);
@@ -87,15 +94,16 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
 
       setBatchJobs(updatedJobs);
       setPayeeNamesMap(validPayeeMap);
+      setOriginalFileDataMap(validFileDataMap);
 
       // Save the cleaned up state
-      saveToStorage(updatedJobs, validPayeeMap);
+      saveToStorage(updatedJobs, validPayeeMap, validFileDataMap);
 
       if (updatedJobs.length > 0) {
         setActiveTab("jobs");
         toast({
           title: "Jobs Recovered",
-          description: `Restored ${updatedJobs.length} batch job(s) from previous session.`,
+          description: `Restored ${updatedJobs.length} batch job(s) with original data from previous session.`,
         });
       }
 
@@ -104,6 +112,7 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
       // Clear corrupted data
       localStorage.removeItem(STORAGE_KEYS.BATCH_JOBS);
       localStorage.removeItem(STORAGE_KEYS.PAYEE_NAMES_MAP);
+      localStorage.removeItem(STORAGE_KEYS.ORIGINAL_FILE_DATA_MAP);
     } finally {
       setIsLoadingJobs(false);
     }
@@ -117,19 +126,21 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
   // Save jobs whenever they change
   useEffect(() => {
     if (!isLoadingJobs && batchJobs.length > 0) {
-      saveToStorage(batchJobs, payeeNamesMap);
+      saveToStorage(batchJobs, payeeNamesMap, originalFileDataMap);
     }
-  }, [batchJobs, payeeNamesMap, isLoadingJobs]);
+  }, [batchJobs, payeeNamesMap, originalFileDataMap, isLoadingJobs]);
 
   const resetForm = () => {
     setBatchResults([]);
     setProcessingSummary(null);
     setBatchJobs([]);
     setPayeeNamesMap({});
+    setOriginalFileDataMap({});
     
     // Clear localStorage
     localStorage.removeItem(STORAGE_KEYS.BATCH_JOBS);
     localStorage.removeItem(STORAGE_KEYS.PAYEE_NAMES_MAP);
+    localStorage.removeItem(STORAGE_KEYS.ORIGINAL_FILE_DATA_MAP);
     
     toast({
       title: "Form Reset",
@@ -137,8 +148,8 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
     });
   };
 
-  const handleFileUploadBatchJob = (batchJob: BatchJob, payeeNames: string[]) => {
-    console.log(`[BATCH FORM] File upload batch job created:`, batchJob);
+  const handleFileUploadBatchJob = (batchJob: BatchJob, payeeNames: string[], originalFileData: any[]) => {
+    console.log(`[BATCH FORM] File upload batch job created with original data:`, batchJob);
     
     setBatchJobs(prev => {
       const newJobs = [...prev, batchJob];
@@ -149,6 +160,12 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
     setPayeeNamesMap(prev => {
       const newMap = { ...prev, [batchJob.id]: payeeNames };
       console.log(`[BATCH FORM] Updated payee names map from file upload:`, newMap);
+      return newMap;
+    });
+    
+    setOriginalFileDataMap(prev => {
+      const newMap = { ...prev, [batchJob.id]: originalFileData };
+      console.log(`[BATCH FORM] Updated original file data map:`, newMap);
       return newMap;
     });
     
@@ -165,7 +182,7 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
   };
 
   const handleJobComplete = (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => {
-    console.log(`[BATCH FORM] Job ${jobId} completed with ${results.length} results`);
+    console.log(`[BATCH FORM] Job ${jobId} completed with ${results.length} results including original data`);
     setBatchResults(results);
     setProcessingSummary(summary);
     
@@ -191,6 +208,12 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
       const newMap = { ...prev };
       delete newMap[jobId];
       console.log(`[BATCH FORM] Payee names map after deletion:`, newMap);
+      return newMap;
+    });
+    setOriginalFileDataMap(prev => {
+      const newMap = { ...prev };
+      delete newMap[jobId];
+      console.log(`[BATCH FORM] Original file data map after deletion:`, newMap);
       return newMap;
     });
   };
@@ -252,6 +275,7 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
               <BatchJobManager
                 jobs={batchJobs}
                 payeeNamesMap={payeeNamesMap}
+                originalFileDataMap={originalFileDataMap}
                 onJobUpdate={handleJobUpdate}
                 onJobComplete={handleJobComplete}
                 onJobDelete={handleJobDelete}

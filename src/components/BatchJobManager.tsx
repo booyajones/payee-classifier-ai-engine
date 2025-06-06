@@ -7,7 +7,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { CheckCircle, XCircle, Clock, Download, RefreshCw, Trash, Loader2 } from "lucide-react";
 import { BatchJob, checkBatchJobStatus, getBatchJobResults, cancelBatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
-import { createPayeeClassification } from "@/lib/utils";
+import { enhancedClassifyPayeeV3 } from "@/lib/classification/enhancedClassificationV3";
 import { useBatchJobPolling } from "@/hooks/useBatchJobPolling";
 import { handleError, showErrorToast, showRetryableErrorToast } from "@/lib/errorHandler";
 import { useRetry } from "@/hooks/useRetry";
@@ -16,6 +16,7 @@ import ConfirmationDialog from "./ConfirmationDialog";
 interface BatchJobManagerProps {
   jobs: BatchJob[];
   payeeNamesMap: Record<string, string[]>;
+  originalFileDataMap: Record<string, any[]>;
   onJobUpdate: (job: BatchJob) => void;
   onJobComplete: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void;
   onJobDelete: (jobId: string) => void;
@@ -24,6 +25,7 @@ interface BatchJobManagerProps {
 const BatchJobManager = ({ 
   jobs, 
   payeeNamesMap, 
+  originalFileDataMap,
   onJobUpdate, 
   onJobComplete, 
   onJobDelete 
@@ -91,39 +93,93 @@ const BatchJobManager = ({
     setDownloadingJobs(prev => new Set(prev).add(job.id));
     
     try {
-      console.log(`[BATCH MANAGER] Downloading results for job ${job.id}`);
+      console.log(`[BATCH MANAGER] Downloading results for job ${job.id} with enhanced processing`);
       const payeeNames = payeeNamesMap[job.id] || [];
+      const originalFileData = originalFileDataMap[job.id] || [];
       
       if (payeeNames.length === 0) {
         throw new Error('No payee names found for this job. The job data may be corrupted.');
       }
 
-      const results = await downloadResultsWithRetry(job, payeeNames);
+      // Get raw OpenAI results
+      const rawResults = await downloadResultsWithRetry(job, payeeNames);
       
-      const classifications = payeeNames.map((name, index) => {
-        const result = results[index];
-        return createPayeeClassification(name, {
-          classification: result?.classification || 'Individual',
-          confidence: result?.confidence || 0,
-          reasoning: result?.reasoning || 'No result available',
-          processingTier: result?.status === 'success' ? 'AI-Powered' : 'Failed'
-        });
-      });
+      // Enhance each result with keyword exclusion and full classification details
+      const classifications: PayeeClassification[] = [];
+      
+      for (let index = 0; index < payeeNames.length; index++) {
+        const name = payeeNames[index];
+        const rawResult = rawResults[index];
+        const originalData = originalFileData[index] || {};
+        
+        try {
+          // Use enhanced classification to get keyword exclusion and complete data
+          const enhancedResult = await enhancedClassifyPayeeV3(name, {
+            aiThreshold: 80,
+            bypassRuleNLP: true,
+            useEnhanced: true,
+            offlineMode: false,
+            useFuzzyMatching: true,
+            similarityThreshold: 85
+          });
+          
+          // Override with OpenAI result if it was successful
+          if (rawResult?.status === 'success' && enhancedResult.processingTier !== 'Excluded') {
+            enhancedResult.classification = rawResult.classification;
+            enhancedResult.confidence = Math.max(rawResult.confidence, enhancedResult.confidence);
+            enhancedResult.reasoning = `${rawResult.reasoning} (Enhanced with keyword exclusion analysis)`;
+            enhancedResult.processingTier = 'AI-Powered';
+          }
+          
+          const payeeClassification: PayeeClassification = {
+            id: `enhanced-${job.id}-${index}`,
+            payeeName: name,
+            result: enhancedResult,
+            timestamp: new Date(),
+            originalData,
+            rowIndex: index
+          };
+          
+          classifications.push(payeeClassification);
+          
+        } catch (enhancementError) {
+          console.warn(`[BATCH MANAGER] Enhancement failed for "${name}", using fallback:`, enhancementError);
+          
+          // Fallback to raw result
+          const fallbackClassification: PayeeClassification = {
+            id: `fallback-${job.id}-${index}`,
+            payeeName: name,
+            result: {
+              classification: rawResult?.classification || 'Individual',
+              confidence: rawResult?.confidence || 0,
+              reasoning: rawResult?.reasoning || 'Enhancement failed, using basic result',
+              processingTier: rawResult?.status === 'success' ? 'AI-Powered' : 'Failed',
+              processingMethod: 'Fallback processing'
+            },
+            timestamp: new Date(),
+            originalData,
+            rowIndex: index
+          };
+          
+          classifications.push(fallbackClassification);
+        }
+      }
 
-      const successCount = results.filter(r => r.status === 'success').length;
-      const failureCount = results.length - successCount;
+      const successCount = classifications.filter(c => c.result.processingTier !== 'Failed').length;
+      const failureCount = classifications.length - successCount;
 
       const summary: BatchProcessingResult = {
         results: classifications,
         successCount,
-        failureCount
+        failureCount,
+        originalFileData
       };
 
       onJobComplete(classifications, summary, job.id);
 
       toast({
-        title: "Results Downloaded Successfully",
-        description: `Downloaded ${successCount} successful classifications${failureCount > 0 ? ` and ${failureCount} failed attempts` : ''}.`,
+        title: "Enhanced Results Downloaded Successfully",
+        description: `Downloaded ${successCount} classifications with keyword exclusion and original data${failureCount > 0 ? ` and ${failureCount} failed attempts` : ''}.`,
       });
     } catch (error) {
       const appError = handleError(error, 'Results Download');
@@ -221,13 +277,14 @@ const BatchJobManager = ({
   return (
     <>
       <div className="space-y-4">
-        <h3 className="text-lg font-medium">Batch Jobs</h3>
+        <h3 className="text-lg font-medium">Enhanced Batch Jobs</h3>
         
         {jobs.map((job) => {
           const pollingState = pollingStates[job.id];
           const isJobRefreshing = refreshingJobs.has(job.id);
           const isJobDownloading = downloadingJobs.has(job.id);
           const payeeCount = payeeNamesMap[job.id]?.length || 0;
+          const hasOriginalData = originalFileDataMap[job.id]?.length > 0;
           
           return (
             <Card key={job.id}>
@@ -244,6 +301,7 @@ const BatchJobManager = ({
                     </CardTitle>
                     <CardDescription>
                       {job.metadata?.description || 'Payee classification batch'} • {payeeCount} payees
+                      {hasOriginalData && <span className="text-green-600"> • Original data preserved</span>}
                     </CardDescription>
                     {pollingState?.lastError && (
                       <p className="text-xs text-red-600 mt-1">
@@ -303,7 +361,7 @@ const BatchJobManager = ({
                       ) : (
                         <Download className="h-3 w-3 mr-1" />
                       )}
-                      {isJobDownloading ? 'Downloading...' : 'Download Results'}
+                      {isJobDownloading ? 'Enhancing...' : 'Download Enhanced Results'}
                     </Button>
                   )}
 
@@ -345,34 +403,6 @@ const BatchJobManager = ({
       />
     </>
   );
-};
-
-const getStatusIcon = (status: string) => {
-  switch (status) {
-    case 'completed':
-      return <CheckCircle className="h-4 w-4 text-green-500" />;
-    case 'failed':
-    case 'expired':
-    case 'cancelled':
-      return <XCircle className="h-4 w-4 text-red-500" />;
-    default:
-      return <Clock className="h-4 w-4 text-yellow-500" />;
-  }
-};
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'completed':
-      return 'bg-green-100 text-green-800';
-    case 'failed':
-    case 'expired':
-    case 'cancelled':
-      return 'bg-red-100 text-red-800';
-    case 'in_progress':
-      return 'bg-blue-100 text-blue-800';
-    default:
-      return 'bg-yellow-100 text-yellow-800';
-  }
 };
 
 export default BatchJobManager;
