@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { PayeeClassification } from "@/lib/types";
@@ -14,25 +15,15 @@ interface ClassificationResultTableProps {
 const ClassificationResultTable = ({ results }: ClassificationResultTableProps) => {
   const [selectedResult, setSelectedResult] = useState<PayeeClassification | null>(null);
   
-  // Filter out any potentially invalid results and remove duplicates
+  // Filter out any potentially invalid results
   const validResults = results.filter(result => result && result.result);
   
-  // FIXED: Remove duplicates based on payee name (keep first occurrence)
-  const uniqueResults = validResults.filter((result, index, array) => {
-    const firstOccurrence = array.findIndex(r => r.payeeName === result.payeeName);
-    return firstOccurrence === index;
-  });
-  
-  const duplicatesRemoved = validResults.length - uniqueResults.length;
-  
-  console.log('[CLASSIFICATION TABLE] Debug - deduplication:', {
+  console.log('[CLASSIFICATION TABLE] Valid results:', {
     originalCount: results.length,
-    validCount: validResults.length,
-    uniqueCount: uniqueResults.length,
-    duplicatesRemoved
+    validCount: validResults.length
   });
   
-  if (uniqueResults.length === 0) {
+  if (validResults.length === 0) {
     return (
       <div className="text-center py-8 border rounded-md">
         <p className="text-muted-foreground">No valid results to display.</p>
@@ -40,9 +31,9 @@ const ClassificationResultTable = ({ results }: ClassificationResultTableProps) 
     );
   }
 
-  // Get all original data columns from ALL results (not just first one)
+  // Get all original data columns from ALL results
   const allOriginalColumns = new Set<string>();
-  uniqueResults.forEach(result => {
+  validResults.forEach(result => {
     if (result.originalData) {
       Object.keys(result.originalData).forEach(key => allOriginalColumns.add(key));
     }
@@ -59,7 +50,7 @@ const ClassificationResultTable = ({ results }: ClassificationResultTableProps) 
     { key: 'reasoning', label: 'Reasoning' }
   ];
   
-  // Define keyword exclusion columns - these are MANDATORY
+  // Define keyword exclusion columns
   const keywordColumns = [
     { key: 'keywordExclusion', label: 'Excluded by Keywords' },
     { key: 'matchedKeywords', label: 'Matched Keywords' },
@@ -76,18 +67,13 @@ const ClassificationResultTable = ({ results }: ClassificationResultTableProps) 
   
   console.log('[CLASSIFICATION TABLE] All columns for table:', allColumns.map(c => c.label));
   
-  const { sortField, sortDirection, sortedResults, handleSort } = useTableSorting(uniqueResults, originalColumns);
+  const { sortField, sortDirection, sortedResults, handleSort } = useTableSorting(validResults, originalColumns);
   
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
         <div className="text-sm text-muted-foreground">
-          Showing {uniqueResults.length} unique results with {originalColumns.length} original columns + classification data + keyword exclusions
-          {duplicatesRemoved > 0 && (
-            <span className="text-orange-600 ml-2">
-              ({duplicatesRemoved} duplicates removed)
-            </span>
-          )}
+          Showing {validResults.length} results with {originalColumns.length} original columns + classification data + keyword exclusions
         </div>
         <ExportButtons results={results} />
       </div>

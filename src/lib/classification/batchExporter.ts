@@ -2,51 +2,26 @@
 import { BatchProcessingResult } from '../types';
 
 /**
- * FIXED: Ultra-simple export with GUARANTEED perfect 1:1 alignment
- * Now handles timestamp serialization properly
+ * Simple export that preserves original data and adds classification results
  */
 export function exportResultsWithOriginalDataV3(
   batchResult: BatchProcessingResult,
   includeAllColumns: boolean = true
 ): any[] {
-  console.log('[BATCH EXPORTER V3] FIXED: Ultra-simple perfect alignment export:', {
+  console.log('[BATCH EXPORTER] Starting export:', {
     hasOriginalData: !!batchResult.originalFileData,
     originalDataLength: batchResult.originalFileData?.length || 0,
-    resultsLength: batchResult.results.length,
-    perfectAlignment: batchResult.originalFileData?.length === batchResult.results.length
+    resultsLength: batchResult.results.length
   });
-
-  // VALIDATION: Ensure perfect alignment before proceeding
-  if (batchResult.originalFileData && batchResult.originalFileData.length !== batchResult.results.length) {
-    throw new Error(`Export alignment error: ${batchResult.originalFileData.length} original rows vs ${batchResult.results.length} results`);
-  }
 
   const exportData: any[] = [];
   
-  // Create a Set to track processed payee names and detect duplicates
-  const processedPayees = new Set<string>();
-  const duplicateIndices: number[] = [];
-  
-  // FIXED: Simple 1:1 mapping with duplicate detection
+  // Simple 1:1 mapping
   for (let i = 0; i < batchResult.results.length; i++) {
     const result = batchResult.results[i];
     const originalRow = batchResult.originalFileData?.[i] || {};
     
-    // DUPLICATE DETECTION: Check if we've seen this exact payee name at this position before
-    const payeeKey = `${result.payeeName}-${i}`;
-    if (processedPayees.has(result.payeeName)) {
-      console.warn(`[BATCH EXPORTER V3] DUPLICATE DETECTED: "${result.payeeName}" already processed, skipping duplicate at position ${i}`);
-      duplicateIndices.push(i);
-      continue; // Skip this duplicate
-    }
-    processedPayees.add(result.payeeName);
-    
-    // VALIDATION: Ensure row index matches array position (allow some flexibility for recovered data)
-    if (result.rowIndex !== i && result.rowIndex !== undefined) {
-      console.warn(`[BATCH EXPORTER V3] Row index mismatch at position ${i}: expected ${i}, got ${result.rowIndex}, but continuing with position ${i}`);
-    }
-    
-    // FIXED: Properly handle timestamp serialization
+    // Handle timestamp properly
     let timestampString = '';
     try {
       if (result.timestamp instanceof Date) {
@@ -59,33 +34,32 @@ export function exportResultsWithOriginalDataV3(
         timestampString = new Date().toISOString();
       }
     } catch (error) {
-      console.warn(`[BATCH EXPORTER V3] Timestamp conversion error for row ${i}:`, error);
+      console.warn(`[BATCH EXPORTER] Timestamp conversion error for row ${i}:`, error);
       timestampString = new Date().toISOString();
     }
     
-    // Create export row - simple merge
+    // Create export row - original data first, then classification results
     const exportRow = {
-      // Original data first (preserved as-is)
+      // Original data preserved as-is
       ...originalRow,
       
-      // Classification results (overwrites any conflicting original columns)
+      // Classification results
       'Classification': result.result.classification,
       'Confidence_%': result.result.confidence,
       'Processing_Tier': result.result.processingTier,
       'Reasoning': result.result.reasoning,
-      'Processing_Method': result.result.processingMethod || 'OpenAI Batch API (Fixed)',
+      'Processing_Method': result.result.processingMethod || 'OpenAI Classification',
       
-      // Keyword exclusion (simplified)
-      'Matched_Keywords': result.result.keywordExclusion?.matchedKeywords?.join('; ') || '',
+      // Keyword exclusion data
       'Keyword_Exclusion': result.result.keywordExclusion?.isExcluded ? 'Yes' : 'No',
+      'Matched_Keywords': result.result.keywordExclusion?.matchedKeywords?.join('; ') || '',
       'Keyword_Confidence': result.result.keywordExclusion?.confidence?.toString() || '0',
       'Keyword_Reasoning': result.result.keywordExclusion?.reasoning || 'No keyword exclusion applied',
       
       // Additional fields
       'Matching_Rules': result.result.matchingRules?.join('; ') || '',
       'Timestamp': timestampString,
-      'Row_Index': i, // Use the actual array position
-      'Data_Integrity_Status': 'Perfect_Alignment'
+      'Row_Index': i
     };
 
     // Add similarity scores if available
@@ -100,17 +74,8 @@ export function exportResultsWithOriginalDataV3(
     exportData.push(exportRow);
   }
 
-  // FINAL VALIDATION
-  const expectedCount = batchResult.results.length - duplicateIndices.length;
-  if (exportData.length !== expectedCount) {
-    console.warn(`[BATCH EXPORTER V3] Export length after deduplication: expected ${expectedCount}, got ${exportData.length}`);
-  }
-
-  console.log('[BATCH EXPORTER V3] FIXED: Perfect alignment export complete:', {
-    totalRows: exportData.length,
-    duplicatesRemoved: duplicateIndices.length,
-    perfectAlignment: true,
-    allRowsHaveIntegrityStatus: exportData.every(row => row['Data_Integrity_Status'] === 'Perfect_Alignment')
+  console.log('[BATCH EXPORTER] Export complete:', {
+    totalRows: exportData.length
   });
 
   return exportData;

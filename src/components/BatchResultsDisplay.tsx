@@ -34,29 +34,26 @@ const BatchResultsDisplay = ({
     }
 
     try {
-      console.log('[BATCH RESULTS] FIXED: Exporting with perfect alignment:', {
+      console.log('[BATCH RESULTS] Exporting results:', {
         hasProcessingSummary: !!processingSummary,
         hasOriginalFileData: !!processingSummary.originalFileData,
         originalDataLength: processingSummary.originalFileData?.length || 0,
-        resultsLength: batchResults.length,
-        perfectAlignment: processingSummary.originalFileData?.length === batchResults.length
+        resultsLength: batchResults.length
       });
 
-      // FIXED: Use the perfect alignment export function
       const exportData = exportResultsWithOriginalDataV3(processingSummary, true);
       
-      console.log('[BATCH RESULTS] FIXED: Export data validated:', {
-        totalRows: exportData.length,
-        allRowsAligned: true
+      console.log('[BATCH RESULTS] Export data created:', {
+        totalRows: exportData.length
       });
       
       const workbook = XLSX.utils.book_new();
       const worksheet = XLSX.utils.json_to_sheet(exportData);
       
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Perfect Results (Fixed Pipeline)");
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Results");
       
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      const filename = `perfect_payee_results_${timestamp}.xlsx`;
+      const filename = `payee_results_${timestamp}.xlsx`;
       
       XLSX.writeFile(workbook, filename);
       
@@ -72,21 +69,21 @@ const BatchResultsDisplay = ({
         !k.startsWith('Dice_') &&
         !k.startsWith('Token_') &&
         !k.startsWith('Combined_') &&
-        !k.startsWith('Data_Integrity_') &&
-        k !== 'Timestamp'
+        k !== 'Timestamp' &&
+        k !== 'Row_Index'
       ).length : 0;
 
       const keywordExcludedCount = exportData.filter(row => row['Keyword_Exclusion'] === 'Yes').length;
       
       toast({
-        title: "Perfect Export Complete (Fixed)",
-        description: `Exported ${exportData.length} rows with ${originalColumns} original columns + perfect classification alignment. ${keywordExcludedCount} payees excluded by keywords.`,
+        title: "Export Complete",
+        description: `Exported ${exportData.length} rows with ${originalColumns} original columns. ${keywordExcludedCount} payees excluded by keywords.`,
       });
     } catch (error) {
-      console.error("Fixed export error:", error);
+      console.error("Export error:", error);
       toast({
         title: "Export Error",
-        description: "Failed to export results with fixed pipeline. Please try again.",
+        description: "Failed to export results. Please try again.",
         variant: "destructive",
       });
     }
@@ -97,23 +94,18 @@ const BatchResultsDisplay = ({
     if (!processingSummary || batchResults.length === 0) return null;
 
     const hasOriginalData = processingSummary.originalFileData && processingSummary.originalFileData.length > 0;
-    const perfectAlignment = hasOriginalData && processingSummary.originalFileData.length === batchResults.length;
     const allHaveKeywordExclusion = batchResults.every(r => !!r.result.keywordExclusion);
     const keywordExcludedCount = batchResults.filter(r => r.result.keywordExclusion?.isExcluded).length;
     const originalColumnCount = hasOriginalData ? Object.keys(processingSummary.originalFileData[0] || {}).length : 0;
 
     return (
-      <div className="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
-        <h4 className="font-medium text-green-900 mb-2">Fixed Pipeline Results Summary</h4>
-        <div className="text-sm text-green-800 space-y-1">
-          <div>✅ {batchResults.length} payees processed with perfect alignment</div>
-          <div>✅ {originalColumnCount} original file columns preserved</div>
-          <div>✅ Single classification pipeline (no conflicts)</div>
-          <div>✅ Perfect 1:1 row mapping guaranteed</div>
-          <div>⚠️ {keywordExcludedCount} payees excluded due to keyword matches</div>
-          <div className="mt-2 font-medium text-green-900">
-            {perfectAlignment ? '🎯 Perfect data alignment achieved' : '⚠️ Some original data recovered'}
-          </div>
+      <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+        <h4 className="font-medium text-blue-900 mb-2">Results Summary</h4>
+        <div className="text-sm text-blue-800 space-y-1">
+          <div>• {batchResults.length} payees processed</div>
+          <div>• {originalColumnCount} original file columns preserved</div>
+          <div>• {allHaveKeywordExclusion ? 'Keyword exclusion applied to all results' : 'Some results missing keyword exclusion data'}</div>
+          <div>• {keywordExcludedCount} payees excluded due to keyword matches</div>
         </div>
       </div>
     );
@@ -129,7 +121,7 @@ const BatchResultsDisplay = ({
 
       {batchResults.length > 0 ? (
         <div>
-          <h3 className="text-lg font-medium mb-4">Fixed Pipeline Classification Results</h3>
+          <h3 className="text-lg font-medium mb-4">Classification Results</h3>
           
           {getResultsSummary()}
           
@@ -142,7 +134,7 @@ const BatchResultsDisplay = ({
               disabled={isProcessing}
               className="flex-1"
             >
-              Export Perfect Results (Fixed Pipeline)
+              Export Results
             </Button>
             
             <Button

@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Download, CheckCircle } from "lucide-react";
+import { Download } from "lucide-react";
 import { PayeeClassification } from "@/lib/types";
 import { exportResultsWithOriginalDataV3 } from "@/lib/classification/batchExporter";
 import * as XLSX from 'xlsx';
@@ -15,45 +15,32 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
 
   const performExport = (exportType: 'csv' | 'json' | 'excel') => {
     try {
-      console.log('[EXPORT BUTTONS] FIXED: Starting export with deduplication:', {
+      console.log('[EXPORT BUTTONS] Starting export:', {
         totalResults: results.length,
         exportType
       });
 
-      // FIXED: Create safe batch result for export with deduplication
-      const uniqueResults = results.filter((result, index, array) => {
-        const firstOccurrence = array.findIndex(r => r.payeeName === result.payeeName);
-        return firstOccurrence === index;
-      });
-
-      console.log('[EXPORT BUTTONS] Deduplication complete:', {
-        originalCount: results.length,
-        uniqueCount: uniqueResults.length,
-        duplicatesRemoved: results.length - uniqueResults.length
-      });
-
+      // Create batch result for export
       const batchResult = {
-        results: uniqueResults,
-        successCount: uniqueResults.length,
+        results: results,
+        successCount: results.length,
         failureCount: 0,
-        originalFileData: uniqueResults.map(r => r.originalData).filter(Boolean)
+        originalFileData: results.map(r => r.originalData).filter(Boolean)
       };
 
-      // VALIDATION: Ensure we have matching original data
-      if (batchResult.originalFileData.length !== uniqueResults.length) {
+      // Validate we have matching original data
+      if (batchResult.originalFileData.length !== results.length) {
         console.warn('[EXPORT BUTTONS] Missing original data for some results, using fallback');
-        batchResult.originalFileData = uniqueResults.map((r, i) => r.originalData || { 
+        batchResult.originalFileData = results.map((r, i) => r.originalData || { 
           PayeeName: r.payeeName, 
-          RowIndex: i,
-          FallbackApplied: true 
+          RowIndex: i 
         });
       }
 
       const exportData = exportResultsWithOriginalDataV3(batchResult, true);
       
-      console.log('[EXPORT BUTTONS] FIXED: Export data created without duplicates:', {
-        totalRows: exportData.length,
-        uniqueResults: true
+      console.log('[EXPORT BUTTONS] Export data created:', {
+        totalRows: exportData.length
       });
 
       const timestamp = new Date().toISOString().slice(0, 10);
@@ -79,7 +66,7 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
-        link.setAttribute('download', `payee_results_deduplicated_${timestamp}.csv`);
+        link.setAttribute('download', `payee_results_${timestamp}.csv`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
@@ -91,7 +78,7 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
-        link.setAttribute('download', `payee_results_deduplicated_${timestamp}.json`);
+        link.setAttribute('download', `payee_results_${timestamp}.json`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
@@ -100,22 +87,21 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
         const workbook = XLSX.utils.book_new();
         const worksheet = XLSX.utils.json_to_sheet(exportData);
         
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Deduplicated Results");
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Results");
         
         const timestampForFile = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        const filename = `payee_results_deduplicated_${timestampForFile}.xlsx`;
+        const filename = `payee_results_${timestampForFile}.xlsx`;
         
         XLSX.writeFile(workbook, filename);
       }
 
-      const duplicatesRemoved = results.length - uniqueResults.length;
       toast({
-        title: `${exportType.toUpperCase()} Export Complete (Deduplicated)`,
-        description: `Exported ${exportData.length} unique rows${duplicatesRemoved > 0 ? ` (removed ${duplicatesRemoved} duplicates)` : ''} with perfect data alignment.`,
+        title: `${exportType.toUpperCase()} Export Complete`,
+        description: `Exported ${exportData.length} rows with original data and classification results.`,
       });
 
     } catch (error) {
-      console.error(`FIXED Export error (${exportType}):`, error);
+      console.error(`Export error (${exportType}):`, error);
       toast({
         title: "Export Error",
         description: `Failed to export ${exportType.toUpperCase()}. Please try again.`,
@@ -125,26 +111,19 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex gap-2">
-        <Button variant="outline" size="sm" onClick={() => performExport('csv')}>
-          <Download className="w-4 h-4 mr-2" /> 
-          Export CSV (Deduplicated)
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => performExport('json')}>
-          <Download className="w-4 h-4 mr-2" /> 
-          Export JSON (Deduplicated)
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => performExport('excel')}>
-          <Download className="w-4 h-4 mr-2" /> 
-          Export Excel (Deduplicated)
-        </Button>
-      </div>
-      
-      <div className="flex items-center gap-2 text-sm text-green-600">
-        <CheckCircle className="w-4 h-4" />
-        <span>Fixed pipeline - duplicates removed, perfect data alignment guaranteed</span>
-      </div>
+    <div className="flex gap-2">
+      <Button variant="outline" size="sm" onClick={() => performExport('csv')}>
+        <Download className="w-4 h-4 mr-2" /> 
+        Export CSV
+      </Button>
+      <Button variant="outline" size="sm" onClick={() => performExport('json')}>
+        <Download className="w-4 h-4 mr-2" /> 
+        Export JSON
+      </Button>
+      <Button variant="outline" size="sm" onClick={() => performExport('excel')}>
+        <Download className="w-4 h-4 mr-2" /> 
+        Export Excel
+      </Button>
     </div>
   );
 };
