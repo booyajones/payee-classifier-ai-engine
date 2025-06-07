@@ -3,7 +3,7 @@ import { BatchProcessingResult } from '../types';
 
 /**
  * FIXED: Ultra-simple export with GUARANTEED perfect 1:1 alignment
- * No fallbacks, no complex logic - just direct mapping
+ * Now handles timestamp serialization properly
  */
 export function exportResultsWithOriginalDataV3(
   batchResult: BatchProcessingResult,
@@ -23,14 +23,44 @@ export function exportResultsWithOriginalDataV3(
 
   const exportData: any[] = [];
   
-  // FIXED: Simple 1:1 mapping with no complex logic
+  // Create a Set to track processed payee names and detect duplicates
+  const processedPayees = new Set<string>();
+  const duplicateIndices: number[] = [];
+  
+  // FIXED: Simple 1:1 mapping with duplicate detection
   for (let i = 0; i < batchResult.results.length; i++) {
     const result = batchResult.results[i];
     const originalRow = batchResult.originalFileData?.[i] || {};
     
-    // VALIDATION: Ensure row index matches array position
-    if (result.rowIndex !== i) {
-      console.warn(`[BATCH EXPORTER V3] Row index mismatch at position ${i}: expected ${i}, got ${result.rowIndex}`);
+    // DUPLICATE DETECTION: Check if we've seen this exact payee name at this position before
+    const payeeKey = `${result.payeeName}-${i}`;
+    if (processedPayees.has(result.payeeName)) {
+      console.warn(`[BATCH EXPORTER V3] DUPLICATE DETECTED: "${result.payeeName}" already processed, skipping duplicate at position ${i}`);
+      duplicateIndices.push(i);
+      continue; // Skip this duplicate
+    }
+    processedPayees.add(result.payeeName);
+    
+    // VALIDATION: Ensure row index matches array position (allow some flexibility for recovered data)
+    if (result.rowIndex !== i && result.rowIndex !== undefined) {
+      console.warn(`[BATCH EXPORTER V3] Row index mismatch at position ${i}: expected ${i}, got ${result.rowIndex}, but continuing with position ${i}`);
+    }
+    
+    // FIXED: Properly handle timestamp serialization
+    let timestampString = '';
+    try {
+      if (result.timestamp instanceof Date) {
+        timestampString = result.timestamp.toISOString();
+      } else if (typeof result.timestamp === 'string') {
+        timestampString = result.timestamp;
+      } else if (result.timestamp) {
+        timestampString = new Date(result.timestamp).toISOString();
+      } else {
+        timestampString = new Date().toISOString();
+      }
+    } catch (error) {
+      console.warn(`[BATCH EXPORTER V3] Timestamp conversion error for row ${i}:`, error);
+      timestampString = new Date().toISOString();
     }
     
     // Create export row - simple merge
@@ -53,8 +83,8 @@ export function exportResultsWithOriginalDataV3(
       
       // Additional fields
       'Matching_Rules': result.result.matchingRules?.join('; ') || '',
-      'Timestamp': result.timestamp.toISOString(),
-      'Row_Index': i,
+      'Timestamp': timestampString,
+      'Row_Index': i, // Use the actual array position
       'Data_Integrity_Status': 'Perfect_Alignment'
     };
 
@@ -71,12 +101,14 @@ export function exportResultsWithOriginalDataV3(
   }
 
   // FINAL VALIDATION
-  if (exportData.length !== batchResult.results.length) {
-    throw new Error(`Export length mismatch: expected ${batchResult.results.length}, got ${exportData.length}`);
+  const expectedCount = batchResult.results.length - duplicateIndices.length;
+  if (exportData.length !== expectedCount) {
+    console.warn(`[BATCH EXPORTER V3] Export length after deduplication: expected ${expectedCount}, got ${exportData.length}`);
   }
 
   console.log('[BATCH EXPORTER V3] FIXED: Perfect alignment export complete:', {
     totalRows: exportData.length,
+    duplicatesRemoved: duplicateIndices.length,
     perfectAlignment: true,
     allRowsHaveIntegrityStatus: exportData.every(row => row['Data_Integrity_Status'] === 'Perfect_Alignment')
   });

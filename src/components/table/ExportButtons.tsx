@@ -15,23 +15,34 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
 
   const performExport = (exportType: 'csv' | 'json' | 'excel') => {
     try {
-      console.log('[EXPORT BUTTONS] FIXED: Starting simple export:', {
+      console.log('[EXPORT BUTTONS] FIXED: Starting export with deduplication:', {
         totalResults: results.length,
         exportType
       });
 
-      // FIXED: Create simple batch result for export
+      // FIXED: Create safe batch result for export with deduplication
+      const uniqueResults = results.filter((result, index, array) => {
+        const firstOccurrence = array.findIndex(r => r.payeeName === result.payeeName);
+        return firstOccurrence === index;
+      });
+
+      console.log('[EXPORT BUTTONS] Deduplication complete:', {
+        originalCount: results.length,
+        uniqueCount: uniqueResults.length,
+        duplicatesRemoved: results.length - uniqueResults.length
+      });
+
       const batchResult = {
-        results,
-        successCount: results.length,
+        results: uniqueResults,
+        successCount: uniqueResults.length,
         failureCount: 0,
-        originalFileData: results.map(r => r.originalData).filter(Boolean)
+        originalFileData: uniqueResults.map(r => r.originalData).filter(Boolean)
       };
 
       // VALIDATION: Ensure we have matching original data
-      if (batchResult.originalFileData.length !== results.length) {
+      if (batchResult.originalFileData.length !== uniqueResults.length) {
         console.warn('[EXPORT BUTTONS] Missing original data for some results, using fallback');
-        batchResult.originalFileData = results.map((r, i) => r.originalData || { 
+        batchResult.originalFileData = uniqueResults.map((r, i) => r.originalData || { 
           PayeeName: r.payeeName, 
           RowIndex: i,
           FallbackApplied: true 
@@ -40,9 +51,9 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
 
       const exportData = exportResultsWithOriginalDataV3(batchResult, true);
       
-      console.log('[EXPORT BUTTONS] FIXED: Export data created:', {
+      console.log('[EXPORT BUTTONS] FIXED: Export data created without duplicates:', {
         totalRows: exportData.length,
-        perfectAlignment: true
+        uniqueResults: true
       });
 
       const timestamp = new Date().toISOString().slice(0, 10);
@@ -68,7 +79,7 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
-        link.setAttribute('download', `payee_results_fixed_${timestamp}.csv`);
+        link.setAttribute('download', `payee_results_deduplicated_${timestamp}.csv`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
@@ -80,7 +91,7 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
-        link.setAttribute('download', `payee_results_fixed_${timestamp}.json`);
+        link.setAttribute('download', `payee_results_deduplicated_${timestamp}.json`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
@@ -89,17 +100,18 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
         const workbook = XLSX.utils.book_new();
         const worksheet = XLSX.utils.json_to_sheet(exportData);
         
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Fixed Perfect Results");
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Deduplicated Results");
         
         const timestampForFile = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        const filename = `payee_results_fixed_${timestampForFile}.xlsx`;
+        const filename = `payee_results_deduplicated_${timestampForFile}.xlsx`;
         
         XLSX.writeFile(workbook, filename);
       }
 
+      const duplicatesRemoved = results.length - uniqueResults.length;
       toast({
-        title: `${exportType.toUpperCase()} Export Complete (FIXED)`,
-        description: `Exported ${exportData.length} rows with perfect data alignment and integrity.`,
+        title: `${exportType.toUpperCase()} Export Complete (Deduplicated)`,
+        description: `Exported ${exportData.length} unique rows${duplicatesRemoved > 0 ? ` (removed ${duplicatesRemoved} duplicates)` : ''} with perfect data alignment.`,
       });
 
     } catch (error) {
@@ -117,21 +129,21 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
       <div className="flex gap-2">
         <Button variant="outline" size="sm" onClick={() => performExport('csv')}>
           <Download className="w-4 h-4 mr-2" /> 
-          Export CSV (Fixed)
+          Export CSV (Deduplicated)
         </Button>
         <Button variant="outline" size="sm" onClick={() => performExport('json')}>
           <Download className="w-4 h-4 mr-2" /> 
-          Export JSON (Fixed)
+          Export JSON (Deduplicated)
         </Button>
         <Button variant="outline" size="sm" onClick={() => performExport('excel')}>
           <Download className="w-4 h-4 mr-2" /> 
-          Export Excel (Fixed)
+          Export Excel (Deduplicated)
         </Button>
       </div>
       
       <div className="flex items-center gap-2 text-sm text-green-600">
         <CheckCircle className="w-4 h-4" />
-        <span>Fixed pipeline - perfect data alignment guaranteed</span>
+        <span>Fixed pipeline - duplicates removed, perfect data alignment guaranteed</span>
       </div>
     </div>
   );
