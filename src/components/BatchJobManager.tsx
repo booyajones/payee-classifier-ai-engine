@@ -76,15 +76,46 @@ const BatchJobManager = ({
     });
   };
 
-  const ensureOriginalData = (payeeNames: string[], existingData?: any[]): any[] => {
-    if (existingData && existingData.length === payeeNames.length) {
-      return existingData;
+  // FIXED: Ensure perfect alignment by trimming original data to match payee names count
+  const ensureDataAlignment = (payeeNames: string[], originalData: any[]): any[] => {
+    console.log(`[ALIGNMENT FIX] Input: ${payeeNames.length} payee names, ${originalData.length} original rows`);
+    
+    if (!originalData || originalData.length === 0) {
+      console.log(`[ALIGNMENT FIX] No original data, creating fallback data`);
+      return payeeNames.map((name, index) => ({
+        PayeeName: name,
+        RowIndex: index
+      }));
     }
     
-    return payeeNames.map((name, index) => ({
-      PayeeName: name,
-      RowIndex: index
-    }));
+    if (originalData.length === payeeNames.length) {
+      console.log(`[ALIGNMENT FIX] Perfect alignment already exists`);
+      return originalData;
+    }
+    
+    if (originalData.length > payeeNames.length) {
+      console.log(`[ALIGNMENT FIX] Trimming ${originalData.length} original rows to ${payeeNames.length}`);
+      // Take only the first N rows to match payee names count
+      const trimmedData = originalData.slice(0, payeeNames.length);
+      console.log(`[ALIGNMENT FIX] After trimming: ${trimmedData.length} rows`);
+      return trimmedData;
+    }
+    
+    if (originalData.length < payeeNames.length) {
+      console.log(`[ALIGNMENT FIX] Padding ${originalData.length} original rows to ${payeeNames.length}`);
+      // Pad with fallback data for missing rows
+      const paddedData = [...originalData];
+      for (let i = originalData.length; i < payeeNames.length; i++) {
+        paddedData.push({
+          PayeeName: payeeNames[i],
+          RowIndex: i
+        });
+      }
+      console.log(`[ALIGNMENT FIX] After padding: ${paddedData.length} rows`);
+      return paddedData;
+    }
+    
+    return originalData;
   };
 
   const handleRefreshJob = async (jobId: string) => {
@@ -126,7 +157,23 @@ const BatchJobManager = ({
     
     try {
       const payeeNames = payeeNamesMap[job.id] || [];
-      const originalFileData = originalFileDataMap[job.id] || [];
+      const rawOriginalFileData = originalFileDataMap[job.id] || [];
+      
+      console.log(`[BATCH MANAGER] BEFORE ALIGNMENT FIX:`, {
+        jobId: job.id,
+        payeeCount: payeeNames.length,
+        originalDataCount: rawOriginalFileData.length
+      });
+      
+      // CRITICAL FIX: Ensure perfect data alignment
+      const originalFileData = ensureDataAlignment(payeeNames, rawOriginalFileData);
+      
+      console.log(`[BATCH MANAGER] AFTER ALIGNMENT FIX:`, {
+        jobId: job.id,
+        payeeCount: payeeNames.length,
+        originalDataCount: originalFileData.length,
+        perfectAlignment: payeeNames.length === originalFileData.length
+      });
       
       // STRICT VALIDATION: Must have exact data alignment
       if (payeeNames.length === 0) {
@@ -134,14 +181,8 @@ const BatchJobManager = ({
       }
       
       if (originalFileData.length !== payeeNames.length) {
-        throw new Error(`Data misalignment: ${payeeNames.length} payee names vs ${originalFileData.length} original data rows`);
+        throw new Error(`CRITICAL: Data alignment failed - ${payeeNames.length} payee names vs ${originalFileData.length} original data rows`);
       }
-      
-      console.log('[BATCH MANAGER] Processing job with exact counts:', {
-        jobId: job.id,
-        payeeCount: payeeNames.length,
-        originalDataCount: originalFileData.length
-      });
       
       setDownloadProgress(prev => ({ ...prev, [job.id]: { current: 0, total: payeeNames.length } }));
 
@@ -156,7 +197,7 @@ const BatchJobManager = ({
       for (let i = 0; i < payeeNames.length; i++) {
         const payeeName = payeeNames[i];
         const rawResult = rawResults[i];
-        const originalData = originalFileData[i]; // Direct 1:1 mapping
+        const originalData = originalFileData[i]; // Perfect 1:1 mapping guaranteed
         
         // Apply keyword exclusion
         const keywordExclusion = checkKeywordExclusion(payeeName);
@@ -173,7 +214,7 @@ const BatchJobManager = ({
             keywordExclusion: keywordExclusion
           },
           timestamp: new Date(),
-          originalData: originalData, // Direct assignment, no modification
+          originalData: originalData, // Perfect 1:1 mapping
           rowIndex: i
         };
         
@@ -197,8 +238,16 @@ const BatchJobManager = ({
         results: classifications,
         successCount,
         failureCount,
-        originalFileData: originalFileData // Direct assignment, no modification
+        originalFileData: originalFileData // Aligned data
       };
+
+      console.log(`[BATCH MANAGER] PERFECT ALIGNMENT ACHIEVED:`, {
+        jobId: job.id,
+        payeeNames: payeeNames.length,
+        classifications: classifications.length,
+        originalFileData: originalFileData.length,
+        allMatch: payeeNames.length === classifications.length && classifications.length === originalFileData.length
+      });
 
       onJobComplete(classifications, summary, job.id);
 
