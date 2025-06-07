@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Clock, Download, RefreshCw, Trash, Loader2 } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Download, RefreshCw, Trash, Loader2, CheckCheck } from "lucide-react";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 
 interface BatchJobCardProps {
@@ -12,6 +12,7 @@ interface BatchJobCardProps {
   isRefreshing: boolean;
   isDownloading: boolean;
   isPolling: boolean;
+  isCompleted?: boolean;
   progress?: { current: number; total: number };
   lastError?: string;
   onRefresh: (jobId: string) => void;
@@ -26,6 +27,7 @@ const BatchJobCard = ({
   isRefreshing,
   isDownloading,
   isPolling,
+  isCompleted = false,
   progress,
   lastError,
   onRefresh,
@@ -77,8 +79,14 @@ const BatchJobCard = ({
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-sm">
+            <CardTitle className="text-sm flex items-center gap-2">
               Job {job.id.slice(-8)}
+              {isCompleted && (
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                  <CheckCheck className="h-3 w-3 mr-1" />
+                  Downloaded
+                </Badge>
+              )}
             </CardTitle>
             <CardDescription>
               {job.metadata?.description || 'Payee classification batch'} • {payeeCount} payees
@@ -161,15 +169,20 @@ const BatchJobCard = ({
             <Button
               size="sm"
               onClick={() => onDownload(job)}
-              disabled={isDownloading}
+              disabled={isDownloading || isCompleted}
+              variant={isCompleted ? "outline" : "default"}
             >
               {isDownloading ? (
                 <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              ) : isCompleted ? (
+                <CheckCheck className="h-3 w-3 mr-1" />
               ) : (
                 <Download className="h-3 w-3 mr-1" />
               )}
               {isDownloading 
                 ? (progress ? `Processing ${progress.current}/${progress.total}...` : 'Processing...')
+                : isCompleted
+                ? 'Already Downloaded'
                 : 'Download Results'
               }
             </Button>

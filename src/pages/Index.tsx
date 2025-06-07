@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BatchClassificationForm from "@/components/BatchClassificationForm";
@@ -32,13 +31,39 @@ const Index = () => {
     logMemoryUsage(`Tab change to ${activeTab}`);
   }, [activeTab]);
 
+  // Deduplication function to remove duplicates based on payee name and job ID
+  const deduplicateResults = (results: PayeeClassification[]): PayeeClassification[] => {
+    const seen = new Set<string>();
+    const deduplicated: PayeeClassification[] = [];
+    
+    // Sort by timestamp (newest first) to keep the most recent version of each result
+    const sorted = [...results].sort((a, b) => 
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+    
+    for (const result of sorted) {
+      // Create a unique key based on payee name and job ID (from result ID)
+      const jobId = result.id.includes('openai-') ? result.id.split('-')[1] : 'unknown';
+      const uniqueKey = `${result.payeeName}-${jobId}`;
+      
+      if (!seen.has(uniqueKey)) {
+        seen.add(uniqueKey);
+        deduplicated.push(result);
+      }
+    }
+    
+    console.log(`[INDEX] Deduplication: ${results.length} → ${deduplicated.length} results`);
+    return deduplicated;
+  };
+
   const loadStoredResults = () => {
     try {
       const storedResults = localStorage.getItem('all_classification_results');
       if (storedResults) {
         const parsedResults = JSON.parse(storedResults);
-        setAllResults(parsedResults);
-        console.log(`[INDEX] Loaded ${parsedResults.length} stored results`);
+        const deduplicatedResults = deduplicateResults(parsedResults);
+        setAllResults(deduplicatedResults);
+        console.log(`[INDEX] Loaded ${deduplicatedResults.length} deduplicated stored results`);
       }
     } catch (error) {
       console.error('[INDEX] Error loading stored results:', error);
@@ -47,8 +72,9 @@ const Index = () => {
 
   const saveResults = (results: PayeeClassification[]) => {
     try {
-      localStorage.setItem('all_classification_results', JSON.stringify(results));
-      console.log(`[INDEX] Saved ${results.length} results to storage`);
+      const deduplicatedResults = deduplicateResults(results);
+      localStorage.setItem('all_classification_results', JSON.stringify(deduplicatedResults));
+      console.log(`[INDEX] Saved ${deduplicatedResults.length} deduplicated results to storage`);
     } catch (error) {
       console.error('[INDEX] Error saving results:', error);
     }
@@ -61,10 +87,12 @@ const Index = () => {
     setBatchResults(results);
     setBatchSummary(summary);
     
-    // Add new results to all results and store them
-    const updatedResults = [...results, ...allResults];
-    setAllResults(updatedResults);
-    saveResults(updatedResults);
+    // FIXED: Instead of adding to existing results, merge and deduplicate
+    const mergedResults = [...results, ...allResults];
+    const deduplicatedResults = deduplicateResults(mergedResults);
+    
+    setAllResults(deduplicatedResults);
+    saveResults(deduplicatedResults);
     
     setActiveTab("results");
     logMemoryUsage('Batch processing complete');

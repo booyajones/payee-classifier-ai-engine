@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
@@ -37,6 +36,8 @@ const BatchJobManager = ({
     onConfirm: () => {}
   });
 
+  const [completedJobs, setCompletedJobs] = useState<Set<string>>(new Set());
+
   const {
     refreshingJobs,
     downloadingJobs,
@@ -50,7 +51,16 @@ const BatchJobManager = ({
     payeeNamesMap,
     originalFileDataMap,
     onJobUpdate,
-    onJobComplete
+    onJobComplete: (results, summary, jobId) => {
+      // FIXED: Track completed jobs to prevent duplicate processing
+      if (!completedJobs.has(jobId)) {
+        setCompletedJobs(prev => new Set(prev).add(jobId));
+        onJobComplete(results, summary, jobId);
+        console.log(`[BATCH MANAGER] Job ${jobId} marked as completed, preventing future duplicates`);
+      } else {
+        console.log(`[BATCH MANAGER] Job ${jobId} already completed, skipping duplicate processing`);
+      }
+    }
   });
 
   const sortedJobs = [...jobs].sort((a, b) => {
@@ -100,6 +110,7 @@ const BatchJobManager = ({
           const isJobDownloading = downloadingJobs.has(job.id);
           const progress = downloadProgress[job.id];
           const payeeCount = payeeNamesMap[job.id]?.length || 0;
+          const isCompleted = completedJobs.has(job.id);
           
           return (
             <BatchJobCard
@@ -115,6 +126,7 @@ const BatchJobManager = ({
               onDownload={handleDownloadResults}
               onCancel={showCancelConfirmation}
               onDelete={showDeleteConfirmation}
+              isCompleted={isCompleted}
             />
           );
         })}
