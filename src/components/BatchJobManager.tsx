@@ -126,13 +126,22 @@ const BatchJobManager = ({
     
     try {
       const payeeNames = payeeNamesMap[job.id] || [];
-      let originalFileData = originalFileDataMap[job.id] || [];
+      const originalFileData = originalFileDataMap[job.id] || [];
       
+      // STRICT VALIDATION: Must have exact data alignment
       if (payeeNames.length === 0) {
-        throw new Error('No payee names found for this job. The job data may be corrupted.');
+        throw new Error('No payee names found for this job');
       }
-
-      originalFileData = ensureOriginalData(payeeNames, originalFileData);
+      
+      if (originalFileData.length !== payeeNames.length) {
+        throw new Error(`Data misalignment: ${payeeNames.length} payee names vs ${originalFileData.length} original data rows`);
+      }
+      
+      console.log('[BATCH MANAGER] Processing job with exact counts:', {
+        jobId: job.id,
+        payeeCount: payeeNames.length,
+        originalDataCount: originalFileData.length
+      });
       
       setDownloadProgress(prev => ({ ...prev, [job.id]: { current: 0, total: payeeNames.length } }));
 
@@ -147,7 +156,7 @@ const BatchJobManager = ({
       for (let i = 0; i < payeeNames.length; i++) {
         const payeeName = payeeNames[i];
         const rawResult = rawResults[i];
-        const originalData = originalFileData[i];
+        const originalData = originalFileData[i]; // Direct 1:1 mapping
         
         // Apply keyword exclusion
         const keywordExclusion = checkKeywordExclusion(payeeName);
@@ -164,7 +173,7 @@ const BatchJobManager = ({
             keywordExclusion: keywordExclusion
           },
           timestamp: new Date(),
-          originalData: originalData,
+          originalData: originalData, // Direct assignment, no modification
           rowIndex: i
         };
         
@@ -176,6 +185,11 @@ const BatchJobManager = ({
         }));
       }
 
+      // FINAL VALIDATION
+      if (classifications.length !== payeeNames.length) {
+        throw new Error(`Final count mismatch: created ${classifications.length} classifications from ${payeeNames.length} payees`);
+      }
+
       const successCount = classifications.filter(c => c.result.processingTier !== 'Failed').length;
       const failureCount = classifications.length - successCount;
 
@@ -183,14 +197,14 @@ const BatchJobManager = ({
         results: classifications,
         successCount,
         failureCount,
-        originalFileData: originalFileData
+        originalFileData: originalFileData // Direct assignment, no modification
       };
 
       onJobComplete(classifications, summary, job.id);
 
       toast({
         title: "Download Complete",
-        description: `Downloaded ${successCount} classifications${failureCount > 0 ? ` (${failureCount} failed)` : ''}.`,
+        description: `Processed exactly ${classifications.length} rows (${successCount} successful, ${failureCount} failed).`,
       });
       
     } catch (error) {

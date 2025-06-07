@@ -15,19 +15,25 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
 
   const performExport = (exportType: 'csv' | 'json' | 'excel') => {
     try {
+      // STRICT VALIDATION: Check all results have original data
+      const invalidResults = results.filter(r => !r.originalData);
+      if (invalidResults.length > 0) {
+        throw new Error(`${invalidResults.length} results missing original data`);
+      }
+
+      // Create batch result with exact 1:1 mapping
       const batchResult = {
         results: results,
         successCount: results.length,
         failureCount: 0,
-        originalFileData: results.map(r => r.originalData).filter(Boolean)
+        originalFileData: results.map(r => r.originalData) // Direct mapping, no filtering
       };
 
-      if (batchResult.originalFileData.length !== results.length) {
-        batchResult.originalFileData = results.map((r, i) => r.originalData || { 
-          PayeeName: r.payeeName, 
-          RowIndex: i 
-        });
-      }
+      console.log('[EXPORT BUTTONS] Pre-export validation:', {
+        resultsCount: results.length,
+        originalDataCount: batchResult.originalFileData.length,
+        isValid: results.length === batchResult.originalFileData.length
+      });
 
       const exportData = exportResultsWithOriginalDataV3(batchResult, true);
       
@@ -80,15 +86,15 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
       }
 
       toast({
-        title: `Export Complete`,
-        description: `Exported ${exportData.length} rows.`,
+        title: "Export Complete",
+        description: `Exported ${exportData.length} rows exactly.`,
       });
 
     } catch (error) {
-      console.error(`Export error (${exportType}):`, error);
+      console.error(`[EXPORT BUTTONS] Export error (${exportType}):`, error);
       toast({
         title: "Export Error",
-        description: `Failed to export. Please try again.`,
+        description: `Failed to export: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive",
       });
     }
@@ -98,15 +104,15 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
     <div className="flex gap-2">
       <Button variant="outline" size="sm" onClick={() => performExport('csv')}>
         <Download className="w-4 h-4 mr-2" /> 
-        Export CSV
+        CSV
       </Button>
       <Button variant="outline" size="sm" onClick={() => performExport('json')}>
         <Download className="w-4 h-4 mr-2" /> 
-        Export JSON
+        JSON
       </Button>
       <Button variant="outline" size="sm" onClick={() => performExport('excel')}>
         <Download className="w-4 h-4 mr-2" /> 
-        Export Excel
+        Excel
       </Button>
     </div>
   );

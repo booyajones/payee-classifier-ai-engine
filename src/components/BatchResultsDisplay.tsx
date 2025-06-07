@@ -34,6 +34,17 @@ const BatchResultsDisplay = ({
     }
 
     try {
+      // STRICT VALIDATION: Check all results have original data
+      const invalidResults = batchResults.filter(r => !r.originalData);
+      if (invalidResults.length > 0) {
+        throw new Error(`${invalidResults.length} results missing original data`);
+      }
+
+      console.log('[BATCH RESULTS DISPLAY] Pre-export validation:', {
+        resultsCount: batchResults.length,
+        summaryOriginalCount: processingSummary.originalFileData?.length || 0
+      });
+
       const exportData = exportResultsWithOriginalDataV3(processingSummary, true);
       
       const workbook = XLSX.utils.book_new();
@@ -48,13 +59,13 @@ const BatchResultsDisplay = ({
       
       toast({
         title: "Export Complete",
-        description: `Exported ${exportData.length} rows.`,
+        description: `Exported exactly ${exportData.length} rows.`,
       });
     } catch (error) {
       console.error("Export error:", error);
       toast({
         title: "Export Error",
-        description: "Failed to export results. Please try again.",
+        description: `Failed to export: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive",
       });
     }

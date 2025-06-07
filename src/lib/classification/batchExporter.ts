@@ -2,80 +2,81 @@
 import { BatchProcessingResult } from '../types';
 
 /**
- * Simple export that preserves original data and adds classification results
+ * Export that preserves original data and adds classification results with strict 1:1 mapping
  */
 export function exportResultsWithOriginalDataV3(
   batchResult: BatchProcessingResult,
   includeAllColumns: boolean = true
 ): any[] {
-  console.log('[BATCH EXPORTER] Starting export:', {
-    hasOriginalData: !!batchResult.originalFileData,
-    originalDataLength: batchResult.originalFileData?.length || 0,
-    resultsLength: batchResult.results.length
+  console.log('[BATCH EXPORTER] Starting export with strict validation:', {
+    resultsLength: batchResult.results.length,
+    originalDataLength: batchResult.originalFileData?.length || 0
   });
+
+  // STRICT VALIDATION: Must have exact same number of rows
+  if (!batchResult.originalFileData || batchResult.originalFileData.length !== batchResult.results.length) {
+    throw new Error(`Row count mismatch: ${batchResult.results.length} results vs ${batchResult.originalFileData?.length || 0} original rows`);
+  }
 
   const exportData: any[] = [];
   
-  // Simple 1:1 mapping
+  // Simple 1:1 mapping - no loops, no filters, no synthetic data
   for (let i = 0; i < batchResult.results.length; i++) {
     const result = batchResult.results[i];
-    const originalRow = batchResult.originalFileData?.[i] || {};
+    const originalRow = batchResult.originalFileData[i];
     
-    // Handle timestamp properly
+    if (!result || !originalRow) {
+      throw new Error(`Missing data at index ${i}: result=${!!result}, originalRow=${!!originalRow}`);
+    }
+    
+    // Handle timestamp conversion
     let timestampString = '';
     try {
       if (result.timestamp instanceof Date) {
         timestampString = result.timestamp.toISOString();
       } else if (typeof result.timestamp === 'string') {
         timestampString = result.timestamp;
-      } else if (result.timestamp) {
-        timestampString = new Date(result.timestamp).toISOString();
       } else {
         timestampString = new Date().toISOString();
       }
     } catch (error) {
-      console.warn(`[BATCH EXPORTER] Timestamp conversion error for row ${i}:`, error);
       timestampString = new Date().toISOString();
     }
     
-    // Create export row - original data first, then classification results
+    // Create export row: original data + classification columns
     const exportRow = {
-      // Original data preserved as-is
+      // Preserve ALL original columns exactly as they were
       ...originalRow,
       
-      // Classification results
+      // Add classification results
       'Classification': result.result.classification,
       'Confidence_%': result.result.confidence,
       'Processing_Tier': result.result.processingTier,
       'Reasoning': result.result.reasoning,
       'Processing_Method': result.result.processingMethod || 'OpenAI Classification',
       
-      // Keyword exclusion data
+      // Add keyword exclusion results
       'Keyword_Exclusion': result.result.keywordExclusion?.isExcluded ? 'Yes' : 'No',
       'Matched_Keywords': result.result.keywordExclusion?.matchedKeywords?.join('; ') || '',
       'Keyword_Confidence': result.result.keywordExclusion?.confidence?.toString() || '0',
       'Keyword_Reasoning': result.result.keywordExclusion?.reasoning || 'No keyword exclusion applied',
       
-      // Additional fields
-      'Matching_Rules': result.result.matchingRules?.join('; ') || '',
-      'Timestamp': timestampString,
-      'Row_Index': i
+      // Add timestamp
+      'Timestamp': timestampString
     };
 
-    // Add similarity scores if available
-    if (result.result.similarityScores) {
-      exportRow['Levenshtein_Score'] = result.result.similarityScores.levenshtein?.toFixed(2) || '';
-      exportRow['Jaro_Winkler_Score'] = result.result.similarityScores.jaroWinkler?.toFixed(2) || '';
-      exportRow['Dice_Coefficient'] = result.result.similarityScores.dice?.toFixed(2) || '';
-      exportRow['Token_Sort_Ratio'] = result.result.similarityScores.tokenSort?.toFixed(2) || '';
-      exportRow['Combined_Similarity'] = result.result.similarityScores.combined?.toFixed(2) || '';
-    }
-    
     exportData.push(exportRow);
   }
 
-  console.log('[BATCH EXPORTER] Export complete:', {
-    totalRows: exportData.length
+  // FINAL VALIDATION
+  if (exportData.length !== batchResult.results.length) {
+    throw new Error(`Export count mismatch: created ${exportData.length} rows from ${batchResult.results.length} results`);
+  }
+
+  console.log('[BATCH EXPORTER] Export complete - EXACT ROW COUNT:', {
+    inputRows: batchResult.results.length,
+    outputRows: exportData.length,
+    validated: exportData.length === batchResult.results.length
   });
 
   return exportData;
