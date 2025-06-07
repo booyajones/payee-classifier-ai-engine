@@ -34,18 +34,7 @@ const BatchResultsDisplay = ({
     }
 
     try {
-      console.log('[BATCH RESULTS] Exporting results:', {
-        hasProcessingSummary: !!processingSummary,
-        hasOriginalFileData: !!processingSummary.originalFileData,
-        originalDataLength: processingSummary.originalFileData?.length || 0,
-        resultsLength: batchResults.length
-      });
-
       const exportData = exportResultsWithOriginalDataV3(processingSummary, true);
-      
-      console.log('[BATCH RESULTS] Export data created:', {
-        totalRows: exportData.length
-      });
       
       const workbook = XLSX.utils.book_new();
       const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -57,27 +46,9 @@ const BatchResultsDisplay = ({
       
       XLSX.writeFile(workbook, filename);
       
-      const originalColumns = exportData[0] ? Object.keys(exportData[0]).filter(k => 
-        !k.startsWith('Classification') && 
-        !k.startsWith('Keyword_') && 
-        !k.startsWith('Processing_') &&
-        !k.startsWith('Confidence') &&
-        !k.startsWith('Reasoning') &&
-        !k.startsWith('Matching_') &&
-        !k.startsWith('Levenshtein_') &&
-        !k.startsWith('Jaro_') &&
-        !k.startsWith('Dice_') &&
-        !k.startsWith('Token_') &&
-        !k.startsWith('Combined_') &&
-        k !== 'Timestamp' &&
-        k !== 'Row_Index'
-      ).length : 0;
-
-      const keywordExcludedCount = exportData.filter(row => row['Keyword_Exclusion'] === 'Yes').length;
-      
       toast({
         title: "Export Complete",
-        description: `Exported ${exportData.length} rows with ${originalColumns} original columns. ${keywordExcludedCount} payees excluded by keywords.`,
+        description: `Exported ${exportData.length} rows.`,
       });
     } catch (error) {
       console.error("Export error:", error);
@@ -87,28 +58,6 @@ const BatchResultsDisplay = ({
         variant: "destructive",
       });
     }
-  };
-
-  // Display summary of what's included in the results
-  const getResultsSummary = () => {
-    if (!processingSummary || batchResults.length === 0) return null;
-
-    const hasOriginalData = processingSummary.originalFileData && processingSummary.originalFileData.length > 0;
-    const allHaveKeywordExclusion = batchResults.every(r => !!r.result.keywordExclusion);
-    const keywordExcludedCount = batchResults.filter(r => r.result.keywordExclusion?.isExcluded).length;
-    const originalColumnCount = hasOriginalData ? Object.keys(processingSummary.originalFileData[0] || {}).length : 0;
-
-    return (
-      <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <h4 className="font-medium text-blue-900 mb-2">Results Summary</h4>
-        <div className="text-sm text-blue-800 space-y-1">
-          <div>• {batchResults.length} payees processed</div>
-          <div>• {originalColumnCount} original file columns preserved</div>
-          <div>• {allHaveKeywordExclusion ? 'Keyword exclusion applied to all results' : 'Some results missing keyword exclusion data'}</div>
-          <div>• {keywordExcludedCount} payees excluded due to keyword matches</div>
-        </div>
-      </div>
-    );
   };
 
   return (
@@ -122,8 +71,6 @@ const BatchResultsDisplay = ({
       {batchResults.length > 0 ? (
         <div>
           <h3 className="text-lg font-medium mb-4">Classification Results</h3>
-          
-          {getResultsSummary()}
           
           <ClassificationResultTable results={batchResults} />
           

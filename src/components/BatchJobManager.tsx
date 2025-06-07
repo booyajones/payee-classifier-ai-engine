@@ -10,6 +10,7 @@ import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { useBatchJobPolling } from "@/hooks/useBatchJobPolling";
 import { handleError, showErrorToast, showRetryableErrorToast } from "@/lib/errorHandler";
 import { useRetry } from "@/hooks/useRetry";
+import { checkKeywordExclusion } from "@/lib/classification/enhancedKeywordExclusion";
 import ConfirmationDialog from "./ConfirmationDialog";
 
 interface BatchJobManagerProps {
@@ -46,10 +47,8 @@ const BatchJobManager = ({
   });
   const { toast } = useToast();
 
-  // Use the simplified polling hook for manual refresh only
   const { pollingStates, refreshSpecificJob } = useBatchJobPolling(jobs, onJobUpdate);
 
-  // Retry mechanism for operations
   const {
     execute: refreshJobWithRetry,
     isRetrying: isRefreshRetrying
@@ -60,11 +59,10 @@ const BatchJobManager = ({
     isRetrying: isDownloadRetrying
   } = useRetry(getBatchJobResults, { maxRetries: 3, baseDelay: 2000 });
 
-  // Sort jobs by creation date (most recent first)
   const sortedJobs = [...jobs].sort((a, b) => {
     const dateA = new Date(a.created_at * 1000).getTime();
     const dateB = new Date(b.created_at * 1000).getTime();
-    return dateB - dateA; // Descending order (newest first)
+    return dateB - dateA;
   });
 
   const formatDate = (timestamp: number) => {
@@ -78,40 +76,27 @@ const BatchJobManager = ({
     });
   };
 
-  // FIXED: Safe original data recovery without complex fallbacks
   const ensureOriginalData = (payeeNames: string[], existingData?: any[]): any[] => {
     if (existingData && existingData.length === payeeNames.length) {
-      console.log(`[RECOVERY] Using preserved original data: ${existingData.length} rows`);
       return existingData;
     }
     
-    console.log(`[RECOVERY] Creating minimal fallback for ${payeeNames.length} payees`);
     return payeeNames.map((name, index) => ({
       PayeeName: name,
-      RowIndex: index,
-      RecoveryApplied: true
+      RowIndex: index
     }));
   };
-
-  // FIXED: Safe keyword exclusion processing (simplified)
-  const safeKeywordExclusion = () => ({
-    isExcluded: false,
-    matchedKeywords: [],
-    confidence: 0,
-    reasoning: 'Safe processing applied'
-  });
 
   const handleRefreshJob = async (jobId: string) => {
     const refreshFunction = async () => {
       setRefreshingJobs(prev => new Set(prev).add(jobId));
       try {
-        console.log(`[BATCH MANAGER] Manual refresh for job ${jobId}`);
         const updatedJob = await refreshJobWithRetry(jobId);
         onJobUpdate(updatedJob);
         
         toast({
           title: "Job Status Updated",
-          description: `Job ${jobId.slice(-8)} status refreshed to "${updatedJob.status}".`,
+          description: `Job status refreshed to "${updatedJob.status}".`,
         });
       } catch (error) {
         const appError = handleError(error, 'Job Status Refresh');
@@ -135,13 +120,11 @@ const BatchJobManager = ({
     await refreshSpecificJob(jobId, refreshFunction);
   };
 
-  // FIXED: Single pipeline processing - no dual classification conflicts
   const handleDownloadResults = async (job: BatchJob) => {
     setDownloadingJobs(prev => new Set(prev).add(job.id));
     setDownloadProgress(prev => ({ ...prev, [job.id]: { current: 0, total: 0 } }));
     
     try {
-      console.log(`[BATCH MANAGER] FIXED: Single pipeline download for job ${job.id}`);
       const payeeNames = payeeNamesMap[job.id] || [];
       let originalFileData = originalFileDataMap[job.id] || [];
       
@@ -149,21 +132,16 @@ const BatchJobManager = ({
         throw new Error('No payee names found for this job. The job data may be corrupted.');
       }
 
-      // FIXED: Ensure original data alignment
       originalFileData = ensureOriginalData(payeeNames, originalFileData);
       
-      console.log(`[BATCH MANAGER] FIXED: Processing ${payeeNames.length} payees with ${originalFileData.length} aligned data rows`);
       setDownloadProgress(prev => ({ ...prev, [job.id]: { current: 0, total: payeeNames.length } }));
 
-      // STEP 1: Get OpenAI Batch Results (single source of truth)
-      console.log(`[BATCH MANAGER] FIXED: Downloading OpenAI batch results (single pipeline)`);
       const rawResults = await downloadResultsWithRetry(job, payeeNames);
       
       if (rawResults.length !== payeeNames.length) {
-        throw new Error(`OpenAI results misalignment: expected ${payeeNames.length}, got ${rawResults.length}`);
+        throw new Error(`Results misalignment: expected ${payeeNames.length}, got ${rawResults.length}`);
       }
 
-      // STEP 2: Create PayeeClassification array with perfect alignment
       const classifications: PayeeClassification[] = [];
       
       for (let i = 0; i < payeeNames.length; i++) {
@@ -171,7 +149,9 @@ const BatchJobManager = ({
         const rawResult = rawResults[i];
         const originalData = originalFileData[i];
         
-        // FIXED: Use OpenAI results directly, no dual processing
+        // Apply keyword exclusion
+        const keywordExclusion = checkKeywordExclusion(payeeName);
+        
         const classification: PayeeClassification = {
           id: `openai-${job.id}-${i}`,
           payeeName: payeeName,
@@ -180,8 +160,8 @@ const BatchJobManager = ({
             confidence: rawResult?.confidence || 50,
             reasoning: rawResult?.reasoning || 'OpenAI batch processing result',
             processingTier: rawResult?.status === 'success' ? 'AI-Powered' : 'Failed',
-            processingMethod: 'OpenAI Batch API (Single Pipeline)',
-            keywordExclusion: safeKeywordExclusion()
+            processingMethod: 'OpenAI Batch API',
+            keywordExclusion: keywordExclusion
           },
           timestamp: new Date(),
           originalData: originalData,
@@ -190,31 +170,15 @@ const BatchJobManager = ({
         
         classifications.push(classification);
         
-        // Update progress
         setDownloadProgress(prev => ({ 
           ...prev, 
           [job.id]: { current: i + 1, total: payeeNames.length } 
         }));
       }
 
-      // VALIDATION: Ensure perfect alignment
-      if (classifications.length !== payeeNames.length) {
-        throw new Error(`Classification alignment error: expected ${payeeNames.length}, got ${classifications.length}`);
-      }
-
-      for (let i = 0; i < classifications.length; i++) {
-        if (classifications[i].rowIndex !== i) {
-          throw new Error(`Row index mismatch at position ${i}`);
-        }
-        if (classifications[i].payeeName !== payeeNames[i]) {
-          throw new Error(`Payee name mismatch at position ${i}`);
-        }
-      }
-
       const successCount = classifications.filter(c => c.result.processingTier !== 'Failed').length;
       const failureCount = classifications.length - successCount;
 
-      // FIXED: Create summary with guaranteed alignment
       const summary: BatchProcessingResult = {
         results: classifications,
         successCount,
@@ -222,22 +186,20 @@ const BatchJobManager = ({
         originalFileData: originalFileData
       };
 
-      console.log(`[BATCH MANAGER] FIXED: Single pipeline processing complete - perfect alignment guaranteed`);
-
       onJobComplete(classifications, summary, job.id);
 
       toast({
-        title: "Download Complete (Single Pipeline)",
-        description: `Downloaded ${successCount} classifications using OpenAI Batch API${failureCount > 0 ? ` (${failureCount} failed)` : ''}.`,
+        title: "Download Complete",
+        description: `Downloaded ${successCount} classifications${failureCount > 0 ? ` (${failureCount} failed)` : ''}.`,
       });
       
     } catch (error) {
       const appError = handleError(error, 'Results Download');
-      console.error(`[BATCH MANAGER] FIXED: Download error for job ${job.id}:`, error);
+      console.error(`[BATCH MANAGER] Download error for job ${job.id}:`, error);
       
       toast({
         title: "Download Failed",
-        description: `Job ${job.id.slice(-8)} download failed: ${appError.message}`,
+        description: `Job download failed: ${appError.message}`,
         variant: "destructive",
       });
       
@@ -257,13 +219,12 @@ const BatchJobManager = ({
 
   const handleCancelJob = async (jobId: string) => {
     try {
-      console.log(`[BATCH MANAGER] Cancelling job ${jobId}`);
       const cancelledJob = await cancelBatchJob(jobId);
       onJobUpdate(cancelledJob);
       
       toast({
         title: "Job Cancelled",
-        description: `Batch job ${jobId.slice(-8)} has been cancelled successfully.`,
+        description: `Batch job has been cancelled successfully.`,
       });
     } catch (error) {
       const appError = handleError(error, 'Job Cancellation');
@@ -276,7 +237,7 @@ const BatchJobManager = ({
     setConfirmDialog({
       isOpen: true,
       title: 'Cancel Batch Job',
-      description: `Are you sure you want to cancel job ${jobId.slice(-8)}? This action cannot be undone and you may be charged for completed requests.`,
+      description: `Are you sure you want to cancel this job? This action cannot be undone and you may be charged for completed requests.`,
       onConfirm: () => handleCancelJob(jobId),
       variant: 'destructive'
     });
@@ -286,7 +247,7 @@ const BatchJobManager = ({
     setConfirmDialog({
       isOpen: true,
       title: 'Remove Job',
-      description: `Are you sure you want to remove job ${jobId.slice(-8)} from the list? This will only remove it from your view, not delete the actual job.`,
+      description: `Are you sure you want to remove this job from the list? This will only remove it from your view, not delete the actual job.`,
       onConfirm: () => onJobDelete(jobId),
       variant: 'destructive'
     });
@@ -333,7 +294,7 @@ const BatchJobManager = ({
   return (
     <>
       <div className="space-y-4">
-        <h3 className="text-lg font-medium">Batch Jobs (Single Pipeline) - Latest First</h3>
+        <h3 className="text-lg font-medium">Batch Jobs</h3>
         
         {sortedJobs.map((job) => {
           const pollingState = pollingStates[job.id];
@@ -341,7 +302,6 @@ const BatchJobManager = ({
           const isJobDownloading = downloadingJobs.has(job.id);
           const progress = downloadProgress[job.id];
           const payeeCount = payeeNamesMap[job.id]?.length || 0;
-          const hasOriginalData = originalFileDataMap[job.id]?.length > 0;
           
           return (
             <Card key={job.id}>
@@ -353,11 +313,6 @@ const BatchJobManager = ({
                     </CardTitle>
                     <CardDescription>
                       {job.metadata?.description || 'Payee classification batch'} • {payeeCount} payees
-                      {hasOriginalData ? (
-                        <span className="text-green-600"> • Original data preserved</span>
-                      ) : (
-                        <span className="text-orange-600"> • Fallback data available</span>
-                      )}
                       <br />
                       <span className="text-xs text-muted-foreground">
                         Created: {formatDate(job.created_at)}
@@ -446,7 +401,7 @@ const BatchJobManager = ({
                       )}
                       {isJobDownloading 
                         ? (progress ? `Processing ${progress.current}/${progress.total}...` : 'Processing...')
-                        : 'Download Results (Single Pipeline)'
+                        : 'Download Results'
                       }
                     </Button>
                   )}

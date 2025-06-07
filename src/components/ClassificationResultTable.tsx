@@ -15,13 +15,7 @@ interface ClassificationResultTableProps {
 const ClassificationResultTable = ({ results }: ClassificationResultTableProps) => {
   const [selectedResult, setSelectedResult] = useState<PayeeClassification | null>(null);
   
-  // Filter out any potentially invalid results
   const validResults = results.filter(result => result && result.result);
-  
-  console.log('[CLASSIFICATION TABLE] Valid results:', {
-    originalCount: results.length,
-    validCount: validResults.length
-  });
   
   if (validResults.length === 0) {
     return (
@@ -31,7 +25,6 @@ const ClassificationResultTable = ({ results }: ClassificationResultTableProps) 
     );
   }
 
-  // Get all original data columns from ALL results
   const allOriginalColumns = new Set<string>();
   validResults.forEach(result => {
     if (result.originalData) {
@@ -40,9 +33,6 @@ const ClassificationResultTable = ({ results }: ClassificationResultTableProps) 
   });
   const originalColumns = Array.from(allOriginalColumns);
   
-  console.log('[CLASSIFICATION TABLE] Original columns detected:', originalColumns);
-  
-  // Define classification columns
   const classificationColumns = [
     { key: 'classification', label: 'Classification' },
     { key: 'confidence', label: 'Confidence' },
@@ -50,14 +40,12 @@ const ClassificationResultTable = ({ results }: ClassificationResultTableProps) 
     { key: 'reasoning', label: 'Reasoning' }
   ];
   
-  // Define keyword exclusion columns
   const keywordColumns = [
     { key: 'keywordExclusion', label: 'Excluded by Keywords' },
     { key: 'matchedKeywords', label: 'Matched Keywords' },
     { key: 'keywordReasoning', label: 'Keyword Reasoning' }
   ];
   
-  // All columns for the table
   const allColumns = [
     ...originalColumns.map(col => ({ key: col, label: col, isOriginal: true })),
     ...classificationColumns.map(col => ({ ...col, isOriginal: false })),
@@ -65,15 +53,13 @@ const ClassificationResultTable = ({ results }: ClassificationResultTableProps) 
     { key: 'details', label: 'Details', isOriginal: false }
   ];
   
-  console.log('[CLASSIFICATION TABLE] All columns for table:', allColumns.map(c => c.label));
-  
   const { sortField, sortDirection, sortedResults, handleSort } = useTableSorting(validResults, originalColumns);
   
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
         <div className="text-sm text-muted-foreground">
-          Showing {validResults.length} results with {originalColumns.length} original columns + classification data + keyword exclusions
+          Showing {validResults.length} results
         </div>
         <ExportButtons results={results} />
       </div>

@@ -15,12 +15,6 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
 
   const performExport = (exportType: 'csv' | 'json' | 'excel') => {
     try {
-      console.log('[EXPORT BUTTONS] Starting export:', {
-        totalResults: results.length,
-        exportType
-      });
-
-      // Create batch result for export
       const batchResult = {
         results: results,
         successCount: results.length,
@@ -28,9 +22,7 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
         originalFileData: results.map(r => r.originalData).filter(Boolean)
       };
 
-      // Validate we have matching original data
       if (batchResult.originalFileData.length !== results.length) {
-        console.warn('[EXPORT BUTTONS] Missing original data for some results, using fallback');
         batchResult.originalFileData = results.map((r, i) => r.originalData || { 
           PayeeName: r.payeeName, 
           RowIndex: i 
@@ -39,21 +31,15 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
 
       const exportData = exportResultsWithOriginalDataV3(batchResult, true);
       
-      console.log('[EXPORT BUTTONS] Export data created:', {
-        totalRows: exportData.length
-      });
-
       const timestamp = new Date().toISOString().slice(0, 10);
       
       if (exportType === 'csv') {
-        // Convert to CSV
         const headers = Object.keys(exportData[0] || {});
         const csvContent = [
           headers.join(','),
           ...exportData.map(row => 
             headers.map(header => {
               const value = row[header] || '';
-              // Escape values that contain commas or quotes
               return typeof value === 'string' && (value.includes(',') || value.includes('"')) 
                 ? `"${value.replace(/"/g, '""')}"` 
                 : value;
@@ -61,7 +47,6 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
           )
         ].join('\n');
 
-        // Download CSV
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
@@ -72,7 +57,6 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
         link.click();
         document.body.removeChild(link);
       } else if (exportType === 'json') {
-        // Download JSON
         const jsonContent = JSON.stringify(exportData, null, 2);
         const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
         const link = document.createElement('a');
@@ -96,15 +80,15 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
       }
 
       toast({
-        title: `${exportType.toUpperCase()} Export Complete`,
-        description: `Exported ${exportData.length} rows with original data and classification results.`,
+        title: `Export Complete`,
+        description: `Exported ${exportData.length} rows.`,
       });
 
     } catch (error) {
       console.error(`Export error (${exportType}):`, error);
       toast({
         title: "Export Error",
-        description: `Failed to export ${exportType.toUpperCase()}. Please try again.`,
+        description: `Failed to export. Please try again.`,
         variant: "destructive",
       });
     }
