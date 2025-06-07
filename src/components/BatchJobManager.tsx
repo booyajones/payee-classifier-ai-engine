@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
@@ -36,7 +37,8 @@ const BatchJobManager = ({
     onConfirm: () => {}
   });
 
-  const [completedJobs, setCompletedJobs] = useState<Set<string>>(new Set());
+  // FIXED: Track processed jobs to prevent any possibility of duplicate processing
+  const [processedJobs, setProcessedJobs] = useState<Set<string>>(new Set());
 
   const {
     refreshingJobs,
@@ -52,14 +54,15 @@ const BatchJobManager = ({
     originalFileDataMap,
     onJobUpdate,
     onJobComplete: (results, summary, jobId) => {
-      // FIXED: Track completed jobs to prevent duplicate processing
-      if (!completedJobs.has(jobId)) {
-        setCompletedJobs(prev => new Set(prev).add(jobId));
-        onJobComplete(results, summary, jobId);
-        console.log(`[BATCH MANAGER] Job ${jobId} marked as completed, preventing future duplicates`);
-      } else {
-        console.log(`[BATCH MANAGER] Job ${jobId} already completed, skipping duplicate processing`);
+      // GUARANTEED NO DUPLICATES: Only process each job exactly once
+      if (processedJobs.has(jobId)) {
+        console.log(`[BATCH MANAGER] Job ${jobId} already processed, ignoring duplicate`);
+        return;
       }
+      
+      setProcessedJobs(prev => new Set(prev).add(jobId));
+      onJobComplete(results, summary, jobId);
+      console.log(`[BATCH MANAGER] Job ${jobId} processed successfully, marked as completed`);
     }
   });
 
@@ -110,7 +113,7 @@ const BatchJobManager = ({
           const isJobDownloading = downloadingJobs.has(job.id);
           const progress = downloadProgress[job.id];
           const payeeCount = payeeNamesMap[job.id]?.length || 0;
-          const isCompleted = completedJobs.has(job.id);
+          const isProcessed = processedJobs.has(job.id);
           
           return (
             <BatchJobCard
@@ -126,7 +129,7 @@ const BatchJobManager = ({
               onDownload={handleDownloadResults}
               onCancel={showCancelConfirmation}
               onDelete={showDeleteConfirmation}
-              isCompleted={isCompleted}
+              isCompleted={isProcessed}
             />
           );
         })}

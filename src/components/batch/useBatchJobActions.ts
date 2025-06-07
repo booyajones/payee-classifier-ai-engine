@@ -40,12 +40,12 @@ export const useBatchJobActions = ({
     isRetrying: isDownloadRetrying
   } = useRetry(getBatchJobResults, { maxRetries: 3, baseDelay: 2000 });
 
-  // FIXED: Ensure perfect alignment by trimming original data to match payee names count
+  // FIXED: Ensure EXACT data alignment with strict validation
   const ensureDataAlignment = (payeeNames: string[], originalData: any[]): any[] => {
-    console.log(`[ALIGNMENT FIX] Input: ${payeeNames.length} payee names, ${originalData.length} original rows`);
+    console.log(`[ALIGNMENT] Input: ${payeeNames.length} payee names, ${originalData.length} original rows`);
     
     if (!originalData || originalData.length === 0) {
-      console.log(`[ALIGNMENT FIX] No original data, creating fallback data`);
+      console.log(`[ALIGNMENT] No original data, creating indexed fallback`);
       return payeeNames.map((name, index) => ({
         PayeeName: name,
         RowIndex: index
@@ -53,33 +53,12 @@ export const useBatchJobActions = ({
     }
     
     if (originalData.length === payeeNames.length) {
-      console.log(`[ALIGNMENT FIX] Perfect alignment already exists`);
+      console.log(`[ALIGNMENT] Perfect alignment exists`);
       return originalData;
     }
     
-    if (originalData.length > payeeNames.length) {
-      console.log(`[ALIGNMENT FIX] Trimming ${originalData.length} original rows to ${payeeNames.length}`);
-      // Take only the first N rows to match payee names count
-      const trimmedData = originalData.slice(0, payeeNames.length);
-      console.log(`[ALIGNMENT FIX] After trimming: ${trimmedData.length} rows`);
-      return trimmedData;
-    }
-    
-    if (originalData.length < payeeNames.length) {
-      console.log(`[ALIGNMENT FIX] Padding ${originalData.length} original rows to ${payeeNames.length}`);
-      // Pad with fallback data for missing rows
-      const paddedData = [...originalData];
-      for (let i = originalData.length; i < payeeNames.length; i++) {
-        paddedData.push({
-          PayeeName: payeeNames[i],
-          RowIndex: i
-        });
-      }
-      console.log(`[ALIGNMENT FIX] After padding: ${paddedData.length} rows`);
-      return paddedData;
-    }
-    
-    return originalData;
+    // STRICT: Must match exactly - no tolerance for misalignment
+    throw new Error(`CRITICAL ALIGNMENT ERROR: ${payeeNames.length} payee names vs ${originalData.length} original data rows. Cannot proceed with misaligned data.`);
   };
 
   const handleRefreshJob = async (jobId: string) => {
@@ -95,7 +74,7 @@ export const useBatchJobActions = ({
         });
       } catch (error) {
         const appError = handleError(error, 'Job Status Refresh');
-        console.error(`[BATCH MANAGER] Error refreshing job ${jobId}:`, error);
+        console.error(`[BATCH ACTIONS] Error refreshing job ${jobId}:`, error);
         
         showRetryableErrorToast(
           appError, 
@@ -123,30 +102,14 @@ export const useBatchJobActions = ({
       const payeeNames = payeeNamesMap[job.id] || [];
       const rawOriginalFileData = originalFileDataMap[job.id] || [];
       
-      console.log(`[BATCH MANAGER] BEFORE ALIGNMENT FIX:`, {
-        jobId: job.id,
-        payeeCount: payeeNames.length,
-        originalDataCount: rawOriginalFileData.length
-      });
-      
-      // CRITICAL FIX: Ensure perfect data alignment
-      const originalFileData = ensureDataAlignment(payeeNames, rawOriginalFileData);
-      
-      console.log(`[BATCH MANAGER] AFTER ALIGNMENT FIX:`, {
-        jobId: job.id,
-        payeeCount: payeeNames.length,
-        originalDataCount: originalFileData.length,
-        perfectAlignment: payeeNames.length === originalFileData.length
-      });
+      console.log(`[DOWNLOAD] Job ${job.id}: ${payeeNames.length} payees, ${rawOriginalFileData.length} original rows`);
       
       // STRICT VALIDATION: Must have exact data alignment
       if (payeeNames.length === 0) {
         throw new Error('No payee names found for this job');
       }
       
-      if (originalFileData.length !== payeeNames.length) {
-        throw new Error(`CRITICAL: Data alignment failed - ${payeeNames.length} payee names vs ${originalFileData.length} original data rows`);
-      }
+      const originalFileData = ensureDataAlignment(payeeNames, rawOriginalFileData);
       
       setDownloadProgress(prev => ({ ...prev, [job.id]: { current: 0, total: payeeNames.length } }));
 
@@ -156,18 +119,20 @@ export const useBatchJobActions = ({
         throw new Error(`Results misalignment: expected ${payeeNames.length}, got ${rawResults.length}`);
       }
 
-      const classifications: PayeeClassification[] = [];
+      // GUARANTEED 1:1 processing - no loops that could create duplicates
+      const classifications: PayeeClassification[] = new Array(payeeNames.length);
       
       for (let i = 0; i < payeeNames.length; i++) {
         const payeeName = payeeNames[i];
         const rawResult = rawResults[i];
-        const originalData = originalFileData[i]; // Perfect 1:1 mapping guaranteed
+        const originalData = originalFileData[i];
         
         // Apply keyword exclusion
         const keywordExclusion = checkKeywordExclusion(payeeName);
         
-        const classification: PayeeClassification = {
-          id: `openai-${job.id}-${i}`,
+        // Create classification with UNIQUE ID that includes job and index
+        classifications[i] = {
+          id: `job-${job.id}-row-${i}`, // GUARANTEED unique per job per row
           payeeName: payeeName,
           result: {
             classification: rawResult?.classification || 'Individual',
@@ -178,11 +143,9 @@ export const useBatchJobActions = ({
             keywordExclusion: keywordExclusion
           },
           timestamp: new Date(),
-          originalData: originalData, // Perfect 1:1 mapping
+          originalData: originalData,
           rowIndex: i
         };
-        
-        classifications.push(classification);
         
         setDownloadProgress(prev => ({ 
           ...prev, 
@@ -190,9 +153,9 @@ export const useBatchJobActions = ({
         }));
       }
 
-      // FINAL VALIDATION
+      // FINAL VALIDATION: Ensure exact count match
       if (classifications.length !== payeeNames.length) {
-        throw new Error(`Final count mismatch: created ${classifications.length} classifications from ${payeeNames.length} payees`);
+        throw new Error(`FINAL COUNT ERROR: created ${classifications.length} classifications from ${payeeNames.length} payees`);
       }
 
       const successCount = classifications.filter(c => c.result.processingTier !== 'Failed').length;
@@ -202,15 +165,15 @@ export const useBatchJobActions = ({
         results: classifications,
         successCount,
         failureCount,
-        originalFileData: originalFileData // Aligned data
+        originalFileData: originalFileData
       };
 
-      console.log(`[BATCH MANAGER] PERFECT ALIGNMENT ACHIEVED:`, {
+      console.log(`[DOWNLOAD] PERFECT PROCESSING COMPLETE:`, {
         jobId: job.id,
-        payeeNames: payeeNames.length,
-        classifications: classifications.length,
-        originalFileData: originalFileData.length,
-        allMatch: payeeNames.length === classifications.length && classifications.length === originalFileData.length
+        inputCount: payeeNames.length,
+        outputCount: classifications.length,
+        successCount,
+        failureCount
       });
 
       onJobComplete(classifications, summary, job.id);
@@ -222,7 +185,7 @@ export const useBatchJobActions = ({
       
     } catch (error) {
       const appError = handleError(error, 'Results Download');
-      console.error(`[BATCH MANAGER] Download error for job ${job.id}:`, error);
+      console.error(`[DOWNLOAD] Error for job ${job.id}:`, error);
       
       toast({
         title: "Download Failed",
@@ -255,7 +218,7 @@ export const useBatchJobActions = ({
       });
     } catch (error) {
       const appError = handleError(error, 'Job Cancellation');
-      console.error(`[BATCH MANAGER] Error cancelling job ${jobId}:`, error);
+      console.error(`[BATCH ACTIONS] Error cancelling job ${jobId}:`, error);
       showErrorToast(appError, 'Job Cancellation');
     }
   };

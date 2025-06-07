@@ -31,39 +31,13 @@ const Index = () => {
     logMemoryUsage(`Tab change to ${activeTab}`);
   }, [activeTab]);
 
-  // Deduplication function to remove duplicates based on payee name and job ID
-  const deduplicateResults = (results: PayeeClassification[]): PayeeClassification[] => {
-    const seen = new Set<string>();
-    const deduplicated: PayeeClassification[] = [];
-    
-    // Sort by timestamp (newest first) to keep the most recent version of each result
-    const sorted = [...results].sort((a, b) => 
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
-    
-    for (const result of sorted) {
-      // Create a unique key based on payee name and job ID (from result ID)
-      const jobId = result.id.includes('openai-') ? result.id.split('-')[1] : 'unknown';
-      const uniqueKey = `${result.payeeName}-${jobId}`;
-      
-      if (!seen.has(uniqueKey)) {
-        seen.add(uniqueKey);
-        deduplicated.push(result);
-      }
-    }
-    
-    console.log(`[INDEX] Deduplication: ${results.length} → ${deduplicated.length} results`);
-    return deduplicated;
-  };
-
   const loadStoredResults = () => {
     try {
       const storedResults = localStorage.getItem('all_classification_results');
       if (storedResults) {
         const parsedResults = JSON.parse(storedResults);
-        const deduplicatedResults = deduplicateResults(parsedResults);
-        setAllResults(deduplicatedResults);
-        console.log(`[INDEX] Loaded ${deduplicatedResults.length} deduplicated stored results`);
+        setAllResults(parsedResults);
+        console.log(`[INDEX] Loaded ${parsedResults.length} stored results`);
       }
     } catch (error) {
       console.error('[INDEX] Error loading stored results:', error);
@@ -72,27 +46,29 @@ const Index = () => {
 
   const saveResults = (results: PayeeClassification[]) => {
     try {
-      const deduplicatedResults = deduplicateResults(results);
-      localStorage.setItem('all_classification_results', JSON.stringify(deduplicatedResults));
-      console.log(`[INDEX] Saved ${deduplicatedResults.length} deduplicated results to storage`);
+      localStorage.setItem('all_classification_results', JSON.stringify(results));
+      console.log(`[INDEX] Saved ${results.length} results to storage`);
     } catch (error) {
       console.error('[INDEX] Error saving results:', error);
     }
   };
 
+  // FIXED: No merging, no deduplication - just direct replacement for new batch results
   const handleBatchComplete = (
     results: PayeeClassification[],
     summary: BatchProcessingResult
   ) => {
+    console.log(`[INDEX] Batch complete: ${results.length} results`);
+    
     setBatchResults(results);
     setBatchSummary(summary);
     
-    // FIXED: Instead of adding to existing results, merge and deduplicate
-    const mergedResults = [...results, ...allResults];
-    const deduplicatedResults = deduplicateResults(mergedResults);
+    // Create a new array with existing results + new results (NO deduplication logic)
+    // Each result should have a unique ID from its job, so no duplicates should be possible
+    const updatedResults = [...allResults, ...results];
     
-    setAllResults(deduplicatedResults);
-    saveResults(deduplicatedResults);
+    setAllResults(updatedResults);
+    saveResults(updatedResults);
     
     setActiveTab("results");
     logMemoryUsage('Batch processing complete');
@@ -167,7 +143,6 @@ const Index = () => {
             
             <TabsContent value="results" className="mt-6">
               <ClassificationErrorBoundary context="Results Display">
-                {/* Show the most recent batch summary if available */}
                 {batchSummary && batchResults.length > 0 && (
                   <div className="mb-6">
                     <h3 className="text-lg font-medium mb-4">Latest Batch Summary</h3>
@@ -175,7 +150,6 @@ const Index = () => {
                   </div>
                 )}
                 
-                {/* Always show all historical results */}
                 <div>
                   <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">All Historical Classification Results</h2>
