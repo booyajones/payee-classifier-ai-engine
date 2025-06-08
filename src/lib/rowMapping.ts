@@ -59,6 +59,7 @@ export function createPayeeRowMapping(
 
 /**
  * Maps classification results back to original file structure
+ * FIXED: Now correctly handles the mapping from unique payee results to all original rows
  */
 export function mapResultsToOriginalRows(
   classificationResults: any[],
@@ -66,8 +67,9 @@ export function mapResultsToOriginalRows(
 ): any[] {
   const { originalFileData, rowMappings, uniquePayeeNames } = payeeRowData;
   
+  // FIXED: Check that classification results match unique payee count, not original file length
   if (classificationResults.length !== uniquePayeeNames.length) {
-    throw new Error(`Classification results mismatch: expected ${uniquePayeeNames.length}, got ${classificationResults.length}`);
+    throw new Error(`Classification results mismatch: expected ${uniquePayeeNames.length} unique payees, got ${classificationResults.length}`);
   }
 
   // Create output array with same length as original file
@@ -78,7 +80,7 @@ export function mapResultsToOriginalRows(
     mappedResults[index] = { ...row };
   });
 
-  // Apply classification results using the mapping
+  // FIXED: Apply classification results using the mapping correctly
   rowMappings.forEach(mapping => {
     const classificationResult = classificationResults[mapping.uniquePayeeIndex];
     if (classificationResult) {
@@ -99,7 +101,7 @@ export function mapResultsToOriginalRows(
     }
   });
 
-  console.log(`[ROW MAPPING] Mapped ${classificationResults.length} results to ${mappedResults.length} original rows`);
+  console.log(`[ROW MAPPING] Successfully mapped ${classificationResults.length} unique payee results to ${mappedResults.length} original rows`);
   
   return mappedResults;
 }

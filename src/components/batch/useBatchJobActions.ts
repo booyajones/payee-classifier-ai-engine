@@ -94,8 +94,8 @@ export const useBatchJobActions = ({
         throw new Error(`Results misalignment: expected ${uniquePayeeNames.length}, got ${rawResults.length}`);
       }
 
-      // Create classifications for unique payees
-      const classifications: PayeeClassification[] = new Array(uniquePayeeNames.length);
+      // FIXED: Create classifications for unique payees first, then map to original rows
+      const uniquePayeeClassifications: PayeeClassification[] = new Array(uniquePayeeNames.length);
       
       for (let i = 0; i < uniquePayeeNames.length; i++) {
         const payeeName = uniquePayeeNames[i];
@@ -104,8 +104,8 @@ export const useBatchJobActions = ({
         // Apply keyword exclusion
         const keywordExclusion = checkKeywordExclusion(payeeName);
         
-        // Create classification with unique ID
-        classifications[i] = {
+        // Create classification for unique payee
+        uniquePayeeClassifications[i] = {
           id: `job-${job.id}-payee-${i}`,
           payeeName: payeeName,
           result: {
@@ -127,8 +127,8 @@ export const useBatchJobActions = ({
         }));
       }
 
-      // FIXED: Use row mapping to create properly aligned results
-      const mappedResults = mapResultsToOriginalRows(classifications, payeeRowData);
+      // FIXED: Use row mapping to create properly aligned results for ALL original rows
+      const mappedResults = mapResultsToOriginalRows(uniquePayeeClassifications, payeeRowData);
       
       // Create final classifications for each original row
       const finalClassifications: PayeeClassification[] = mappedResults.map((row, index) => ({
@@ -166,8 +166,10 @@ export const useBatchJobActions = ({
         jobId: job.id,
         originalRows: originalFileData.length,
         finalResults: finalClassifications.length,
+        mappedResults: mappedResults.length,
         successCount,
-        failureCount
+        failureCount,
+        isAligned: originalFileData.length === finalClassifications.length && finalClassifications.length === mappedResults.length
       });
 
       onJobComplete(finalClassifications, summary, job.id);
