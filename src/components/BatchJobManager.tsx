@@ -120,11 +120,14 @@ const BatchJobManager = ({
   });
 
   const showCancelConfirmation = (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    
     setConfirmDialog({
       isOpen: true,
       title: 'Cancel Batch Job',
       description: `Are you sure you want to cancel this job? This action cannot be undone and you may be charged for completed requests.`,
-      onConfirm: () => handleCancelJob(jobId),
+      onConfirm: () => handleCancelJob(job),
       variant: 'destructive'
     });
   };
