@@ -8,6 +8,7 @@ import OpenAIKeySetup from "@/components/OpenAIKeySetup";
 import KeywordExclusionManager from "@/components/KeywordExclusionManager";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ClassificationErrorBoundary from "@/components/ClassificationErrorBoundary";
+import { UnifiedProgressProvider } from "@/contexts/UnifiedProgressContext";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { PayeeRowData } from "@/lib/rowMapping";
 import { isOpenAIInitialized } from "@/lib/openai/client";
@@ -76,11 +77,18 @@ const Index = () => {
       setBatchResults(results);
       setBatchSummary(summary);
       
-      // Simple append - each result has a unique ID from its job
-      const updatedResults = [...allResults, ...results];
+      // Remove duplicates before adding to allResults
+      const existingIds = new Set(allResults.map(r => r.id));
+      const newResults = results.filter(r => !existingIds.has(r.id));
       
-      setAllResults(updatedResults);
-      saveResults(updatedResults);
+      if (newResults.length > 0) {
+        const updatedResults = [...allResults, ...newResults];
+        setAllResults(updatedResults);
+        saveResults(updatedResults);
+        console.log(`[INDEX] Added ${newResults.length} new results, ${results.length - newResults.length} duplicates filtered`);
+      } else {
+        console.log(`[INDEX] All ${results.length} results were duplicates, not adding to storage`);
+      }
       
       setActiveTab("results");
       logMemoryUsage('Batch processing complete');
@@ -111,106 +119,110 @@ const Index = () => {
 
   if (!hasApiKey) {
     return (
-      <ErrorBoundary>
-        <div className="min-h-screen bg-background">
-          <header className="bg-primary text-white py-6 mb-6">
-            <div className="container px-4">
-              <h1 className="text-2xl font-bold">Payee Classification System</h1>
-              <p className="opacity-90">
-                Efficient file-based payee classification processing
-              </p>
-            </div>
-          </header>
+      <UnifiedProgressProvider>
+        <ErrorBoundary>
+          <div className="min-h-screen bg-background">
+            <header className="bg-primary text-white py-6 mb-6">
+              <div className="container px-4">
+                <h1 className="text-2xl font-bold">Payee Classification System</h1>
+                <p className="opacity-90">
+                  Efficient file-based payee classification processing
+                </p>
+              </div>
+            </header>
 
-          <main className="container px-4 pb-8">
-            <div className="max-w-2xl mx-auto">
-              <OpenAIKeySetup onKeySet={handleKeySet} />
-            </div>
-          </main>
-        </div>
-      </ErrorBoundary>
+            <main className="container px-4 pb-8">
+              <div className="max-w-2xl mx-auto">
+                <OpenAIKeySetup onKeySet={handleKeySet} />
+              </div>
+            </main>
+          </div>
+        </ErrorBoundary>
+      </UnifiedProgressProvider>
     );
   }
 
   console.log('[INDEX DEBUG] Rendering main app with hasApiKey:', hasApiKey);
 
   return (
-    <ErrorBoundary>
-      <div className="min-h-screen bg-background">
-        <header className="bg-primary text-white py-6 mb-6">
-          <div className="container px-4">
-            <h1 className="text-2xl font-bold">Payee Classification System</h1>
-            <p className="opacity-90">
-              File-based payee classification processing
-            </p>
-          </div>
-        </header>
+    <UnifiedProgressProvider>
+      <ErrorBoundary>
+        <div className="min-h-screen bg-background">
+          <header className="bg-primary text-white py-6 mb-6">
+            <div className="container px-4">
+              <h1 className="text-2xl font-bold">Payee Classification System</h1>
+              <p className="opacity-90">
+                File-based payee classification processing
+              </p>
+            </div>
+          </header>
 
-        <main className="container px-4 pb-8">
-          <ErrorBoundary>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="batch">File Processing</TabsTrigger>
-                <TabsTrigger value="keywords">Keyword Management</TabsTrigger>
-                <TabsTrigger value="results">All Results ({allResults.length})</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="batch" className="mt-6">
-                <ClassificationErrorBoundary context="File Processing">
-                  <BatchClassificationForm onComplete={handleBatchComplete} />
-                </ClassificationErrorBoundary>
-              </TabsContent>
-              
-              <TabsContent value="keywords" className="mt-6">
-                <ClassificationErrorBoundary context="Keyword Management">
-                  <KeywordExclusionManager />
-                </ClassificationErrorBoundary>
-              </TabsContent>
-              
-              <TabsContent value="results" className="mt-6">
-                <ClassificationErrorBoundary context="Results Display">
-                  {batchSummary && batchResults.length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="text-lg font-medium mb-4">Latest Batch Summary</h3>
-                      <BatchProcessingSummary summary={batchSummary} />
-                    </div>
-                  )}
-                  
-                  <div>
-                    <div className="flex justify-between items-center mb-4">
-                      <h2 className="text-xl font-bold">All Historical Classification Results</h2>
-                      {allResults.length > 0 && (
-                        <button
-                          onClick={clearAllResults}
-                          className="text-sm text-muted-foreground hover:text-destructive"
-                        >
-                          Clear All Results
-                        </button>
-                      )}
-                    </div>
-                    {allResults.length > 0 ? (
-                      <ClassificationResultTable results={allResults} />
-                    ) : (
-                      <div className="text-center py-8 border rounded-md">
-                        <p className="text-muted-foreground">
-                          No classification results yet. Upload a file to see results here.
-                        </p>
+          <main className="container px-4 pb-8">
+            <ErrorBoundary>
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="batch">File Processing</TabsTrigger>
+                  <TabsTrigger value="keywords">Keyword Management</TabsTrigger>
+                  <TabsTrigger value="results">All Results ({allResults.length})</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="batch" className="mt-6">
+                  <ClassificationErrorBoundary context="File Processing">
+                    <BatchClassificationForm onComplete={handleBatchComplete} />
+                  </ClassificationErrorBoundary>
+                </TabsContent>
+                
+                <TabsContent value="keywords" className="mt-6">
+                  <ClassificationErrorBoundary context="Keyword Management">
+                    <KeywordExclusionManager />
+                  </ClassificationErrorBoundary>
+                </TabsContent>
+                
+                <TabsContent value="results" className="mt-6">
+                  <ClassificationErrorBoundary context="Results Display">
+                    {batchSummary && batchResults.length > 0 && (
+                      <div className="mb-6">
+                        <h3 className="text-lg font-medium mb-4">Latest Batch Summary</h3>
+                        <BatchProcessingSummary summary={batchSummary} />
                       </div>
                     )}
-                  </div>
-                </ClassificationErrorBoundary>
-              </TabsContent>
-            </Tabs>
-          </ErrorBoundary>
-        </main>
+                    
+                    <div>
+                      <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-bold">All Historical Classification Results</h2>
+                        {allResults.length > 0 && (
+                          <button
+                            onClick={clearAllResults}
+                            className="text-sm text-muted-foreground hover:text-destructive"
+                          >
+                            Clear All Results
+                          </button>
+                        )}
+                      </div>
+                      {allResults.length > 0 ? (
+                        <ClassificationResultTable results={allResults} />
+                      ) : (
+                        <div className="text-center py-8 border rounded-md">
+                          <p className="text-muted-foreground">
+                            No classification results yet. Upload a file to see results here.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </ClassificationErrorBoundary>
+                </TabsContent>
+              </Tabs>
+            </ErrorBoundary>
+          </main>
 
-        <footer className="bg-muted py-4 text-center text-sm text-muted-foreground">
-          <div className="container">
-            <p>Payee Classification System &copy; {new Date().getFullYear()}</p>
-          </div>
-        </footer>
-      </div>
-    </ErrorBoundary>
+          <footer className="bg-muted py-4 text-center text-sm text-muted-foreground">
+            <div className="container">
+              <p>Payee Classification System &copy; {new Date().getFullYear()}</p>
+            </div>
+          </footer>
+        </div>
+      </ErrorBoundary>
+    </UnifiedProgressProvider>
   );
 };
 
