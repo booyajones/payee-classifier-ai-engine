@@ -17,7 +17,7 @@ interface BatchJobListProps {
   processedJobs: Set<string>;
   processingInProgress: Set<string>;
   onRefresh: (jobId: string) => void;
-  onDownload: (jobId: string) => void;
+  onDownload: (job: BatchJob) => void;
   onCancel: (jobId: string) => void;
   onDelete: (jobId: string) => void;
   getSmartState: (jobId: string) => any;
@@ -134,7 +134,7 @@ const BatchJobList = ({
               customProgress={customProgress}
               lastError={pollingState?.lastError}
               onRefresh={() => onRefresh(job.id)}
-              onDownload={() => onDownload(job.id)}
+              onDownload={() => onDownload(job)}
               onCancel={() => onCancel(job.id)}
               onDelete={() => onDelete(job.id)}
               isCompleted={isProcessed}

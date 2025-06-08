@@ -127,7 +127,7 @@ const BatchJobManager = ({
       isOpen: true,
       title: 'Cancel Batch Job',
       description: `Are you sure you want to cancel this job? This action cannot be undone and you may be charged for completed requests.`,
-      onConfirm: () => handleCancelJob(job),
+      onConfirm: () => handleCancelJob(job.id),
       variant: 'destructive'
     });
   };
