@@ -133,10 +133,10 @@ const BatchJobList = ({
               progress={progress}
               customProgress={customProgress}
               lastError={pollingState?.lastError}
-              onRefresh={onRefresh}
-              onDownload={onDownload}
-              onCancel={onCancel}
-              onDelete={onDelete}
+              onRefresh={() => onRefresh(job.id)}
+              onDownload={() => onDownload(job.id)}
+              onCancel={() => onCancel(job.id)}
+              onDelete={() => onDelete(job.id)}
               isCompleted={isProcessed}
             />
           );
