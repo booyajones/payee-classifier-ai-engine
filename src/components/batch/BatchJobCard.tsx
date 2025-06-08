@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Clock, Download, RefreshCw, Trash, Loader2, CheckCheck } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Download, RefreshCw, Trash, Loader2, CheckCheck, AlertCircle } from "lucide-react";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 
 interface BatchJobCardProps {
@@ -52,8 +52,11 @@ const BatchJobCard = ({
         return <CheckCircle className="h-4 w-4 text-green-500" />;
       case 'failed':
       case 'expired':
-      case 'cancelled':
         return <XCircle className="h-4 w-4 text-red-500" />;
+      case 'cancelled':
+        return <XCircle className="h-4 w-4 text-gray-500" />;
+      case 'cancelling':
+        return <AlertCircle className="h-4 w-4 text-amber-500" />;
       default:
         return <Clock className="h-4 w-4 text-yellow-500" />;
     }
@@ -65,8 +68,11 @@ const BatchJobCard = ({
         return 'bg-green-100 text-green-800';
       case 'failed':
       case 'expired':
-      case 'cancelled':
         return 'bg-red-100 text-red-800';
+      case 'cancelled':
+        return 'bg-gray-100 text-gray-800';
+      case 'cancelling':
+        return 'bg-amber-100 text-amber-800';
       case 'in_progress':
         return 'bg-blue-100 text-blue-800';
       default:
@@ -241,14 +247,14 @@ const BatchJobCard = ({
             </Button>
           )}
 
-          {['completed', 'failed', 'expired', 'cancelled'].includes(job.status) && (
+          {['completed', 'failed', 'expired', 'cancelled', 'cancelling'].includes(job.status) && (
             <Button
               size="sm"
               variant="outline"
               onClick={() => onDelete(job.id)}
             >
               <Trash className="h-3 w-3 mr-1" />
-              Remove
+              Remove from List
             </Button>
           )}
         </div>

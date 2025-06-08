@@ -1,5 +1,8 @@
+
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { EyeOff, Eye } from "lucide-react";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { PayeeRowData } from "@/lib/rowMapping";
@@ -35,6 +38,8 @@ const BatchJobManager = ({
     onConfirm: () => {}
   });
 
+  const [hideFinishedJobs, setHideFinishedJobs] = useState(false);
+
   // Track processed jobs to prevent duplicate processing
   const [processedJobs, setProcessedJobs] = useState<Set<string>>(new Set());
 
@@ -69,6 +74,13 @@ const BatchJobManager = ({
     return dateB - dateA;
   });
 
+  // Filter jobs based on hide finished jobs toggle
+  const filteredJobs = hideFinishedJobs 
+    ? sortedJobs.filter(job => !['completed', 'failed', 'expired', 'cancelled', 'cancelling'].includes(job.status))
+    : sortedJobs;
+
+  const finishedJobsCount = sortedJobs.length - sortedJobs.filter(job => !['completed', 'failed', 'expired', 'cancelled', 'cancelling'].includes(job.status)).length;
+
   const showCancelConfirmation = (jobId: string) => {
     setConfirmDialog({
       isOpen: true,
@@ -80,10 +92,24 @@ const BatchJobManager = ({
   };
 
   const showDeleteConfirmation = (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    const jobStatus = job?.status || 'unknown';
+    
+    let description = '';
+    if (jobStatus === 'cancelling') {
+      description = 'This job is currently being cancelled. Removing it will hide it from your view but the cancellation will continue on OpenAI\'s side.';
+    } else if (['cancelled', 'failed', 'expired'].includes(jobStatus)) {
+      description = 'This will remove the job from your list. The job data will no longer be visible, but this does not affect the actual OpenAI batch job.';
+    } else if (jobStatus === 'completed') {
+      description = 'This will remove the completed job from your list. You can still download results before removing if needed.';
+    } else {
+      description = 'This will remove the job from your view. This does not cancel or affect the actual OpenAI batch job.';
+    }
+
     setConfirmDialog({
       isOpen: true,
-      title: 'Remove Job',
-      description: `Are you sure you want to remove this job from the list? This will only remove it from your view, not delete the actual job.`,
+      title: 'Remove Job from List',
+      description,
       onConfirm: () => onJobDelete(jobId),
       variant: 'destructive'
     });
@@ -102,35 +128,68 @@ const BatchJobManager = ({
   return (
     <>
       <div className="space-y-4">
-        <h3 className="text-lg font-medium">Batch Jobs</h3>
-        
-        {sortedJobs.map((job) => {
-          const pollingState = pollingStates[job.id];
-          const isJobRefreshing = refreshingJobs.has(job.id);
-          const isJobDownloading = downloadingJobs.has(job.id);
-          const progress = downloadProgress[job.id];
-          const payeeRowData = payeeRowDataMap[job.id];
-          const payeeCount = payeeRowData?.uniquePayeeNames.length || 0;
-          const isProcessed = processedJobs.has(job.id);
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium">Batch Jobs</h3>
           
-          return (
-            <BatchJobCard
-              key={job.id}
-              job={job}
-              payeeCount={payeeCount}
-              isRefreshing={isJobRefreshing}
-              isDownloading={isJobDownloading}
-              isPolling={pollingState?.isPolling || false}
-              progress={progress}
-              lastError={pollingState?.lastError}
-              onRefresh={handleRefreshJob}
-              onDownload={handleDownloadResults}
-              onCancel={showCancelConfirmation}
-              onDelete={showDeleteConfirmation}
-              isCompleted={isProcessed}
-            />
-          );
-        })}
+          {finishedJobsCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setHideFinishedJobs(!hideFinishedJobs)}
+            >
+              {hideFinishedJobs ? (
+                <>
+                  <Eye className="h-3 w-3 mr-1" />
+                  Show Finished ({finishedJobsCount})
+                </>
+              ) : (
+                <>
+                  <EyeOff className="h-3 w-3 mr-1" />
+                  Hide Finished ({finishedJobsCount})
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+
+        {filteredJobs.length === 0 ? (
+          <Alert>
+            <AlertDescription>
+              {hideFinishedJobs 
+                ? "No active jobs. Click 'Show Finished' to see completed, cancelled, or failed jobs."
+                : "No jobs to display."
+              }
+            </AlertDescription>
+          </Alert>
+        ) : (
+          filteredJobs.map((job) => {
+            const pollingState = pollingStates[job.id];
+            const isJobRefreshing = refreshingJobs.has(job.id);
+            const isJobDownloading = downloadingJobs.has(job.id);
+            const progress = downloadProgress[job.id];
+            const payeeRowData = payeeRowDataMap[job.id];
+            const payeeCount = payeeRowData?.uniquePayeeNames.length || 0;
+            const isProcessed = processedJobs.has(job.id);
+            
+            return (
+              <BatchJobCard
+                key={job.id}
+                job={job}
+                payeeCount={payeeCount}
+                isRefreshing={isJobRefreshing}
+                isDownloading={isJobDownloading}
+                isPolling={pollingState?.isPolling || false}
+                progress={progress}
+                lastError={pollingState?.lastError}
+                onRefresh={handleRefreshJob}
+                onDownload={handleDownloadResults}
+                onCancel={showCancelConfirmation}
+                onDelete={showDeleteConfirmation}
+                isCompleted={isProcessed}
+              />
+            );
+          })
+        )}
       </div>
 
       <ConfirmationDialog
@@ -140,7 +199,7 @@ const BatchJobManager = ({
         description={confirmDialog.description}
         onConfirm={confirmDialog.onConfirm}
         variant={confirmDialog.variant}
-        confirmText={confirmDialog.variant === 'destructive' ? 'Delete' : 'Continue'}
+        confirmText={confirmDialog.variant === 'destructive' ? 'Remove' : 'Continue'}
       />
     </>
   );
