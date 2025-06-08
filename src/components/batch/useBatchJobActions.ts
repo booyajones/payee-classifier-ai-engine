@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { BatchJob, checkBatchJobStatus, getBatchJobResults, cancelBatchJob } from "@/lib/openai/trueBatchAPI";
@@ -81,10 +82,12 @@ export const useBatchJobActions = ({
         throw new Error(`No payee row data found for job ${job.id}`);
       }
 
-      const { uniquePayeeNames, rowMappings, originalFileData } = payeeRowData;
+      const { uniquePayeeNames, originalFileData } = payeeRowData;
       
-      console.log(`[DOWNLOAD] ABSOLUTE REQUIREMENT: Job ${job.id} must output exactly ${originalFileData.length} rows`);
-      console.log(`[DOWNLOAD] Input data: ${uniquePayeeNames.length} unique payees, ${originalFileData.length} original rows, ${rowMappings.length} mappings`);
+      console.log(`[DOWNLOAD] Starting download for job ${job.id}:`, {
+        uniquePayees: uniquePayeeNames.length,
+        originalRows: originalFileData.length
+      });
       
       setDownloadProgress(prev => ({ ...prev, [job.id]: { current: 0, total: uniquePayeeNames.length } }));
 
@@ -96,7 +99,7 @@ export const useBatchJobActions = ({
       }
 
       // Create classifications for unique payees first
-      const uniquePayeeClassifications: PayeeClassification[] = new Array(uniquePayeeNames.length);
+      const uniquePayeeClassifications: PayeeClassification[] = [];
       
       for (let i = 0; i < uniquePayeeNames.length; i++) {
         const payeeName = uniquePayeeNames[i];
@@ -106,7 +109,7 @@ export const useBatchJobActions = ({
         const keywordExclusion = checkKeywordExclusion(payeeName);
         
         // Create classification for unique payee
-        uniquePayeeClassifications[i] = {
+        uniquePayeeClassifications.push({
           id: `job-${job.id}-payee-${i}`,
           payeeName: payeeName,
           result: {
@@ -118,9 +121,9 @@ export const useBatchJobActions = ({
             keywordExclusion: keywordExclusion
           },
           timestamp: new Date(),
-          originalData: null, // Will be set by mapping function
+          originalData: null,
           rowIndex: i
-        };
+        });
         
         setDownloadProgress(prev => ({ 
           ...prev, 
@@ -128,44 +131,34 @@ export const useBatchJobActions = ({
         }));
       }
 
-      // CRITICAL: Use row mapping to expand unique results to ALL original rows
+      // Use row mapping to expand unique results to ALL original rows
       const mappedResults = mapResultsToOriginalRows(uniquePayeeClassifications, payeeRowData);
       
-      // ABSOLUTE GUARANTEE: Create exactly one classification per original row
-      const finalClassifications: PayeeClassification[] = [];
-      
-      for (let i = 0; i < originalFileData.length; i++) {
-        const mappedRow = mappedResults[i];
-        
-        if (!mappedRow) {
-          throw new Error(`CRITICAL: Missing mapped result for original row ${i}`);
-        }
-        
-        finalClassifications.push({
-          id: `job-${job.id}-row-${i}`,
-          payeeName: mappedRow.PayeeName || mappedRow.payeeName || 'Unknown',
-          result: {
-            classification: mappedRow.classification || 'Individual',
-            confidence: parseInt(mappedRow.confidence) || 50,
-            reasoning: mappedRow.reasoning || 'Mapped from unique payee classification',
-            processingTier: mappedRow.processingTier || 'AI-Powered',
-            processingMethod: mappedRow.processingMethod || 'OpenAI Batch API',
-            keywordExclusion: {
-              isExcluded: mappedRow.keywordExclusion === 'Yes',
-              matchedKeywords: mappedRow.matchedKeywords ? mappedRow.matchedKeywords.split('; ').filter(k => k) : [],
-              confidence: parseInt(mappedRow.keywordConfidence) || 0,
-              reasoning: mappedRow.keywordReasoning || 'No keyword exclusion applied'
-            }
-          },
-          timestamp: new Date(mappedRow.timestamp || Date.now()),
-          originalData: mappedRow,
-          rowIndex: i
-        });
-      }
+      // Create final classifications from mapped results
+      const finalClassifications: PayeeClassification[] = mappedResults.map((mappedRow, index) => ({
+        id: `job-${job.id}-row-${index}`,
+        payeeName: mappedRow.PayeeName || mappedRow.payeeName || 'Unknown',
+        result: {
+          classification: mappedRow.classification || 'Individual',
+          confidence: parseInt(mappedRow.confidence) || 50,
+          reasoning: mappedRow.reasoning || 'Mapped from unique payee classification',
+          processingTier: mappedRow.processingTier || 'AI-Powered',
+          processingMethod: mappedRow.processingMethod || 'OpenAI Batch API',
+          keywordExclusion: {
+            isExcluded: mappedRow.keywordExclusion === 'Yes',
+            matchedKeywords: mappedRow.matchedKeywords ? mappedRow.matchedKeywords.split('; ').filter(k => k) : [],
+            confidence: parseInt(mappedRow.keywordConfidence) || 0,
+            reasoning: mappedRow.keywordReasoning || 'No keyword exclusion applied'
+          }
+        },
+        timestamp: new Date(mappedRow.timestamp || Date.now()),
+        originalData: mappedRow,
+        rowIndex: index
+      }));
 
-      // FINAL VALIDATION: Absolute guarantee of exact row count
+      // VALIDATION: Must match original file length exactly
       if (finalClassifications.length !== originalFileData.length) {
-        throw new Error(`CRITICAL FAILURE: Expected exactly ${originalFileData.length} results, got ${finalClassifications.length}`);
+        throw new Error(`CRITICAL: Expected exactly ${originalFileData.length} results, got ${finalClassifications.length}`);
       }
 
       const successCount = finalClassifications.filter(c => c.result.processingTier !== 'Failed').length;
@@ -178,21 +171,19 @@ export const useBatchJobActions = ({
         originalFileData: mappedResults
       };
 
-      console.log(`[DOWNLOAD] ABSOLUTE SUCCESS - EXACT ROW COUNT MAINTAINED:`, {
+      console.log(`[DOWNLOAD] SUCCESS - EXACT alignment maintained:`, {
         jobId: job.id,
         originalRows: originalFileData.length,
         finalResults: finalClassifications.length,
-        mappedResults: mappedResults.length,
         successCount,
-        failureCount,
-        PERFECT_ALIGNMENT: originalFileData.length === finalClassifications.length && finalClassifications.length === mappedResults.length
+        failureCount
       });
 
       onJobComplete(finalClassifications, summary, job.id);
 
       toast({
         title: "Download Complete",
-        description: `Processed exactly ${finalClassifications.length} rows - perfect 1:1 alignment maintained.`,
+        description: `Processed exactly ${finalClassifications.length} rows.`,
       });
       
     } catch (error) {
