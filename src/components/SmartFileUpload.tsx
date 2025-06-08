@@ -4,12 +4,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { Upload, FileCheck, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-import { useIntelligentFileProcessor } from '@/hooks/useIntelligentFileProcessor';
+import { parseUploadedFile } from '@/lib/utils';
+import { validateFile, validatePayeeData } from '@/lib/fileValidation';
+import { createPayeeRowMapping, PayeeRowData } from '@/lib/rowMapping';
 import { useSmartBatchManager } from '@/hooks/useSmartBatchManager';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
-import { PayeeRowData } from '@/lib/rowMapping';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 
 interface SmartFileUploadProps {
   onBatchJobCreated: (batchJob: BatchJob, payeeRowData: PayeeRowData) => void;
@@ -17,46 +21,114 @@ interface SmartFileUploadProps {
 }
 
 const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileUploadProps) => {
-  const [uploadState, setUploadState] = useState<'idle' | 'uploading' | 'processing' | 'complete' | 'error'>('idle');
+  const [uploadState, setUploadState] = useState<'idle' | 'uploaded' | 'processing' | 'complete' | 'error'>('idle');
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [currentJob, setCurrentJob] = useState<BatchJob | null>(null);
+  const [fileData, setFileData] = useState<any[] | null>(null);
+  const [fileHeaders, setFileHeaders] = useState<string[]>([]);
+  const [selectedPayeeColumn, setSelectedPayeeColumn] = useState<string>('');
+  const [fileName, setFileName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { processFileIntelligently, isProcessing: isFileProcessing } = useIntelligentFileProcessor();
   const { createSmartBatchJob, getSmartState } = useSmartBatchManager();
+  const { toast } = useToast();
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploadState('uploading');
+    setUploadState('processing');
     setProgress(10);
     setStatusMessage('Analyzing file structure...');
     setErrorMessage('');
     setSuggestions([]);
+    setFileName(file.name);
 
     try {
-      // Step 1: Intelligent file processing
-      const result = await processFileIntelligently(file);
-      
-      if (!result.success) {
+      // Validate file
+      const fileValidation = validateFile(file);
+      if (!fileValidation.isValid) {
         setUploadState('error');
-        setErrorMessage(result.errorMessage || 'File processing failed');
-        setSuggestions(result.suggestions || []);
+        setErrorMessage(fileValidation.error!.message);
+        setSuggestions(getSuggestions(fileValidation.error!.code));
         setProgress(0);
         return;
       }
 
       setProgress(30);
-      setStatusMessage('File validated successfully! Creating batch job...');
+      setStatusMessage('Reading file contents...');
 
-      // Step 2: Create smart batch job
+      // Parse file data
+      const data = await parseUploadedFile(file);
+      if (!data || data.length === 0) {
+        setUploadState('error');
+        setErrorMessage('No data found in the file. Please check if the file has content.');
+        setSuggestions(['Ensure the file has data rows', 'Try a different file format']);
+        setProgress(0);
+        return;
+      }
+
+      // Get headers
+      const headers = Object.keys(data[0]);
+      if (headers.length === 0) {
+        setUploadState('error');
+        setErrorMessage('No columns found in the file.');
+        setSuggestions(['Ensure the file has a header row', 'Try a different file format']);
+        setProgress(0);
+        return;
+      }
+
+      setProgress(60);
+      setStatusMessage('File uploaded successfully! Please select the payee column.');
+      
+      setFileData(data);
+      setFileHeaders(headers);
+      setUploadState('uploaded');
+      setProgress(100);
+
+    } catch (error) {
+      console.error('[SMART UPLOAD] Upload failed:', error);
+      setUploadState('error');
+      setErrorMessage(error instanceof Error ? error.message : 'Upload failed');
+      setSuggestions(['Try again with a different file', 'Check your internet connection']);
+      setProgress(0);
+    }
+  };
+
+  const handleColumnSelect = async () => {
+    if (!fileData || !selectedPayeeColumn) return;
+
+    setUploadState('processing');
+    setProgress(10);
+    setStatusMessage('Validating payee data...');
+
+    try {
+      // Validate payee data
+      const dataValidation = validatePayeeData(fileData, selectedPayeeColumn);
+      if (!dataValidation.isValid) {
+        setUploadState('error');
+        setErrorMessage(dataValidation.error!.message);
+        setSuggestions(getSuggestions(dataValidation.error!.code));
+        setProgress(0);
+        return;
+      }
+
+      setProgress(30);
+      setStatusMessage('Creating payee mappings...');
+
+      // Create row mapping
+      const payeeRowData = createPayeeRowMapping(fileData, selectedPayeeColumn);
+
+      setProgress(50);
+      setStatusMessage('Creating batch job...');
+
+      // Create smart batch job
       const job = await createSmartBatchJob(
-        result.payeeRowData!,
-        `Smart upload: ${file.name}`,
+        payeeRowData,
+        `Upload: ${fileName}`,
         (updatedJob) => {
           setCurrentJob(updatedJob);
           const smartState = getSmartState(updatedJob.id);
@@ -74,21 +146,25 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
       if (job) {
         setCurrentJob(job);
         setUploadState('processing');
-        setProgress(50);
+        setProgress(70);
         setStatusMessage('Batch job created! Processing payee classifications...');
-        onBatchJobCreated(job, result.payeeRowData!);
+        onBatchJobCreated(job, payeeRowData);
       } else {
-        // Local processing completed immediately
         setUploadState('complete');
         setProgress(100);
         setStatusMessage('Processing completed using enhanced local classification!');
       }
 
+      toast({
+        title: "Processing Started",
+        description: `Processing ${payeeRowData.uniquePayeeNames.length} unique payees from ${fileName}.`,
+      });
+
     } catch (error) {
-      console.error('[SMART UPLOAD] Upload failed:', error);
+      console.error('[SMART UPLOAD] Processing failed:', error);
       setUploadState('error');
-      setErrorMessage(error instanceof Error ? error.message : 'Upload failed');
-      setSuggestions(['Try again with a different file', 'Check your internet connection']);
+      setErrorMessage(error instanceof Error ? error.message : 'Processing failed');
+      setSuggestions(['Try again', 'Check your data format']);
       setProgress(0);
     }
   };
@@ -100,6 +176,10 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
     setErrorMessage('');
     setSuggestions([]);
     setCurrentJob(null);
+    setFileData(null);
+    setFileHeaders([]);
+    setSelectedPayeeColumn('');
+    setFileName('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -111,7 +191,6 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
 
   const getStatusIcon = () => {
     switch (uploadState) {
-      case 'uploading':
       case 'processing':
         return <Loader2 className="h-5 w-5 animate-spin text-blue-500" />;
       case 'complete':
@@ -123,17 +202,30 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
     }
   };
 
-  const isProcessing = uploadState === 'uploading' || uploadState === 'processing' || isFileProcessing;
+  const getSuggestions = (errorCode: string): string[] => {
+    switch (errorCode) {
+      case 'FILE_TOO_LARGE':
+        return ['Try splitting the file into smaller chunks', 'Remove unnecessary columns', 'Use CSV format instead of Excel'];
+      case 'INVALID_FILE_FORMAT':
+        return ['Use .xlsx, .xls, or .csv format', 'Check if the file is corrupted', 'Export from your accounting software again'];
+      case 'NO_VALID_PAYEES':
+        return ['Ensure the payee column contains names', 'Check for empty cells', 'Remove header/footer rows'];
+      default:
+        return ['Try re-saving the file', 'Check file permissions', 'Use a different browser'];
+    }
+  };
+
+  const isProcessing = uploadState === 'processing';
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileCheck className="h-5 w-5" />
-          Smart File Upload
+          File Upload & Classification
         </CardTitle>
         <CardDescription>
-          Simply upload your file - we'll handle everything automatically!
+          Upload your payee file and select the column containing payee names
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -151,7 +243,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
             <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="font-medium mb-2">Upload Your Payee File</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              We'll automatically detect columns, validate data, and process classifications
+              Upload an Excel or CSV file containing payee information
             </p>
             <Button onClick={triggerFileSelect} size="lg">
               Choose File
@@ -159,6 +251,44 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
             <p className="text-xs text-muted-foreground mt-2">
               Supports Excel (.xlsx, .xls) and CSV files
             </p>
+          </div>
+        )}
+
+        {uploadState === 'uploaded' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-green-600">
+              <CheckCircle className="h-5 w-5" />
+              <span className="font-medium">File uploaded successfully!</span>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="payee-column">Select the column containing payee names:</Label>
+              <Select value={selectedPayeeColumn} onValueChange={setSelectedPayeeColumn}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a column..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {fileHeaders.map((header) => (
+                    <SelectItem key={header} value={header}>
+                      {header}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleColumnSelect} 
+                disabled={!selectedPayeeColumn}
+                className="flex-1"
+              >
+                Process {fileData?.length || 0} Records
+              </Button>
+              <Button variant="outline" onClick={resetUpload}>
+                Cancel
+              </Button>
+            </div>
           </div>
         )}
 

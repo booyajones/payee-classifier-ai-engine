@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
-import { PayeeClassification, BatchProcessingResult, ClassificationConfig } from "@/lib/types";
-import FileUploadForm from "./FileUploadForm";
+import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import SmartFileUpload from "./SmartFileUpload";
 import BatchJobManager from "./BatchJobManager";
 import BatchResultsDisplay from "./BatchResultsDisplay";
@@ -23,20 +22,11 @@ const STORAGE_KEYS = {
 const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassificationFormProps) => {
   const [batchResults, setBatchResults] = useState<PayeeClassification[]>([]);
   const [processingSummary, setProcessingSummary] = useState<BatchProcessingResult | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("smart");
+  const [activeTab, setActiveTab] = useState<string>("upload");
   const [batchJobs, setBatchJobs] = useState<BatchJob[]>([]);
   const [payeeRowDataMap, setPayeeRowDataMap] = useState<Record<string, PayeeRowData>>({});
   const [isLoadingJobs, setIsLoadingJobs] = useState(true);
   const { toast } = useToast();
-
-  const config: ClassificationConfig = {
-    aiThreshold: 80,
-    bypassRuleNLP: true,
-    useEnhanced: true,
-    offlineMode: false,
-    useFuzzyMatching: true,
-    similarityThreshold: 85
-  };
 
   // Save ALL job data to localStorage
   const saveToStorage = (jobs: BatchJob[], payeeRowDataMap: Record<string, PayeeRowData>) => {
@@ -245,40 +235,25 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Intelligent Batch Payee Classification</CardTitle>
+        <CardTitle>Payee Classification System</CardTitle>
         <CardDescription>
-          Upload files for automatic payee classification with intelligent processing and self-healing capabilities.
+          Upload files for automatic payee classification with intelligent processing.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="smart">Smart Upload</TabsTrigger>
-            <TabsTrigger value="manual">Manual Upload</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="upload">File Upload</TabsTrigger>
             <TabsTrigger value="jobs">
               Batch Jobs {batchJobs.length > 0 && `(${batchJobs.length})`}
             </TabsTrigger>
             <TabsTrigger value="results">Results</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="smart" className="mt-4">
+          <TabsContent value="upload" className="mt-4">
             <SmartFileUpload 
               onBatchJobCreated={handleFileUploadBatchJob}
               onProcessingComplete={handleJobComplete}
-            />
-          </TabsContent>
-
-          <TabsContent value="manual" className="mt-4">
-            <FileUploadForm 
-              onBatchJobCreated={handleFileUploadBatchJob}
-              config={{
-                aiThreshold: 80,
-                bypassRuleNLP: true,
-                useEnhanced: true,
-                offlineMode: false,
-                useFuzzyMatching: true,
-                similarityThreshold: 85
-              }}
             />
           </TabsContent>
 
