@@ -1,5 +1,5 @@
-
 import { getOpenAIClient } from './client';
+import { CLASSIFICATION_MODEL } from './config';
 
 export interface BatchJobRequest {
   custom_id: string;
@@ -39,7 +39,7 @@ function createBatchRequests(payeeNames: string[]): BatchJobRequest[] {
     method: 'POST',
     url: '/v1/chat/completions',
     body: {
-      model: 'gpt-4o-mini',
+      model: CLASSIFICATION_MODEL, // Use the configured model
       messages: [
         {
           role: 'system',
@@ -67,14 +67,14 @@ async function processWithChatCompletions(
   const results: BatchClassificationResult[] = [];
   const batchSize = 10; // Process in smaller batches to avoid rate limits
   
-  console.log(`[BATCH API] Processing ${payeeNames.length} names with chat completions`);
+  console.log(`[BATCH API] Processing ${payeeNames.length} names with chat completions using model: ${CLASSIFICATION_MODEL}`);
   
   for (let i = 0; i < payeeNames.length; i += batchSize) {
     const batch = payeeNames.slice(i, i + batchSize);
     const batchPromises = batch.map(async (name, index) => {
       try {
         const response = await client.chat.completions.create({
-          model: 'gpt-4o-mini',
+          model: CLASSIFICATION_MODEL, // Use the configured model
           messages: [
             {
               role: 'system',

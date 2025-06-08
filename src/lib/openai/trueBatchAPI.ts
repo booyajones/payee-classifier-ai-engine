@@ -1,5 +1,6 @@
 import { getOpenAIClient } from './client';
 import { makeAPIRequest, logMemoryUsage } from './apiUtils';
+import { CLASSIFICATION_MODEL } from './config';
 
 export interface BatchJob {
   id: string;
@@ -69,7 +70,7 @@ export async function createBatchJob(
   return makeAPIRequest(async () => {
     const client = getOpenAIClient();
     
-    console.log(`[TRUE BATCH API] Creating batch job for ${payeeNames.length} payees`);
+    console.log(`[TRUE BATCH API] Creating batch job for ${payeeNames.length} payees with model: ${CLASSIFICATION_MODEL}`);
     
     // Create batch requests in JSONL format
     const batchRequests = payeeNames.map((name, index) => ({
@@ -77,7 +78,7 @@ export async function createBatchJob(
       method: 'POST',
       url: '/v1/chat/completions',
       body: {
-        model: 'gpt-4o-mini',
+        model: CLASSIFICATION_MODEL, // Use the configured model
         messages: [
           {
             role: 'system',
@@ -102,7 +103,7 @@ export async function createBatchJob(
       purpose: 'batch'
     });
     
-    console.log(`[TRUE BATCH API] Created input file: ${file.id}`);
+    console.log(`[TRUE BATCH API] Created input file: ${file.id} using model: ${CLASSIFICATION_MODEL}`);
     
     // Create the batch job
     const batch = await client.batches.create({
@@ -115,7 +116,7 @@ export async function createBatchJob(
       }
     });
     
-    console.log(`[TRUE BATCH API] Created batch job: ${batch.id}`);
+    console.log(`[TRUE BATCH API] Created batch job: ${batch.id} with updated model`);
     
     return {
       id: batch.id,
