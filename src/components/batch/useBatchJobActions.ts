@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { BatchJob, checkBatchJobStatus, getBatchJobResults, cancelBatchJob } from "@/lib/openai/trueBatchAPI";
@@ -38,44 +39,6 @@ export const useBatchJobActions = ({
     execute: downloadResultsWithRetry,
     isRetrying: isDownloadRetrying
   } = useRetry(getBatchJobResults, { maxRetries: 3, baseDelay: 2000 });
-
-  const validateUniqueResults = (classifications: PayeeClassification[], expectedCount: number): boolean => {
-    console.log(`[VALIDATION] Checking ${classifications.length} classifications against expected ${expectedCount}`);
-    
-    // Check total count
-    if (classifications.length !== expectedCount) {
-      console.error(`[VALIDATION] Count mismatch: got ${classifications.length}, expected ${expectedCount}`);
-      return false;
-    }
-
-    // Check for duplicate IDs
-    const ids = classifications.map(c => c.id);
-    const uniqueIds = new Set(ids);
-    if (ids.length !== uniqueIds.size) {
-      console.error(`[VALIDATION] Found ${ids.length - uniqueIds.size} duplicate IDs`);
-      return false;
-    }
-
-    // Check for duplicate row indices
-    const rowIndices = classifications.map(c => c.rowIndex).filter(idx => idx !== undefined);
-    const uniqueRowIndices = new Set(rowIndices);
-    if (rowIndices.length !== uniqueRowIndices.size) {
-      console.error(`[VALIDATION] Found ${rowIndices.length - uniqueRowIndices.size} duplicate row indices`);
-      return false;
-    }
-
-    // Check for sequential row indices (0 to expectedCount-1)
-    const sortedIndices = rowIndices.sort((a, b) => a - b);
-    for (let i = 0; i < expectedCount; i++) {
-      if (sortedIndices[i] !== i) {
-        console.error(`[VALIDATION] Missing row index ${i}, found ${sortedIndices[i]} instead`);
-        return false;
-      }
-    }
-
-    console.log(`[VALIDATION] All checks passed - ${classifications.length} unique results`);
-    return true;
-  };
 
   const handleRefreshJob = async (jobId: string) => {
     const refreshFunction = async () => {
@@ -218,35 +181,12 @@ export const useBatchJobActions = ({
         throw new Error(`CRITICAL: Expected exactly ${originalFileData.length} results, got ${mappedResults.length}`);
       }
       
-      // Create final classifications from mapped results with strict deduplication
+      // FIXED: Create final classifications DIRECTLY from mapped results WITHOUT duplication
       console.log(`[DOWNLOAD] Creating final classifications from mapped results...`);
       
-      const finalClassifications: PayeeClassification[] = [];
-      const usedRowIndices = new Set<number>();
-      const usedIds = new Set<string>();
-      
-      for (let index = 0; index < mappedResults.length; index++) {
-        const mappedRow = mappedResults[index];
-        
-        // Prevent duplicate row indices
-        if (usedRowIndices.has(index)) {
-          console.error(`[DOWNLOAD] DUPLICATE ROW INDEX DETECTED: ${index}`);
-          throw new Error(`Duplicate row index detected: ${index}`);
-        }
-        usedRowIndices.add(index);
-        
-        // Generate unique ID
-        const baseId = `job-${job.id}-row-${index}`;
-        let finalId = baseId;
-        let counter = 0;
-        while (usedIds.has(finalId)) {
-          counter++;
-          finalId = `${baseId}-v${counter}`;
-        }
-        usedIds.add(finalId);
-        
-        const classification: PayeeClassification = {
-          id: finalId,
+      const finalClassifications: PayeeClassification[] = mappedResults.map((mappedRow, index) => {
+        return {
+          id: `job-${job.id}-row-${index}`,
           payeeName: mappedRow.PayeeName || mappedRow.payeeName || 'Unknown',
           result: {
             classification: mappedRow.classification || 'Individual',
@@ -265,20 +205,25 @@ export const useBatchJobActions = ({
           originalData: mappedRow,
           rowIndex: index
         };
-        
-        // Validate each classification
-        if (!classification.payeeName) {
-          console.warn(`[DOWNLOAD] Warning: Empty payee name at row ${index}`);
-        }
-        
-        finalClassifications.push(classification);
-      }
+      });
 
       console.log(`[DOWNLOAD] Created ${finalClassifications.length} final classifications`);
 
       // FINAL VALIDATION: Must match original file length exactly
-      if (!validateUniqueResults(finalClassifications, originalFileData.length)) {
-        throw new Error(`VALIDATION FAILED: Results contain duplicates or incorrect count`);
+      if (finalClassifications.length !== originalFileData.length) {
+        console.error(`[DOWNLOAD] FINAL COUNT MISMATCH:`, {
+          finalClassificationsLength: finalClassifications.length,
+          originalFileDataLength: originalFileData.length
+        });
+        throw new Error(`FINAL VALIDATION FAILED: Expected exactly ${originalFileData.length} results, got ${finalClassifications.length}`);
+      }
+
+      // Validate no duplicate row indices
+      const rowIndices = finalClassifications.map(c => c.rowIndex).filter(idx => idx !== undefined);
+      const uniqueRowIndices = new Set(rowIndices);
+      if (rowIndices.length !== uniqueRowIndices.size) {
+        console.error(`[DOWNLOAD] DUPLICATE ROW INDICES DETECTED`);
+        throw new Error(`DUPLICATE ROW INDICES: ${rowIndices.length - uniqueRowIndices.size} duplicates found`);
       }
 
       const successCount = finalClassifications.filter(c => c.result.processingTier !== 'Failed').length;
