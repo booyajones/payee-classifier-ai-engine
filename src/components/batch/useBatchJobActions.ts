@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { BatchJob, checkBatchJobStatus, getBatchJobResults, cancelBatchJob } from "@/lib/openai/trueBatchAPI";
@@ -25,6 +24,7 @@ export const useBatchJobActions = ({
   const [refreshingJobs, setRefreshingJobs] = useState<Set<string>>(new Set());
   const [downloadingJobs, setDownloadingJobs] = useState<Set<string>>(new Set());
   const [downloadProgress, setDownloadProgress] = useState<Record<string, { current: number; total: number }>>({});
+  const [processedJobResults, setProcessedJobResults] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   const { pollingStates, refreshSpecificJob } = useBatchJobPolling(jobs, onJobUpdate);
@@ -38,6 +38,44 @@ export const useBatchJobActions = ({
     execute: downloadResultsWithRetry,
     isRetrying: isDownloadRetrying
   } = useRetry(getBatchJobResults, { maxRetries: 3, baseDelay: 2000 });
+
+  const validateUniqueResults = (classifications: PayeeClassification[], expectedCount: number): boolean => {
+    console.log(`[VALIDATION] Checking ${classifications.length} classifications against expected ${expectedCount}`);
+    
+    // Check total count
+    if (classifications.length !== expectedCount) {
+      console.error(`[VALIDATION] Count mismatch: got ${classifications.length}, expected ${expectedCount}`);
+      return false;
+    }
+
+    // Check for duplicate IDs
+    const ids = classifications.map(c => c.id);
+    const uniqueIds = new Set(ids);
+    if (ids.length !== uniqueIds.size) {
+      console.error(`[VALIDATION] Found ${ids.length - uniqueIds.size} duplicate IDs`);
+      return false;
+    }
+
+    // Check for duplicate row indices
+    const rowIndices = classifications.map(c => c.rowIndex).filter(idx => idx !== undefined);
+    const uniqueRowIndices = new Set(rowIndices);
+    if (rowIndices.length !== uniqueRowIndices.size) {
+      console.error(`[VALIDATION] Found ${rowIndices.length - uniqueRowIndices.size} duplicate row indices`);
+      return false;
+    }
+
+    // Check for sequential row indices (0 to expectedCount-1)
+    const sortedIndices = rowIndices.sort((a, b) => a - b);
+    for (let i = 0; i < expectedCount; i++) {
+      if (sortedIndices[i] !== i) {
+        console.error(`[VALIDATION] Missing row index ${i}, found ${sortedIndices[i]} instead`);
+        return false;
+      }
+    }
+
+    console.log(`[VALIDATION] All checks passed - ${classifications.length} unique results`);
+    return true;
+  };
 
   const handleRefreshJob = async (jobId: string) => {
     const refreshFunction = async () => {
@@ -75,7 +113,15 @@ export const useBatchJobActions = ({
   };
 
   const handleDownloadResults = async (job: BatchJob) => {
-    console.log(`[DEBUG] === STARTING DOWNLOAD FOR JOB ${job.id} ===`);
+    console.log(`[DOWNLOAD] === STARTING DOWNLOAD FOR JOB ${job.id} ===`);
+    
+    // Prevent duplicate processing
+    const resultKey = `${job.id}-results`;
+    if (processedJobResults.has(resultKey)) {
+      console.log(`[DOWNLOAD] Job ${job.id} results already processed, skipping`);
+      return;
+    }
+
     setDownloadingJobs(prev => new Set(prev).add(job.id));
     
     try {
@@ -87,7 +133,7 @@ export const useBatchJobActions = ({
 
       const { uniquePayeeNames, originalFileData } = payeeRowData;
       
-      console.log(`[DEBUG] Download validation for job ${job.id}:`, {
+      console.log(`[DOWNLOAD] Job ${job.id} validation:`, {
         uniquePayees: uniquePayeeNames.length,
         originalRows: originalFileData.length,
         jobId: job.id
@@ -104,12 +150,12 @@ export const useBatchJobActions = ({
       
       setDownloadProgress(prev => ({ ...prev, [job.id]: { current: 0, total: uniquePayeeNames.length } }));
 
-      console.log(`[DEBUG] Downloading raw results for ${uniquePayeeNames.length} unique payees...`);
+      console.log(`[DOWNLOAD] Downloading raw results for ${uniquePayeeNames.length} unique payees...`);
       
       // Download raw results for unique payees only
       const rawResults = await downloadResultsWithRetry(job, uniquePayeeNames);
       
-      console.log(`[DEBUG] Downloaded ${rawResults.length} raw results for job ${job.id}`);
+      console.log(`[DOWNLOAD] Downloaded ${rawResults.length} raw results for job ${job.id}`);
       
       if (rawResults.length !== uniquePayeeNames.length) {
         throw new Error(`Results misalignment: expected ${uniquePayeeNames.length}, got ${rawResults.length}`);
@@ -118,13 +164,13 @@ export const useBatchJobActions = ({
       // Create classifications for unique payees first
       const uniquePayeeClassifications: PayeeClassification[] = [];
       
-      console.log(`[DEBUG] Creating classifications for unique payees...`);
+      console.log(`[DOWNLOAD] Creating classifications for unique payees...`);
       
       for (let i = 0; i < uniquePayeeNames.length; i++) {
         const payeeName = uniquePayeeNames[i];
         const rawResult = rawResults[i];
         
-        console.log(`[DEBUG] Processing unique payee ${i + 1}/${uniquePayeeNames.length}: "${payeeName}"`);
+        console.log(`[DOWNLOAD] Processing unique payee ${i + 1}/${uniquePayeeNames.length}: "${payeeName}"`);
         
         // Apply keyword exclusion
         const keywordExclusion = checkKeywordExclusion(payeeName);
@@ -152,19 +198,19 @@ export const useBatchJobActions = ({
         }));
       }
 
-      console.log(`[DEBUG] Created ${uniquePayeeClassifications.length} unique payee classifications`);
+      console.log(`[DOWNLOAD] Created ${uniquePayeeClassifications.length} unique payee classifications`);
 
       // CRITICAL: Use row mapping to expand unique results to ALL original rows
-      console.log(`[DEBUG] Mapping ${uniquePayeeClassifications.length} unique results to ${originalFileData.length} original rows...`);
+      console.log(`[DOWNLOAD] Mapping ${uniquePayeeClassifications.length} unique results to ${originalFileData.length} original rows...`);
       
       const mappedResults = mapResultsToOriginalRows(uniquePayeeClassifications, payeeRowData);
       
-      console.log(`[DEBUG] Mapped results count: ${mappedResults.length}`);
-      console.log(`[DEBUG] Expected original rows: ${originalFileData.length}`);
+      console.log(`[DOWNLOAD] Mapped results count: ${mappedResults.length}`);
+      console.log(`[DOWNLOAD] Expected original rows: ${originalFileData.length}`);
       
       // VALIDATION: Must match original file length exactly
       if (mappedResults.length !== originalFileData.length) {
-        console.error(`[DEBUG] CRITICAL MAPPING ERROR:`, {
+        console.error(`[DOWNLOAD] CRITICAL MAPPING ERROR:`, {
           mappedResultsLength: mappedResults.length,
           originalFileDataLength: originalFileData.length,
           uniquePayeesLength: uniquePayeeNames.length
@@ -172,12 +218,35 @@ export const useBatchJobActions = ({
         throw new Error(`CRITICAL: Expected exactly ${originalFileData.length} results, got ${mappedResults.length}`);
       }
       
-      // Create final classifications from mapped results
-      console.log(`[DEBUG] Creating final classifications from mapped results...`);
+      // Create final classifications from mapped results with strict deduplication
+      console.log(`[DOWNLOAD] Creating final classifications from mapped results...`);
       
-      const finalClassifications: PayeeClassification[] = mappedResults.map((mappedRow, index) => {
+      const finalClassifications: PayeeClassification[] = [];
+      const usedRowIndices = new Set<number>();
+      const usedIds = new Set<string>();
+      
+      for (let index = 0; index < mappedResults.length; index++) {
+        const mappedRow = mappedResults[index];
+        
+        // Prevent duplicate row indices
+        if (usedRowIndices.has(index)) {
+          console.error(`[DOWNLOAD] DUPLICATE ROW INDEX DETECTED: ${index}`);
+          throw new Error(`Duplicate row index detected: ${index}`);
+        }
+        usedRowIndices.add(index);
+        
+        // Generate unique ID
+        const baseId = `job-${job.id}-row-${index}`;
+        let finalId = baseId;
+        let counter = 0;
+        while (usedIds.has(finalId)) {
+          counter++;
+          finalId = `${baseId}-v${counter}`;
+        }
+        usedIds.add(finalId);
+        
         const classification: PayeeClassification = {
-          id: `job-${job.id}-row-${index}`,
+          id: finalId,
           payeeName: mappedRow.PayeeName || mappedRow.payeeName || 'Unknown',
           result: {
             classification: mappedRow.classification || 'Individual',
@@ -199,28 +268,17 @@ export const useBatchJobActions = ({
         
         // Validate each classification
         if (!classification.payeeName) {
-          console.warn(`[DEBUG] Warning: Empty payee name at row ${index}`);
+          console.warn(`[DOWNLOAD] Warning: Empty payee name at row ${index}`);
         }
         
-        return classification;
-      });
-
-      console.log(`[DEBUG] Created ${finalClassifications.length} final classifications`);
-
-      // FINAL VALIDATION: Must match original file length exactly
-      if (finalClassifications.length !== originalFileData.length) {
-        console.error(`[DEBUG] FINAL VALIDATION FAILED:`, {
-          finalClassificationsLength: finalClassifications.length,
-          originalFileDataLength: originalFileData.length
-        });
-        throw new Error(`CRITICAL: Expected exactly ${originalFileData.length} results, got ${finalClassifications.length}`);
+        finalClassifications.push(classification);
       }
 
-      // Validate no duplicate IDs
-      const ids = finalClassifications.map(c => c.id);
-      const uniqueIds = new Set(ids);
-      if (ids.length !== uniqueIds.size) {
-        console.warn(`[DEBUG] Warning: Found ${ids.length - uniqueIds.size} duplicate IDs in final classifications`);
+      console.log(`[DOWNLOAD] Created ${finalClassifications.length} final classifications`);
+
+      // FINAL VALIDATION: Must match original file length exactly
+      if (!validateUniqueResults(finalClassifications, originalFileData.length)) {
+        throw new Error(`VALIDATION FAILED: Results contain duplicates or incorrect count`);
       }
 
       const successCount = finalClassifications.filter(c => c.result.processingTier !== 'Failed').length;
@@ -233,13 +291,16 @@ export const useBatchJobActions = ({
         originalFileData: mappedResults
       };
 
-      console.log(`[DEBUG] === DOWNLOAD SUCCESS FOR JOB ${job.id} ===`, {
+      console.log(`[DOWNLOAD] === DOWNLOAD SUCCESS FOR JOB ${job.id} ===`, {
         originalRows: originalFileData.length,
         finalResults: finalClassifications.length,
         successCount,
         failureCount,
         perfectAlignment: finalClassifications.length === originalFileData.length
       });
+
+      // Mark as processed to prevent duplicates
+      setProcessedJobResults(prev => new Set(prev).add(resultKey));
 
       onJobComplete(finalClassifications, summary, job.id);
 
@@ -250,7 +311,7 @@ export const useBatchJobActions = ({
       
     } catch (error) {
       const appError = handleError(error, 'Results Download');
-      console.error(`[DEBUG] Download error for job ${job.id}:`, error);
+      console.error(`[DOWNLOAD] Download error for job ${job.id}:`, error);
       
       toast({
         title: "Download Failed",

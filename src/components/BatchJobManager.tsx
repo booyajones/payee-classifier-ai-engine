@@ -42,6 +42,7 @@ const BatchJobManager = ({
 
   // Track processed jobs to prevent duplicate processing
   const [processedJobs, setProcessedJobs] = useState<Set<string>>(new Set());
+  const [processingInProgress, setProcessingInProgress] = useState<Set<string>>(new Set());
 
   const {
     refreshingJobs,
@@ -56,29 +57,71 @@ const BatchJobManager = ({
     payeeRowDataMap,
     onJobUpdate,
     onJobComplete: (results, summary, jobId) => {
-      console.log(`[DEBUG] Batch job ${jobId} completion handler called with ${results.length} results`);
+      console.log(`[BATCH MANAGER] Job ${jobId} completion handler called with ${results.length} results`);
       
       // Prevent duplicate processing
       if (processedJobs.has(jobId)) {
-        console.log(`[DEBUG] Job ${jobId} already processed, ignoring duplicate`);
+        console.log(`[BATCH MANAGER] Job ${jobId} already processed, ignoring duplicate`);
         return;
       }
       
-      // Validate results before marking as processed
-      if (results.length === 0) {
-        console.error(`[DEBUG] Job ${jobId} completed with 0 results - this is unexpected`);
+      // Check if processing is in progress
+      if (processingInProgress.has(jobId)) {
+        console.log(`[BATCH MANAGER] Job ${jobId} processing already in progress, ignoring`);
+        return;
       }
       
-      // Check for duplicates in results
-      const ids = results.map(r => r.id);
-      const uniqueIds = new Set(ids);
-      if (ids.length !== uniqueIds.size) {
-        console.warn(`[DEBUG] Job ${jobId} has ${ids.length - uniqueIds.size} duplicate result IDs`);
-      }
+      // Mark as processing
+      setProcessingInProgress(prev => new Set(prev).add(jobId));
       
-      setProcessedJobs(prev => new Set(prev).add(jobId));
-      onJobComplete(results, summary, jobId);
-      console.log(`[DEBUG] Job ${jobId} processed successfully, marked as completed`);
+      try {
+        // Validate results before marking as processed
+        if (results.length === 0) {
+          console.error(`[BATCH MANAGER] Job ${jobId} completed with 0 results - this is unexpected`);
+          return;
+        }
+        
+        // Check for duplicates in results
+        const ids = results.map(r => r.id);
+        const uniqueIds = new Set(ids);
+        if (ids.length !== uniqueIds.size) {
+          console.warn(`[BATCH MANAGER] Job ${jobId} has ${ids.length - uniqueIds.size} duplicate result IDs`);
+          
+          // Remove duplicates
+          const seenIds = new Set<string>();
+          const deduplicatedResults = results.filter(result => {
+            if (seenIds.has(result.id)) {
+              return false;
+            }
+            seenIds.add(result.id);
+            return true;
+          });
+          
+          console.log(`[BATCH MANAGER] Deduplicated ${results.length} results to ${deduplicatedResults.length}`);
+          results = deduplicatedResults;
+        }
+        
+        // Check for duplicate row indices
+        const rowIndices = results.map(r => r.rowIndex).filter(idx => idx !== undefined);
+        const uniqueRowIndices = new Set(rowIndices);
+        if (rowIndices.length !== uniqueRowIndices.size) {
+          console.error(`[BATCH MANAGER] Job ${jobId} has duplicate row indices`);
+          return;
+        }
+        
+        // Mark as processed and call completion handler
+        setProcessedJobs(prev => new Set(prev).add(jobId));
+        onJobComplete(results, summary, jobId);
+        console.log(`[BATCH MANAGER] Job ${jobId} processed successfully, marked as completed`);
+        
+      } finally {
+        // Remove from processing set
+        setProcessingInProgress(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(jobId);
+          return newSet;
+        });
+      }
     }
   });
 
@@ -142,7 +185,7 @@ const BatchJobManager = ({
     );
   }
 
-  console.log(`[DEBUG] BatchJobManager rendering ${filteredJobs.length} jobs (${jobs.length} total, ${finishedJobsCount} finished)`);
+  console.log(`[BATCH MANAGER] Rendering ${filteredJobs.length} jobs (${jobs.length} total, ${finishedJobsCount} finished)`);
 
   return (
     <>
@@ -189,8 +232,9 @@ const BatchJobManager = ({
             const payeeRowData = payeeRowDataMap[job.id];
             const payeeCount = payeeRowData?.uniquePayeeNames.length || 0;
             const isProcessed = processedJobs.has(job.id);
+            const isProcessing = processingInProgress.has(job.id);
             
-            console.log(`[DEBUG] Rendering job ${job.id}: status=${job.status}, payeeCount=${payeeCount}, isProcessed=${isProcessed}`);
+            console.log(`[BATCH MANAGER] Rendering job ${job.id}: status=${job.status}, payeeCount=${payeeCount}, isProcessed=${isProcessed}, isProcessing=${isProcessing}`);
             
             return (
               <BatchJobCard
@@ -198,7 +242,7 @@ const BatchJobManager = ({
                 job={job}
                 payeeCount={payeeCount}
                 isRefreshing={isJobRefreshing}
-                isDownloading={isJobDownloading}
+                isDownloading={isJobDownloading || isProcessing}
                 isPolling={pollingState?.isPolling || false}
                 progress={progress}
                 lastError={pollingState?.lastError}
