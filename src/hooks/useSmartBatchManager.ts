@@ -1,8 +1,8 @@
-
 import { useState, useCallback, useRef } from 'react';
 import { BatchJob, createBatchJob, checkBatchJobStatus } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
+import { DEFAULT_CLASSIFICATION_CONFIG } from '@/lib/classification/config';
 import { useAutoRecovery } from './useAutoRecovery';
 import { useBatchJobActions } from '@/components/batch/useBatchJobActions';
 import { useToast } from '@/hooks/use-toast';
@@ -85,7 +85,11 @@ export const useSmartBatchManager = () => {
     try {
       const localResults = await enhancedProcessBatchV3(
         payeeRowData.uniquePayeeNames,
-        { offlineMode: true, aiThreshold: 80 },
+        { 
+          ...DEFAULT_CLASSIFICATION_CONFIG,
+          offlineMode: true, 
+          aiThreshold: 80 
+        },
         payeeRowData.originalFileData
       );
 

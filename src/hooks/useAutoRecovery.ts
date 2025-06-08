@@ -4,6 +4,7 @@ import { BatchJob, checkBatchJobStatus, createBatchJob } from '@/lib/openai/true
 import { PayeeRowData } from '@/lib/rowMapping';
 import { enhancedProcessBatchV3 } from '@/lib/classification/enhancedBatchProcessorV3';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
+import { DEFAULT_CLASSIFICATION_CONFIG } from '@/lib/classification/config';
 import { useToast } from '@/hooks/use-toast';
 
 interface AutoRecoveryState {
@@ -98,7 +99,11 @@ export const useAutoRecovery = () => {
       
       const localResults = await enhancedProcessBatchV3(
         payeeRowData.uniquePayeeNames,
-        { offlineMode: true, aiThreshold: 75 },
+        { 
+          ...DEFAULT_CLASSIFICATION_CONFIG,
+          offlineMode: true, 
+          aiThreshold: 75 
+        },
         payeeRowData.originalFileData
       );
 
