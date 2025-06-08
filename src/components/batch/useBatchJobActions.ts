@@ -1,8 +1,8 @@
-
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { BatchJob, checkBatchJobStatus, getBatchJobResults, cancelBatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
+import { PayeeRowData, mapResultsToOriginalRows } from "@/lib/rowMapping";
 import { useBatchJobPolling } from "@/hooks/useBatchJobPolling";
 import { handleError, showErrorToast, showRetryableErrorToast } from "@/lib/errorHandler";
 import { useRetry } from "@/hooks/useRetry";
@@ -10,16 +10,14 @@ import { checkKeywordExclusion } from "@/lib/classification/enhancedKeywordExclu
 
 interface UseBatchJobActionsProps {
   jobs: BatchJob[];
-  payeeNamesMap: Record<string, string[]>;
-  originalFileDataMap: Record<string, any[]>;
+  payeeRowDataMap: Record<string, PayeeRowData>;
   onJobUpdate: (job: BatchJob) => void;
   onJobComplete: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void;
 }
 
 export const useBatchJobActions = ({
   jobs,
-  payeeNamesMap,
-  originalFileDataMap,
+  payeeRowDataMap,
   onJobUpdate,
   onJobComplete
 }: UseBatchJobActionsProps) => {
@@ -39,27 +37,6 @@ export const useBatchJobActions = ({
     execute: downloadResultsWithRetry,
     isRetrying: isDownloadRetrying
   } = useRetry(getBatchJobResults, { maxRetries: 3, baseDelay: 2000 });
-
-  // FIXED: Ensure EXACT data alignment with strict validation
-  const ensureDataAlignment = (payeeNames: string[], originalData: any[]): any[] => {
-    console.log(`[ALIGNMENT] Input: ${payeeNames.length} payee names, ${originalData.length} original rows`);
-    
-    if (!originalData || originalData.length === 0) {
-      console.log(`[ALIGNMENT] No original data, creating indexed fallback`);
-      return payeeNames.map((name, index) => ({
-        PayeeName: name,
-        RowIndex: index
-      }));
-    }
-    
-    if (originalData.length === payeeNames.length) {
-      console.log(`[ALIGNMENT] Perfect alignment exists`);
-      return originalData;
-    }
-    
-    // STRICT: Must match exactly - no tolerance for misalignment
-    throw new Error(`CRITICAL ALIGNMENT ERROR: ${payeeNames.length} payee names vs ${originalData.length} original data rows. Cannot proceed with misaligned data.`);
-  };
 
   const handleRefreshJob = async (jobId: string) => {
     const refreshFunction = async () => {
@@ -96,43 +73,40 @@ export const useBatchJobActions = ({
 
   const handleDownloadResults = async (job: BatchJob) => {
     setDownloadingJobs(prev => new Set(prev).add(job.id));
-    setDownloadProgress(prev => ({ ...prev, [job.id]: { current: 0, total: 0 } }));
     
     try {
-      const payeeNames = payeeNamesMap[job.id] || [];
-      const rawOriginalFileData = originalFileDataMap[job.id] || [];
+      const payeeRowData = payeeRowDataMap[job.id];
       
-      console.log(`[DOWNLOAD] Job ${job.id}: ${payeeNames.length} payees, ${rawOriginalFileData.length} original rows`);
-      
-      // STRICT VALIDATION: Must have exact data alignment
-      if (payeeNames.length === 0) {
-        throw new Error('No payee names found for this job');
-      }
-      
-      const originalFileData = ensureDataAlignment(payeeNames, rawOriginalFileData);
-      
-      setDownloadProgress(prev => ({ ...prev, [job.id]: { current: 0, total: payeeNames.length } }));
-
-      const rawResults = await downloadResultsWithRetry(job, payeeNames);
-      
-      if (rawResults.length !== payeeNames.length) {
-        throw new Error(`Results misalignment: expected ${payeeNames.length}, got ${rawResults.length}`);
+      if (!payeeRowData) {
+        throw new Error(`No payee row data found for job ${job.id}`);
       }
 
-      // GUARANTEED 1:1 processing - no loops that could create duplicates
-      const classifications: PayeeClassification[] = new Array(payeeNames.length);
+      const { uniquePayeeNames, rowMappings, originalFileData } = payeeRowData;
       
-      for (let i = 0; i < payeeNames.length; i++) {
-        const payeeName = payeeNames[i];
+      console.log(`[DOWNLOAD] Job ${job.id}: ${uniquePayeeNames.length} unique payees, ${originalFileData.length} original rows, ${rowMappings.length} mappings`);
+      
+      setDownloadProgress(prev => ({ ...prev, [job.id]: { current: 0, total: uniquePayeeNames.length } }));
+
+      // Download raw results for unique payees only
+      const rawResults = await downloadResultsWithRetry(job, uniquePayeeNames);
+      
+      if (rawResults.length !== uniquePayeeNames.length) {
+        throw new Error(`Results misalignment: expected ${uniquePayeeNames.length}, got ${rawResults.length}`);
+      }
+
+      // Create classifications for unique payees
+      const classifications: PayeeClassification[] = new Array(uniquePayeeNames.length);
+      
+      for (let i = 0; i < uniquePayeeNames.length; i++) {
+        const payeeName = uniquePayeeNames[i];
         const rawResult = rawResults[i];
-        const originalData = originalFileData[i];
         
         // Apply keyword exclusion
         const keywordExclusion = checkKeywordExclusion(payeeName);
         
-        // Create classification with UNIQUE ID that includes job and index
+        // Create classification with unique ID
         classifications[i] = {
-          id: `job-${job.id}-row-${i}`, // GUARANTEED unique per job per row
+          id: `job-${job.id}-payee-${i}`,
           payeeName: payeeName,
           result: {
             classification: rawResult?.classification || 'Individual',
@@ -143,44 +117,64 @@ export const useBatchJobActions = ({
             keywordExclusion: keywordExclusion
           },
           timestamp: new Date(),
-          originalData: originalData,
+          originalData: null, // Will be set by mapping function
           rowIndex: i
         };
         
         setDownloadProgress(prev => ({ 
           ...prev, 
-          [job.id]: { current: i + 1, total: payeeNames.length } 
+          [job.id]: { current: i + 1, total: uniquePayeeNames.length } 
         }));
       }
 
-      // FINAL VALIDATION: Ensure exact count match
-      if (classifications.length !== payeeNames.length) {
-        throw new Error(`FINAL COUNT ERROR: created ${classifications.length} classifications from ${payeeNames.length} payees`);
-      }
+      // FIXED: Use row mapping to create properly aligned results
+      const mappedResults = mapResultsToOriginalRows(classifications, payeeRowData);
+      
+      // Create final classifications for each original row
+      const finalClassifications: PayeeClassification[] = mappedResults.map((row, index) => ({
+        id: `job-${job.id}-row-${index}`,
+        payeeName: row.PayeeName || row.payeeName || 'Unknown',
+        result: {
+          classification: row.classification || 'Individual',
+          confidence: parseInt(row.confidence) || 50,
+          reasoning: row.reasoning || 'Mapped from unique payee classification',
+          processingTier: row.processingTier || 'AI-Powered',
+          processingMethod: row.processingMethod || 'OpenAI Batch API',
+          keywordExclusion: {
+            isExcluded: row.keywordExclusion === 'Yes',
+            matchedKeywords: row.matchedKeywords ? row.matchedKeywords.split('; ').filter(k => k) : [],
+            confidence: parseInt(row.keywordConfidence) || 0,
+            reasoning: row.keywordReasoning || 'No keyword exclusion applied'
+          }
+        },
+        timestamp: new Date(row.timestamp || Date.now()),
+        originalData: row,
+        rowIndex: index
+      }));
 
-      const successCount = classifications.filter(c => c.result.processingTier !== 'Failed').length;
-      const failureCount = classifications.length - successCount;
+      const successCount = finalClassifications.filter(c => c.result.processingTier !== 'Failed').length;
+      const failureCount = finalClassifications.length - successCount;
 
       const summary: BatchProcessingResult = {
-        results: classifications,
+        results: finalClassifications,
         successCount,
         failureCount,
-        originalFileData: originalFileData
+        originalFileData: mappedResults
       };
 
-      console.log(`[DOWNLOAD] PERFECT PROCESSING COMPLETE:`, {
+      console.log(`[DOWNLOAD] PERFECT ALIGNMENT ACHIEVED:`, {
         jobId: job.id,
-        inputCount: payeeNames.length,
-        outputCount: classifications.length,
+        originalRows: originalFileData.length,
+        finalResults: finalClassifications.length,
         successCount,
         failureCount
       });
 
-      onJobComplete(classifications, summary, job.id);
+      onJobComplete(finalClassifications, summary, job.id);
 
       toast({
         title: "Download Complete",
-        description: `Processed exactly ${classifications.length} rows (${successCount} successful, ${failureCount} failed).`,
+        description: `Processed exactly ${finalClassifications.length} rows (${successCount} successful, ${failureCount} failed).`,
       });
       
     } catch (error) {

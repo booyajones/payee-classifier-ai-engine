@@ -1,16 +1,15 @@
-
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
+import { PayeeRowData } from "@/lib/rowMapping";
 import { useBatchJobActions } from "./batch/useBatchJobActions";
 import BatchJobCard from "./batch/BatchJobCard";
 import ConfirmationDialog from "./ConfirmationDialog";
 
 interface BatchJobManagerProps {
   jobs: BatchJob[];
-  payeeNamesMap: Record<string, string[]>;
-  originalFileDataMap: Record<string, any[]>;
+  payeeRowDataMap: Record<string, PayeeRowData>;
   onJobUpdate: (job: BatchJob) => void;
   onJobComplete: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void;
   onJobDelete: (jobId: string) => void;
@@ -18,8 +17,7 @@ interface BatchJobManagerProps {
 
 const BatchJobManager = ({ 
   jobs, 
-  payeeNamesMap, 
-  originalFileDataMap,
+  payeeRowDataMap,
   onJobUpdate, 
   onJobComplete, 
   onJobDelete 
@@ -37,7 +35,7 @@ const BatchJobManager = ({
     onConfirm: () => {}
   });
 
-  // FIXED: Track processed jobs to prevent any possibility of duplicate processing
+  // Track processed jobs to prevent duplicate processing
   const [processedJobs, setProcessedJobs] = useState<Set<string>>(new Set());
 
   const {
@@ -50,11 +48,10 @@ const BatchJobManager = ({
     handleCancelJob
   } = useBatchJobActions({
     jobs,
-    payeeNamesMap,
-    originalFileDataMap,
+    payeeRowDataMap,
     onJobUpdate,
     onJobComplete: (results, summary, jobId) => {
-      // GUARANTEED NO DUPLICATES: Only process each job exactly once
+      // Prevent duplicate processing
       if (processedJobs.has(jobId)) {
         console.log(`[BATCH MANAGER] Job ${jobId} already processed, ignoring duplicate`);
         return;
@@ -112,7 +109,8 @@ const BatchJobManager = ({
           const isJobRefreshing = refreshingJobs.has(job.id);
           const isJobDownloading = downloadingJobs.has(job.id);
           const progress = downloadProgress[job.id];
-          const payeeCount = payeeNamesMap[job.id]?.length || 0;
+          const payeeRowData = payeeRowDataMap[job.id];
+          const payeeCount = payeeRowData?.uniquePayeeNames.length || 0;
           const isProcessed = processedJobs.has(job.id);
           
           return (

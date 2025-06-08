@@ -8,6 +8,7 @@ import KeywordExclusionManager from "@/components/KeywordExclusionManager";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ClassificationErrorBoundary from "@/components/ClassificationErrorBoundary";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
+import { PayeeRowData } from "@/lib/rowMapping";
 import { isOpenAIInitialized } from "@/lib/openai/client";
 import { logMemoryUsage } from "@/lib/openai/apiUtils";
 
@@ -53,18 +54,17 @@ const Index = () => {
     }
   };
 
-  // FIXED: No merging, no deduplication - just direct replacement for new batch results
+  // FIXED: Handle batch completion with proper row mapping
   const handleBatchComplete = (
     results: PayeeClassification[],
     summary: BatchProcessingResult
   ) => {
-    console.log(`[INDEX] Batch complete: ${results.length} results`);
+    console.log(`[INDEX] Batch complete: ${results.length} results with exact row alignment`);
     
     setBatchResults(results);
     setBatchSummary(summary);
     
-    // Create a new array with existing results + new results (NO deduplication logic)
-    // Each result should have a unique ID from its job, so no duplicates should be possible
+    // Simple append - each result has a unique ID from its job
     const updatedResults = [...allResults, ...results];
     
     setAllResults(updatedResults);

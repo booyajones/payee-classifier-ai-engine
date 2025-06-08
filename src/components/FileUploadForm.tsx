@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,12 +9,13 @@ import { AlertCircle, File, Upload, RotateCcw, CheckCircle, Loader2 } from "luci
 import { useToast } from "@/components/ui/use-toast";
 import { ClassificationConfig } from "@/lib/types";
 import { createBatchJob, BatchJob } from "@/lib/openai/trueBatchAPI";
-import { validateFile, validatePayeeData, cleanPayeeNames } from "@/lib/fileValidation";
+import { validateFile, validatePayeeData } from "@/lib/fileValidation";
 import { handleError, showErrorToast, showRetryableErrorToast } from "@/lib/errorHandler";
 import { useRetry } from "@/hooks/useRetry";
+import { createPayeeRowMapping, PayeeRowData } from "@/lib/rowMapping";
 
 interface FileUploadFormProps {
-  onBatchJobCreated: (batchJob: BatchJob, payeeNames: string[], originalFileData: any[]) => void;
+  onBatchJobCreated: (batchJob: BatchJob, payeeRowData: PayeeRowData) => void;
   config?: ClassificationConfig;
 }
 
@@ -149,36 +149,31 @@ const FileUploadForm = ({
         return;
       }
 
-      // Extract and clean payee names
-      const rawPayeeNames = originalFileData
-        .map(row => row[selectedColumn])
-        .filter(name => name && typeof name === 'string' && name.trim() !== '');
-      
-      const cleanedPayeeNames = cleanPayeeNames(rawPayeeNames);
+      // FIXED: Create proper row mapping instead of just extracting payee names
+      const payeeRowData = createPayeeRowMapping(originalFileData, selectedColumn);
       
       setFileInfo({
         rowCount: originalFileData.length,
-        payeeCount: cleanedPayeeNames.length
+        payeeCount: payeeRowData.uniquePayeeNames.length
       });
 
       setValidationStatus('valid');
 
-      console.log(`[FILE UPLOAD] Creating batch job for ${cleanedPayeeNames.length} names from column "${selectedColumn}" with ${originalFileData.length} original data rows`);
+      console.log(`[FILE UPLOAD] Creating batch job for ${payeeRowData.uniquePayeeNames.length} unique payees from ${originalFileData.length} total rows`);
 
       const batchJob = await createBatchJobWithRetry(
-        cleanedPayeeNames, 
-        `File upload batch: ${file.name}, ${cleanedPayeeNames.length} payees`
+        payeeRowData.uniquePayeeNames, 
+        `File upload batch: ${file.name}, ${payeeRowData.uniquePayeeNames.length} unique payees from ${originalFileData.length} rows`
       );
       
       console.log(`[FILE UPLOAD] Batch job created successfully:`, batchJob);
-      console.log(`[FILE UPLOAD] Calling onBatchJobCreated with ${originalFileData.length} original data rows`);
 
-      // Pass the actual original file data, not from state
-      onBatchJobCreated(batchJob, cleanedPayeeNames, originalFileData);
+      // FIXED: Pass the complete PayeeRowData object instead of separate arrays
+      onBatchJobCreated(batchJob, payeeRowData);
       
       toast({
         title: "Batch Job Created Successfully",
-        description: `Submitted ${cleanedPayeeNames.length} payees from ${file.name} for processing with ${originalFileData.length} original data rows preserved. Job ID: ${batchJob.id.slice(-8)}`,
+        description: `Submitted ${payeeRowData.uniquePayeeNames.length} unique payees from ${originalFileData.length} total rows for processing. Job ID: ${batchJob.id.slice(-8)}`,
       });
     } catch (error) {
       const appError = handleError(error, 'Batch Job Creation');
