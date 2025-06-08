@@ -83,7 +83,8 @@ export const useBatchJobActions = ({
 
       const { uniquePayeeNames, rowMappings, originalFileData } = payeeRowData;
       
-      console.log(`[DOWNLOAD] Job ${job.id}: ${uniquePayeeNames.length} unique payees, ${originalFileData.length} original rows, ${rowMappings.length} mappings`);
+      console.log(`[DOWNLOAD] ABSOLUTE REQUIREMENT: Job ${job.id} must output exactly ${originalFileData.length} rows`);
+      console.log(`[DOWNLOAD] Input data: ${uniquePayeeNames.length} unique payees, ${originalFileData.length} original rows, ${rowMappings.length} mappings`);
       
       setDownloadProgress(prev => ({ ...prev, [job.id]: { current: 0, total: uniquePayeeNames.length } }));
 
@@ -94,7 +95,7 @@ export const useBatchJobActions = ({
         throw new Error(`Results misalignment: expected ${uniquePayeeNames.length}, got ${rawResults.length}`);
       }
 
-      // FIXED: Create classifications for unique payees first, then map to original rows
+      // Create classifications for unique payees first
       const uniquePayeeClassifications: PayeeClassification[] = new Array(uniquePayeeNames.length);
       
       for (let i = 0; i < uniquePayeeNames.length; i++) {
@@ -127,30 +128,45 @@ export const useBatchJobActions = ({
         }));
       }
 
-      // FIXED: Use row mapping to create properly aligned results for ALL original rows
+      // CRITICAL: Use row mapping to expand unique results to ALL original rows
       const mappedResults = mapResultsToOriginalRows(uniquePayeeClassifications, payeeRowData);
       
-      // Create final classifications for each original row
-      const finalClassifications: PayeeClassification[] = mappedResults.map((row, index) => ({
-        id: `job-${job.id}-row-${index}`,
-        payeeName: row.PayeeName || row.payeeName || 'Unknown',
-        result: {
-          classification: row.classification || 'Individual',
-          confidence: parseInt(row.confidence) || 50,
-          reasoning: row.reasoning || 'Mapped from unique payee classification',
-          processingTier: row.processingTier || 'AI-Powered',
-          processingMethod: row.processingMethod || 'OpenAI Batch API',
-          keywordExclusion: {
-            isExcluded: row.keywordExclusion === 'Yes',
-            matchedKeywords: row.matchedKeywords ? row.matchedKeywords.split('; ').filter(k => k) : [],
-            confidence: parseInt(row.keywordConfidence) || 0,
-            reasoning: row.keywordReasoning || 'No keyword exclusion applied'
-          }
-        },
-        timestamp: new Date(row.timestamp || Date.now()),
-        originalData: row,
-        rowIndex: index
-      }));
+      // ABSOLUTE GUARANTEE: Create exactly one classification per original row
+      const finalClassifications: PayeeClassification[] = [];
+      
+      for (let i = 0; i < originalFileData.length; i++) {
+        const mappedRow = mappedResults[i];
+        
+        if (!mappedRow) {
+          throw new Error(`CRITICAL: Missing mapped result for original row ${i}`);
+        }
+        
+        finalClassifications.push({
+          id: `job-${job.id}-row-${i}`,
+          payeeName: mappedRow.PayeeName || mappedRow.payeeName || 'Unknown',
+          result: {
+            classification: mappedRow.classification || 'Individual',
+            confidence: parseInt(mappedRow.confidence) || 50,
+            reasoning: mappedRow.reasoning || 'Mapped from unique payee classification',
+            processingTier: mappedRow.processingTier || 'AI-Powered',
+            processingMethod: mappedRow.processingMethod || 'OpenAI Batch API',
+            keywordExclusion: {
+              isExcluded: mappedRow.keywordExclusion === 'Yes',
+              matchedKeywords: mappedRow.matchedKeywords ? mappedRow.matchedKeywords.split('; ').filter(k => k) : [],
+              confidence: parseInt(mappedRow.keywordConfidence) || 0,
+              reasoning: mappedRow.keywordReasoning || 'No keyword exclusion applied'
+            }
+          },
+          timestamp: new Date(mappedRow.timestamp || Date.now()),
+          originalData: mappedRow,
+          rowIndex: i
+        });
+      }
+
+      // FINAL VALIDATION: Absolute guarantee of exact row count
+      if (finalClassifications.length !== originalFileData.length) {
+        throw new Error(`CRITICAL FAILURE: Expected exactly ${originalFileData.length} results, got ${finalClassifications.length}`);
+      }
 
       const successCount = finalClassifications.filter(c => c.result.processingTier !== 'Failed').length;
       const failureCount = finalClassifications.length - successCount;
@@ -162,21 +178,21 @@ export const useBatchJobActions = ({
         originalFileData: mappedResults
       };
 
-      console.log(`[DOWNLOAD] PERFECT ALIGNMENT ACHIEVED:`, {
+      console.log(`[DOWNLOAD] ABSOLUTE SUCCESS - EXACT ROW COUNT MAINTAINED:`, {
         jobId: job.id,
         originalRows: originalFileData.length,
         finalResults: finalClassifications.length,
         mappedResults: mappedResults.length,
         successCount,
         failureCount,
-        isAligned: originalFileData.length === finalClassifications.length && finalClassifications.length === mappedResults.length
+        PERFECT_ALIGNMENT: originalFileData.length === finalClassifications.length && finalClassifications.length === mappedResults.length
       });
 
       onJobComplete(finalClassifications, summary, job.id);
 
       toast({
         title: "Download Complete",
-        description: `Processed exactly ${finalClassifications.length} rows (${successCount} successful, ${failureCount} failed).`,
+        description: `Processed exactly ${finalClassifications.length} rows - perfect 1:1 alignment maintained.`,
       });
       
     } catch (error) {

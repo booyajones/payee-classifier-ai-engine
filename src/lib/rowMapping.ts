@@ -22,15 +22,14 @@ export function createPayeeRowMapping(
   const rowMappings: RowMapping[] = [];
   const payeeToIndexMap = new Map<string, number>();
 
-  // Process each row to build the mapping
+  // Process EVERY single row to ensure complete mapping
   originalFileData.forEach((row, originalRowIndex) => {
     const payeeName = row[payeeColumnName];
     
-    if (!payeeName || typeof payeeName !== 'string' || payeeName.trim() === '') {
-      return; // Skip invalid payee names
-    }
-
-    const cleanedPayeeName = payeeName.trim();
+    // Handle missing/invalid payee names with fallback
+    const cleanedPayeeName = payeeName && typeof payeeName === 'string' && payeeName.trim() !== '' 
+      ? payeeName.trim() 
+      : `Unknown_Row_${originalRowIndex}`;
     
     // Get or create unique payee index
     let uniquePayeeIndex = payeeToIndexMap.get(cleanedPayeeName);
@@ -40,7 +39,7 @@ export function createPayeeRowMapping(
       payeeToIndexMap.set(cleanedPayeeName, uniquePayeeIndex);
     }
 
-    // Create mapping for this row
+    // CRITICAL: Create mapping for EVERY row - no skipping
     rowMappings.push({
       originalRowIndex,
       payeeName: cleanedPayeeName,
@@ -48,7 +47,12 @@ export function createPayeeRowMapping(
     });
   });
 
-  console.log(`[ROW MAPPING] Created mapping: ${originalFileData.length} original rows -> ${uniquePayeeNames.length} unique payees -> ${rowMappings.length} valid mappings`);
+  // VALIDATION: Ensure we have a mapping for every original row
+  if (rowMappings.length !== originalFileData.length) {
+    throw new Error(`CRITICAL: Row mapping failed - expected ${originalFileData.length} mappings, got ${rowMappings.length}`);
+  }
+
+  console.log(`[ROW MAPPING] GUARANTEED ALIGNMENT: ${originalFileData.length} original rows -> ${uniquePayeeNames.length} unique payees -> ${rowMappings.length} mappings`);
 
   return {
     uniquePayeeNames,
@@ -59,7 +63,7 @@ export function createPayeeRowMapping(
 
 /**
  * Maps classification results back to original file structure
- * FIXED: Now correctly handles the mapping from unique payee results to all original rows
+ * ABSOLUTE GUARANTEE: Output length = Original file length
  */
 export function mapResultsToOriginalRows(
   classificationResults: any[],
@@ -67,41 +71,61 @@ export function mapResultsToOriginalRows(
 ): any[] {
   const { originalFileData, rowMappings, uniquePayeeNames } = payeeRowData;
   
-  // FIXED: Check that classification results match unique payee count, not original file length
+  // Validate inputs
   if (classificationResults.length !== uniquePayeeNames.length) {
     throw new Error(`Classification results mismatch: expected ${uniquePayeeNames.length} unique payees, got ${classificationResults.length}`);
   }
 
-  // Create output array with same length as original file
+  if (rowMappings.length !== originalFileData.length) {
+    throw new Error(`Row mapping mismatch: expected ${originalFileData.length} mappings, got ${rowMappings.length}`);
+  }
+
+  // Initialize output array with EXACT original file length
   const mappedResults = new Array(originalFileData.length);
   
-  // Fill with original data first
-  originalFileData.forEach((row, index) => {
-    mappedResults[index] = { ...row };
-  });
-
-  // FIXED: Apply classification results using the mapping correctly
-  rowMappings.forEach(mapping => {
+  // Process EVERY mapping to ensure EVERY original row gets a result
+  for (let i = 0; i < rowMappings.length; i++) {
+    const mapping = rowMappings[i];
+    const originalRow = originalFileData[mapping.originalRowIndex];
     const classificationResult = classificationResults[mapping.uniquePayeeIndex];
-    if (classificationResult) {
-      // Add classification fields to the original row
-      mappedResults[mapping.originalRowIndex] = {
-        ...mappedResults[mapping.originalRowIndex],
-        classification: classificationResult.result?.classification || 'Individual',
-        confidence: classificationResult.result?.confidence || 50,
-        reasoning: classificationResult.result?.reasoning || 'No classification result',
-        processingTier: classificationResult.result?.processingTier || 'Failed',
-        processingMethod: classificationResult.result?.processingMethod || 'Unknown',
-        keywordExclusion: classificationResult.result?.keywordExclusion?.isExcluded ? 'Yes' : 'No',
-        matchedKeywords: classificationResult.result?.keywordExclusion?.matchedKeywords?.join('; ') || '',
-        keywordConfidence: classificationResult.result?.keywordExclusion?.confidence?.toString() || '0',
-        keywordReasoning: classificationResult.result?.keywordExclusion?.reasoning || 'No keyword exclusion applied',
-        timestamp: classificationResult.timestamp instanceof Date ? classificationResult.timestamp.toISOString() : new Date().toISOString()
-      };
+    
+    if (!originalRow) {
+      throw new Error(`Missing original row at index ${mapping.originalRowIndex}`);
     }
-  });
+    
+    if (!classificationResult) {
+      throw new Error(`Missing classification result for unique payee index ${mapping.uniquePayeeIndex}`);
+    }
+    
+    // Create the mapped row with original data + classification
+    mappedResults[mapping.originalRowIndex] = {
+      ...originalRow,
+      classification: classificationResult.result?.classification || 'Individual',
+      confidence: classificationResult.result?.confidence || 50,
+      reasoning: classificationResult.result?.reasoning || 'No classification result',
+      processingTier: classificationResult.result?.processingTier || 'Failed',
+      processingMethod: classificationResult.result?.processingMethod || 'Unknown',
+      keywordExclusion: classificationResult.result?.keywordExclusion?.isExcluded ? 'Yes' : 'No',
+      matchedKeywords: classificationResult.result?.keywordExclusion?.matchedKeywords?.join('; ') || '',
+      keywordConfidence: classificationResult.result?.keywordExclusion?.confidence?.toString() || '0',
+      keywordReasoning: classificationResult.result?.keywordExclusion?.reasoning || 'No keyword exclusion applied',
+      timestamp: classificationResult.timestamp instanceof Date ? classificationResult.timestamp.toISOString() : new Date().toISOString()
+    };
+  }
 
-  console.log(`[ROW MAPPING] Successfully mapped ${classificationResults.length} unique payee results to ${mappedResults.length} original rows`);
+  // FINAL VALIDATION: Ensure no gaps in output
+  for (let i = 0; i < mappedResults.length; i++) {
+    if (!mappedResults[i]) {
+      throw new Error(`CRITICAL: Missing result at row ${i} - this should never happen`);
+    }
+  }
+
+  // ABSOLUTE GUARANTEE CHECK
+  if (mappedResults.length !== originalFileData.length) {
+    throw new Error(`CRITICAL FAILURE: Output length ${mappedResults.length} does not match input length ${originalFileData.length}`);
+  }
+
+  console.log(`[ROW MAPPING] ABSOLUTE SUCCESS: ${classificationResults.length} unique results mapped to exactly ${mappedResults.length} original rows`);
   
   return mappedResults;
 }
