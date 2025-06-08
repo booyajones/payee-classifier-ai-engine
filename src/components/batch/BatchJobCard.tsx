@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle, Clock, Download, RefreshCw, Trash, Loader2, CheckCheck, AlertCircle } from "lucide-react";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
+import BatchProcessingProgress from "../BatchProcessingProgress";
 
 interface BatchJobCardProps {
   job: BatchJob;
@@ -15,6 +16,7 @@ interface BatchJobCardProps {
   isCompleted?: boolean;
   progress?: { current: number; total: number };
   lastError?: string;
+  customProgress?: { stage: string; percentage: number; isActive: boolean };
   onRefresh: (jobId: string) => void;
   onDownload: (job: BatchJob) => void;
   onCancel: (jobId: string) => void;
@@ -30,6 +32,7 @@ const BatchJobCard = ({
   isCompleted = false,
   progress,
   lastError,
+  customProgress,
   onRefresh,
   onDownload,
   onCancel,
@@ -85,8 +88,16 @@ const BatchJobCard = ({
     ? Math.round((job.request_counts.completed / job.request_counts.total) * 100)
     : 0;
 
-  // Determine what progress to show
+  // Determine what progress to show - prioritize custom progress if available
   const getProgressInfo = () => {
+    if (customProgress?.isActive) {
+      return {
+        percentage: customProgress.percentage,
+        label: customProgress.stage,
+        showBar: true
+      };
+    }
+    
     if (isDownloading && progress) {
       return {
         percentage: Math.round((progress.current / progress.total) * 100),
@@ -185,18 +196,10 @@ const BatchJobCard = ({
         </div>
 
         {progressInfo.showBar && (
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>{progressInfo.label}</span>
-              {progressInfo.percentage !== undefined && <span>{progressInfo.percentage}%</span>}
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                style={{ width: `${progressInfo.percentage || 0}%` }}
-              ></div>
-            </div>
-          </div>
+          <BatchProcessingProgress
+            progress={progressInfo.percentage || 0}
+            status={progressInfo.label || 'Processing...'}
+          />
         )}
 
         <div className="flex gap-2 flex-wrap">

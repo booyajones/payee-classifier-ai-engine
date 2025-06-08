@@ -2,7 +2,6 @@
 import { useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
@@ -11,9 +10,11 @@ import { parseUploadedFile } from '@/lib/utils';
 import { validateFile, validatePayeeData } from '@/lib/fileValidation';
 import { createPayeeRowMapping, PayeeRowData } from '@/lib/rowMapping';
 import { useSmartBatchManager } from '@/hooks/useSmartBatchManager';
+import { useProgressTracking } from '@/hooks/useProgressTracking';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import BatchProcessingProgress from './BatchProcessingProgress';
 
 interface SmartFileUploadProps {
   onBatchJobCreated: (batchJob: BatchJob, payeeRowData: PayeeRowData) => void;
@@ -22,8 +23,6 @@ interface SmartFileUploadProps {
 
 const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileUploadProps) => {
   const [uploadState, setUploadState] = useState<'idle' | 'uploaded' | 'processing' | 'complete' | 'error'>('idle');
-  const [progress, setProgress] = useState(0);
-  const [statusMessage, setStatusMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [currentJob, setCurrentJob] = useState<BatchJob | null>(null);
@@ -34,15 +33,17 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { createSmartBatchJob, getSmartState } = useSmartBatchManager();
+  const { updateProgress, getProgress, completeProgress, clearProgress } = useProgressTracking();
   const { toast } = useToast();
+
+  const UPLOAD_ID = 'file-upload';
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploadState('processing');
-    setProgress(10);
-    setStatusMessage('Analyzing file structure...');
+    updateProgress(UPLOAD_ID, 'Analyzing file structure...', 10);
     setErrorMessage('');
     setSuggestions([]);
     setFileName(file.name);
@@ -54,12 +55,11 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
         setUploadState('error');
         setErrorMessage(fileValidation.error!.message);
         setSuggestions(getSuggestions(fileValidation.error!.code));
-        setProgress(0);
+        clearProgress(UPLOAD_ID);
         return;
       }
 
-      setProgress(30);
-      setStatusMessage('Reading file contents...');
+      updateProgress(UPLOAD_ID, 'Reading file contents...', 30);
 
       // Parse file data
       const data = await parseUploadedFile(file);
@@ -67,7 +67,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
         setUploadState('error');
         setErrorMessage('No data found in the file. Please check if the file has content.');
         setSuggestions(['Ensure the file has data rows', 'Try a different file format']);
-        setProgress(0);
+        clearProgress(UPLOAD_ID);
         return;
       }
 
@@ -77,24 +77,23 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
         setUploadState('error');
         setErrorMessage('No columns found in the file.');
         setSuggestions(['Ensure the file has a header row', 'Try a different file format']);
-        setProgress(0);
+        clearProgress(UPLOAD_ID);
         return;
       }
 
-      setProgress(60);
-      setStatusMessage('File uploaded successfully! Please select the payee column.');
+      updateProgress(UPLOAD_ID, 'File uploaded successfully! Please select the payee column.', 60);
       
       setFileData(data);
       setFileHeaders(headers);
       setUploadState('uploaded');
-      setProgress(100);
+      completeProgress(UPLOAD_ID, 'File uploaded successfully!');
 
     } catch (error) {
       console.error('[SMART UPLOAD] Upload failed:', error);
       setUploadState('error');
       setErrorMessage(error instanceof Error ? error.message : 'Upload failed');
       setSuggestions(['Try again with a different file', 'Check your internet connection']);
-      setProgress(0);
+      clearProgress(UPLOAD_ID);
     }
   };
 
@@ -102,8 +101,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
     if (!fileData || !selectedPayeeColumn) return;
 
     setUploadState('processing');
-    setProgress(10);
-    setStatusMessage('Validating payee data...');
+    updateProgress(UPLOAD_ID, 'Validating payee data...', 10);
 
     try {
       // Validate payee data
@@ -112,18 +110,16 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
         setUploadState('error');
         setErrorMessage(dataValidation.error!.message);
         setSuggestions(getSuggestions(dataValidation.error!.code));
-        setProgress(0);
+        clearProgress(UPLOAD_ID);
         return;
       }
 
-      setProgress(30);
-      setStatusMessage('Creating payee mappings...');
+      updateProgress(UPLOAD_ID, 'Creating payee mappings...', 30);
 
       // Create row mapping
       const payeeRowData = createPayeeRowMapping(fileData, selectedPayeeColumn);
 
-      setProgress(50);
-      setStatusMessage('Creating batch job...');
+      updateProgress(UPLOAD_ID, 'Creating batch job...', 50);
 
       // Create smart batch job
       const job = await createSmartBatchJob(
@@ -132,13 +128,11 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
         (updatedJob) => {
           setCurrentJob(updatedJob);
           const smartState = getSmartState(updatedJob.id);
-          setProgress(smartState.progress);
-          setStatusMessage(smartState.currentStage);
+          updateProgress(UPLOAD_ID, smartState.currentStage, smartState.progress);
         },
         (results, summary, jobId) => {
           setUploadState('complete');
-          setProgress(100);
-          setStatusMessage(`Successfully processed ${results.length} payees!`);
+          completeProgress(UPLOAD_ID, `Successfully processed ${results.length} payees!`);
           onProcessingComplete(results, summary, jobId);
         }
       );
@@ -146,13 +140,11 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
       if (job) {
         setCurrentJob(job);
         setUploadState('processing');
-        setProgress(70);
-        setStatusMessage('Batch job created! Processing payee classifications...');
+        updateProgress(UPLOAD_ID, 'Batch job created! Processing payee classifications...', 70);
         onBatchJobCreated(job, payeeRowData);
       } else {
         setUploadState('complete');
-        setProgress(100);
-        setStatusMessage('Processing completed using enhanced local classification!');
+        completeProgress(UPLOAD_ID, 'Processing completed using enhanced local classification!');
       }
 
       toast({
@@ -165,14 +157,12 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
       setUploadState('error');
       setErrorMessage(error instanceof Error ? error.message : 'Processing failed');
       setSuggestions(['Try again', 'Check your data format']);
-      setProgress(0);
+      clearProgress(UPLOAD_ID);
     }
   };
 
   const resetUpload = () => {
     setUploadState('idle');
-    setProgress(0);
-    setStatusMessage('');
     setErrorMessage('');
     setSuggestions([]);
     setCurrentJob(null);
@@ -180,6 +170,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
     setFileHeaders([]);
     setSelectedPayeeColumn('');
     setFileName('');
+    clearProgress(UPLOAD_ID);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -216,6 +207,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
   };
 
   const isProcessing = uploadState === 'processing';
+  const currentProgress = getProgress(UPLOAD_ID);
 
   return (
     <Card>
@@ -292,13 +284,16 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
           </div>
         )}
 
-        {isProcessing && (
+        {isProcessing && currentProgress && (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               {getStatusIcon()}
-              <span className="font-medium">{statusMessage}</span>
+              <span className="font-medium">{currentProgress.stage}</span>
             </div>
-            <Progress value={progress} className="w-full" />
+            <BatchProcessingProgress 
+              progress={currentProgress.percentage} 
+              status={currentProgress.stage} 
+            />
             <p className="text-sm text-muted-foreground">
               This may take a few minutes depending on file size. You can leave this page - we'll save your progress.
             </p>
@@ -309,7 +304,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
           <Alert>
             <CheckCircle className="h-4 w-4" />
             <AlertDescription className="flex items-center justify-between">
-              <span>{statusMessage}</span>
+              <span>{currentProgress?.message || 'Processing completed successfully!'}</span>
               <Button variant="outline" size="sm" onClick={resetUpload}>
                 Upload Another File
               </Button>

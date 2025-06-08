@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -7,6 +6,7 @@ import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { PayeeRowData } from "@/lib/rowMapping";
 import { useBatchJobActions } from "./batch/useBatchJobActions";
+import { useSmartBatchManager } from "@/hooks/useSmartBatchManager";
 import BatchJobCard from "./batch/BatchJobCard";
 import ConfirmationDialog from "./ConfirmationDialog";
 
@@ -43,6 +43,8 @@ const BatchJobManager = ({
   // Track processed jobs to prevent duplicate processing
   const [processedJobs, setProcessedJobs] = useState<Set<string>>(new Set());
   const [processingInProgress, setProcessingInProgress] = useState<Set<string>>(new Set());
+
+  const { getSmartState } = useSmartBatchManager();
 
   const {
     refreshingJobs,
@@ -234,6 +236,14 @@ const BatchJobManager = ({
             const isProcessed = processedJobs.has(job.id);
             const isProcessing = processingInProgress.has(job.id);
             
+            // Get smart state for custom progress
+            const smartState = getSmartState(job.id);
+            const customProgress = smartState.isProcessing ? {
+              stage: smartState.currentStage,
+              percentage: smartState.progress,
+              isActive: smartState.isProcessing
+            } : undefined;
+            
             console.log(`[BATCH MANAGER] Rendering job ${job.id}: status=${job.status}, payeeCount=${payeeCount}, isProcessed=${isProcessed}, isProcessing=${isProcessing}`);
             
             return (
@@ -245,6 +255,7 @@ const BatchJobManager = ({
                 isDownloading={isJobDownloading || isProcessing}
                 isPolling={pollingState?.isPolling || false}
                 progress={progress}
+                customProgress={customProgress}
                 lastError={pollingState?.lastError}
                 onRefresh={handleRefreshJob}
                 onDownload={handleDownloadResults}
