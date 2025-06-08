@@ -89,13 +89,25 @@ const BatchJobCard = ({
     }
   };
 
-  // Calculate OpenAI batch progress
-  const batchProgress = job.request_counts.total > 0 
-    ? Math.round((job.request_counts.completed / job.request_counts.total) * 100)
-    : 0;
+  // Enhanced progress calculation with better time-based estimates
+  const calculateEnhancedProgress = () => {
+    const now = Date.now() / 1000; // Current time in seconds
+    const createdTime = job.created_at;
+    const inProgressTime = job.in_progress_at || createdTime;
+    const timeElapsed = now - inProgressTime;
+    
+    // Calculate basic OpenAI batch progress
+    const batchProgress = job.request_counts.total > 0 
+      ? Math.round((job.request_counts.completed / job.request_counts.total) * 100)
+      : 0;
+
+    return { batchProgress, timeElapsed, inProgressTime };
+  };
 
   // Determine what progress to show - prioritize unified progress, then custom, then others
   const getProgressInfo = () => {
+    const { batchProgress, timeElapsed } = calculateEnhancedProgress();
+    
     // First priority: unified progress that matches this job
     if (unifiedProgress?.isActive && unifiedProgress.jobId === job.id) {
       return {
@@ -136,21 +148,38 @@ const BatchJobCard = ({
       };
     }
     
-    // Fifth priority: OpenAI batch progress
+    // Fifth priority: Enhanced OpenAI batch progress
     if (job.status === 'in_progress' || job.status === 'finalizing') {
       if (job.request_counts.completed > 0) {
         return {
           percentage: batchProgress,
-          label: `OpenAI processing: ${job.request_counts.completed}/${job.request_counts.total}`,
+          label: `OpenAI processing: ${job.request_counts.completed}/${job.request_counts.total} (${batchProgress}%)`,
           showBar: true,
           source: 'openai'
         };
       } else {
+        // Enhanced progress for jobs with no completed requests yet
+        let estimatedProgress = 15; // Start higher than 10%
+        let progressLabel = 'OpenAI batch processing started...';
+        
+        if (timeElapsed > 60) { // After 1 minute
+          estimatedProgress = 25;
+          progressLabel = `Processing ${job.request_counts.total} requests... (${Math.floor(timeElapsed / 60)}m elapsed)`;
+        }
+        if (timeElapsed > 300) { // After 5 minutes
+          estimatedProgress = 35;
+          progressLabel = `Processing in progress... (${Math.floor(timeElapsed / 60)}m elapsed)`;
+        }
+        if (timeElapsed > 600) { // After 10 minutes
+          estimatedProgress = 45;
+          progressLabel = `Batch processing continues... (${Math.floor(timeElapsed / 60)}m elapsed)`;
+        }
+        
         return {
-          percentage: 10,
-          label: 'OpenAI batch processing started...',
+          percentage: estimatedProgress,
+          label: progressLabel,
           showBar: true,
-          source: 'openai-start'
+          source: 'openai-enhanced'
         };
       }
     }
@@ -169,9 +198,11 @@ const BatchJobCard = ({
   };
 
   const progressInfo = getProgressInfo();
+  const { batchProgress } = calculateEnhancedProgress();
 
   console.log(`[BATCH CARD] Job ${job.id} progress:`, {
     status: job.status,
+    requestCounts: job.request_counts,
     unifiedProgress: unifiedProgress ? {
       stage: unifiedProgress.stage,
       percentage: unifiedProgress.percentage,
@@ -212,15 +243,18 @@ const BatchJobCard = ({
                   </span>
                 </>
               )}
+              {job.in_progress_at && job.status === 'in_progress' && (
+                <>
+                  <br />
+                  <span className="text-xs text-muted-foreground">
+                    Started processing: {formatDate(job.in_progress_at)}
+                  </span>
+                </>
+              )}
             </CardDescription>
             {lastError && (
               <p className="text-xs text-red-600 mt-1">
                 Last refresh error: {lastError}
-              </p>
-            )}
-            {progressInfo.showBar && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Progress source: {progressInfo.source}
               </p>
             )}
           </div>
@@ -250,10 +284,15 @@ const BatchJobCard = ({
         </div>
 
         {progressInfo.showBar && (
-          <BatchProcessingProgress
-            progress={progressInfo.percentage || 0}
-            status={progressInfo.label || 'Processing...'}
-          />
+          <div className="space-y-2">
+            <BatchProcessingProgress
+              progress={progressInfo.percentage || 0}
+              status={progressInfo.label || 'Processing...'}
+            />
+            <p className="text-xs text-muted-foreground">
+              Progress source: {progressInfo.source}
+            </p>
+          </div>
         )}
 
         <div className="flex gap-2 flex-wrap">
