@@ -1,15 +1,14 @@
+
 import { useState } from "react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { EyeOff, Eye } from "lucide-react";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { PayeeRowData } from "@/lib/rowMapping";
 import { useBatchJobActions } from "./batch/useBatchJobActions";
 import { useSmartBatchManager } from "@/hooks/useSmartBatchManager";
 import { useUnifiedProgress } from "@/contexts/UnifiedProgressContext";
-import BatchJobCard from "./batch/BatchJobCard";
-import ConfirmationDialog from "./ConfirmationDialog";
+import { useBatchJobState } from "@/hooks/useBatchJobState";
+import BatchJobList from "./batch/BatchJobList";
+import BatchJobConfirmation from "./batch/BatchJobConfirmation";
 
 interface BatchJobManagerProps {
   jobs: BatchJob[];
@@ -39,14 +38,17 @@ const BatchJobManager = ({
     onConfirm: () => {}
   });
 
-  const [hideFinishedJobs, setHideFinishedJobs] = useState(false);
-
-  // Track processed jobs to prevent duplicate processing
-  const [processedJobs, setProcessedJobs] = useState<Set<string>>(new Set());
-  const [processingInProgress, setProcessingInProgress] = useState<Set<string>>(new Set());
-
   const { getSmartState } = useSmartBatchManager();
   const { updateProgress } = useUnifiedProgress();
+  const {
+    processedJobs,
+    processingInProgress,
+    markJobAsProcessed,
+    markJobAsProcessing,
+    removeJobFromProcessing,
+    isJobProcessed,
+    isJobProcessing
+  } = useBatchJobState();
 
   const {
     refreshingJobs,
@@ -63,38 +65,30 @@ const BatchJobManager = ({
     onJobComplete: (results, summary, jobId) => {
       console.log(`[BATCH MANAGER] Job ${jobId} completion handler called with ${results.length} results`);
       
-      // Prevent duplicate processing
-      if (processedJobs.has(jobId)) {
+      if (isJobProcessed(jobId)) {
         console.log(`[BATCH MANAGER] Job ${jobId} already processed, ignoring duplicate`);
         return;
       }
       
-      // Check if processing is in progress
-      if (processingInProgress.has(jobId)) {
+      if (isJobProcessing(jobId)) {
         console.log(`[BATCH MANAGER] Job ${jobId} processing already in progress, ignoring`);
         return;
       }
       
-      // Mark as processing
-      setProcessingInProgress(prev => new Set(prev).add(jobId));
-      
-      // Update unified progress during download completion
+      markJobAsProcessing(jobId);
       updateProgress(`job-${jobId}`, 'Download complete!', 100, `Successfully processed ${results.length} payees`, jobId);
       
       try {
-        // Validate results before marking as processed
         if (results.length === 0) {
           console.error(`[BATCH MANAGER] Job ${jobId} completed with 0 results - this is unexpected`);
           return;
         }
         
-        // Check for duplicates in results
         const ids = results.map(r => r.id);
         const uniqueIds = new Set(ids);
         if (ids.length !== uniqueIds.size) {
           console.warn(`[BATCH MANAGER] Job ${jobId} has ${ids.length - uniqueIds.size} duplicate result IDs`);
           
-          // Remove duplicates
           const seenIds = new Set<string>();
           const deduplicatedResults = results.filter(result => {
             if (seenIds.has(result.id)) {
@@ -108,7 +102,6 @@ const BatchJobManager = ({
           results = deduplicatedResults;
         }
         
-        // Check for duplicate row indices
         const rowIndices = results.map(r => r.rowIndex).filter(idx => idx !== undefined);
         const uniqueRowIndices = new Set(rowIndices);
         if (rowIndices.length !== uniqueRowIndices.size) {
@@ -116,34 +109,15 @@ const BatchJobManager = ({
           return;
         }
         
-        // Mark as processed and call completion handler
-        setProcessedJobs(prev => new Set(prev).add(jobId));
+        markJobAsProcessed(jobId);
         onJobComplete(results, summary, jobId);
         console.log(`[BATCH MANAGER] Job ${jobId} processed successfully, marked as completed`);
         
       } finally {
-        // Remove from processing set
-        setProcessingInProgress(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(jobId);
-          return newSet;
-        });
+        removeJobFromProcessing(jobId);
       }
     }
   });
-
-  const sortedJobs = [...jobs].sort((a, b) => {
-    const dateA = new Date(a.created_at * 1000).getTime();
-    const dateB = new Date(b.created_at * 1000).getTime();
-    return dateB - dateA;
-  });
-
-  // Filter jobs based on hide finished jobs toggle
-  const filteredJobs = hideFinishedJobs 
-    ? sortedJobs.filter(job => !['completed', 'failed', 'expired', 'cancelled', 'cancelling'].includes(job.status))
-    : sortedJobs;
-
-  const finishedJobsCount = sortedJobs.length - sortedJobs.filter(job => !['completed', 'failed', 'expired', 'cancelled', 'cancelling'].includes(job.status)).length;
 
   const showCancelConfirmation = (jobId: string) => {
     setConfirmDialog({
@@ -182,111 +156,34 @@ const BatchJobManager = ({
     });
   };
 
-  if (jobs.length === 0) {
-    return (
-      <Alert>
-        <AlertDescription>
-          No batch jobs found. Submit a batch for processing to see jobs here.
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
-  console.log(`[BATCH MANAGER] Rendering ${filteredJobs.length} jobs (${jobs.length} total, ${finishedJobsCount} finished)`);
+  console.log(`[BATCH MANAGER] Rendering ${jobs.length} jobs`);
 
   return (
     <>
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-medium">Batch Jobs</h3>
-          
-          {finishedJobsCount > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setHideFinishedJobs(!hideFinishedJobs)}
-            >
-              {hideFinishedJobs ? (
-                <>
-                  <Eye className="h-3 w-3 mr-1" />
-                  Show Finished ({finishedJobsCount})
-                </>
-              ) : (
-                <>
-                  <EyeOff className="h-3 w-3 mr-1" />
-                  Hide Finished ({finishedJobsCount})
-                </>
-              )}
-            </Button>
-          )}
-        </div>
+      <BatchJobList
+        jobs={jobs}
+        payeeRowDataMap={payeeRowDataMap}
+        refreshingJobs={refreshingJobs}
+        downloadingJobs={downloadingJobs}
+        downloadProgress={downloadProgress}
+        pollingStates={pollingStates}
+        processedJobs={processedJobs}
+        processingInProgress={processingInProgress}
+        onRefresh={handleRefreshJob}
+        onDownload={handleDownloadResults}
+        onCancel={showCancelConfirmation}
+        onDelete={showDeleteConfirmation}
+        getSmartState={getSmartState}
+        updateProgress={updateProgress}
+      />
 
-        {filteredJobs.length === 0 ? (
-          <Alert>
-            <AlertDescription>
-              {hideFinishedJobs 
-                ? "No active jobs. Click 'Show Finished' to see completed, cancelled, or failed jobs."
-                : "No jobs to display."
-              }
-            </AlertDescription>
-          </Alert>
-        ) : (
-          filteredJobs.map((job) => {
-            const pollingState = pollingStates[job.id];
-            const isJobRefreshing = refreshingJobs.has(job.id);
-            const isJobDownloading = downloadingJobs.has(job.id);
-            const progress = downloadProgress[job.id];
-            const payeeRowData = payeeRowDataMap[job.id];
-            const payeeCount = payeeRowData?.uniquePayeeNames.length || 0;
-            const isProcessed = processedJobs.has(job.id);
-            const isProcessing = processingInProgress.has(job.id);
-            
-            // Get smart state for custom progress
-            const smartState = getSmartState(job.id);
-            const customProgress = smartState.isProcessing ? {
-              stage: smartState.currentStage,
-              percentage: smartState.progress,
-              isActive: smartState.isProcessing
-            } : undefined;
-            
-            // Update unified progress when downloading
-            if (isJobDownloading && progress) {
-              const downloadPercentage = Math.round((progress.current / progress.total) * 100);
-              updateProgress(`job-${job.id}`, `Downloading results: ${progress.current}/${progress.total}`, downloadPercentage, `Processing results: ${progress.current}/${progress.total}`, job.id);
-            }
-            
-            console.log(`[BATCH MANAGER] Rendering job ${job.id}: status=${job.status}, payeeCount=${payeeCount}, isProcessed=${isProcessed}, isProcessing=${isProcessing}`);
-            
-            return (
-              <BatchJobCard
-                key={job.id}
-                job={job}
-                payeeCount={payeeCount}
-                isRefreshing={isJobRefreshing}
-                isDownloading={isJobDownloading || isProcessing}
-                isPolling={pollingState?.isPolling || false}
-                progress={progress}
-                customProgress={customProgress}
-                lastError={pollingState?.lastError}
-                onRefresh={handleRefreshJob}
-                onDownload={handleDownloadResults}
-                onCancel={showCancelConfirmation}
-                onDelete={showDeleteConfirmation}
-                isCompleted={isProcessed}
-              />
-            );
-          })
-        )}
-      </div>
-
-      <ConfirmationDialog
+      <BatchJobConfirmation
         isOpen={confirmDialog.isOpen}
-        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, isOpen: open }))}
         title={confirmDialog.title}
         description={confirmDialog.description}
-        onConfirm={confirmDialog.onConfirm}
         variant={confirmDialog.variant}
-        confirmText={confirmDialog.variant === 'destructive' ? 'Remove' : 'Continue'}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
       />
     </>
   );
