@@ -74,6 +74,50 @@ const BatchJobCard = ({
     }
   };
 
+  // Calculate OpenAI batch progress
+  const batchProgress = job.request_counts.total > 0 
+    ? Math.round((job.request_counts.completed / job.request_counts.total) * 100)
+    : 0;
+
+  // Determine what progress to show
+  const getProgressInfo = () => {
+    if (isDownloading && progress) {
+      return {
+        percentage: Math.round((progress.current / progress.total) * 100),
+        label: `Processing results: ${progress.current}/${progress.total}`,
+        showBar: true
+      };
+    }
+    
+    if (job.status === 'in_progress' || job.status === 'finalizing') {
+      if (job.request_counts.completed > 0) {
+        return {
+          percentage: batchProgress,
+          label: `OpenAI processing: ${job.request_counts.completed}/${job.request_counts.total}`,
+          showBar: true
+        };
+      } else {
+        return {
+          percentage: 0,
+          label: 'OpenAI batch processing started...',
+          showBar: true
+        };
+      }
+    }
+    
+    if (job.status === 'validating') {
+      return {
+        percentage: 0,
+        label: 'Validating batch request...',
+        showBar: true
+      };
+    }
+    
+    return { showBar: false };
+  };
+
+  const progressInfo = getProgressInfo();
+
   return (
     <Card>
       <CardHeader>
@@ -130,21 +174,20 @@ const BatchJobCard = ({
             <span className="font-medium">Failed:</span> {job.request_counts.failed}
           </div>
           <div>
-            <span className="font-medium">Progress:</span>{' '}
-            {Math.round((job.request_counts.completed / job.request_counts.total) * 100)}%
+            <span className="font-medium">Batch Progress:</span> {batchProgress}%
           </div>
         </div>
 
-        {progress && (
+        {progressInfo.showBar && (
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span>Processing results...</span>
-              <span>{progress.current}/{progress.total}</span>
+              <span>{progressInfo.label}</span>
+              {progressInfo.percentage !== undefined && <span>{progressInfo.percentage}%</span>}
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div 
                 className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                style={{ width: `${progressInfo.percentage || 0}%` }}
               ></div>
             </div>
           </div>
