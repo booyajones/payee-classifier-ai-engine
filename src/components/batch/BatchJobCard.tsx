@@ -41,18 +41,30 @@ const BatchJobCard = ({
 }: BatchJobCardProps) => {
   const { getProgress } = useUnifiedProgress();
 
-  // Try to get unified progress for this job
-  const unifiedProgress = getProgress(`job-${job.id}`) || getProgress('file-upload');
+  console.log(`[BATCH CARD DEBUG] Rendering job ${job.id.slice(-8)}, status: ${job.status}`);
+
+  // Try to get unified progress for this job - with error handling
+  let unifiedProgress = null;
+  try {
+    unifiedProgress = getProgress(`job-${job.id}`) || getProgress('file-upload');
+  } catch (error) {
+    console.error(`[BATCH CARD ERROR] Progress retrieval failed:`, error);
+  }
 
   const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp * 1000);
-    return date.toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    try {
+      const date = new Date(timestamp * 1000);
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('[BATCH CARD ERROR] Date formatting failed:', error);
+      return 'Invalid date';
+    }
   };
 
   const getStatusIcon = (status: string) => {
@@ -91,128 +103,111 @@ const BatchJobCard = ({
 
   // Enhanced progress calculation with better time-based estimates
   const calculateEnhancedProgress = () => {
-    const now = Date.now() / 1000; // Current time in seconds
-    const createdTime = job.created_at;
-    const inProgressTime = job.in_progress_at || createdTime;
-    const timeElapsed = now - inProgressTime;
-    
-    // Calculate basic OpenAI batch progress
-    const batchProgress = job.request_counts.total > 0 
-      ? Math.round((job.request_counts.completed / job.request_counts.total) * 100)
-      : 0;
+    try {
+      const now = Date.now() / 1000;
+      const createdTime = job.created_at;
+      const inProgressTime = job.in_progress_at || createdTime;
+      const timeElapsed = now - inProgressTime;
+      
+      const batchProgress = job.request_counts.total > 0 
+        ? Math.round((job.request_counts.completed / job.request_counts.total) * 100)
+        : 0;
 
-    return { batchProgress, timeElapsed, inProgressTime };
+      return { batchProgress, timeElapsed, inProgressTime };
+    } catch (error) {
+      console.error('[BATCH CARD ERROR] Progress calculation failed:', error);
+      return { batchProgress: 0, timeElapsed: 0, inProgressTime: 0 };
+    }
   };
 
-  // Determine what progress to show - prioritize unified progress, then custom, then others
+  // Determine what progress to show with error handling
   const getProgressInfo = () => {
-    const { batchProgress, timeElapsed } = calculateEnhancedProgress();
-    
-    // First priority: unified progress that matches this job
-    if (unifiedProgress?.isActive && unifiedProgress.jobId === job.id) {
-      return {
-        percentage: unifiedProgress.percentage,
-        label: unifiedProgress.stage,
-        showBar: true,
-        source: 'unified'
-      };
-    }
-    
-    // Second priority: unified progress from upload (during initial processing)
-    if (unifiedProgress?.isActive && !unifiedProgress.jobId && ['validating', 'in_progress'].includes(job.status)) {
-      return {
-        percentage: unifiedProgress.percentage,
-        label: unifiedProgress.stage,
-        showBar: true,
-        source: 'unified-upload'
-      };
-    }
-    
-    // Third priority: custom progress (from smart batch manager)
-    if (customProgress?.isActive) {
-      return {
-        percentage: customProgress.percentage,
-        label: customProgress.stage,
-        showBar: true,
-        source: 'custom'
-      };
-    }
-    
-    // Fourth priority: download progress
-    if (isDownloading && progress) {
-      return {
-        percentage: Math.round((progress.current / progress.total) * 100),
-        label: `Processing results: ${progress.current}/${progress.total}`,
-        showBar: true,
-        source: 'download'
-      };
-    }
-    
-    // Fifth priority: Enhanced OpenAI batch progress
-    if (job.status === 'in_progress' || job.status === 'finalizing') {
-      if (job.request_counts.completed > 0) {
+    try {
+      const { batchProgress, timeElapsed } = calculateEnhancedProgress();
+      
+      // First priority: unified progress that matches this job
+      if (unifiedProgress?.isActive && unifiedProgress.jobId === job.id) {
         return {
-          percentage: batchProgress,
-          label: `OpenAI processing: ${job.request_counts.completed}/${job.request_counts.total} (${batchProgress}%)`,
+          percentage: Math.max(0, Math.min(100, unifiedProgress.percentage || 0)),
+          label: unifiedProgress.stage || 'Processing...',
           showBar: true,
-          source: 'openai'
-        };
-      } else {
-        // Enhanced progress for jobs with no completed requests yet
-        let estimatedProgress = 15; // Start higher than 10%
-        let progressLabel = 'OpenAI batch processing started...';
-        
-        if (timeElapsed > 60) { // After 1 minute
-          estimatedProgress = 25;
-          progressLabel = `Processing ${job.request_counts.total} requests... (${Math.floor(timeElapsed / 60)}m elapsed)`;
-        }
-        if (timeElapsed > 300) { // After 5 minutes
-          estimatedProgress = 35;
-          progressLabel = `Processing in progress... (${Math.floor(timeElapsed / 60)}m elapsed)`;
-        }
-        if (timeElapsed > 600) { // After 10 minutes
-          estimatedProgress = 45;
-          progressLabel = `Batch processing continues... (${Math.floor(timeElapsed / 60)}m elapsed)`;
-        }
-        
-        return {
-          percentage: estimatedProgress,
-          label: progressLabel,
-          showBar: true,
-          source: 'openai-enhanced'
+          source: 'unified'
         };
       }
+      
+      // Second priority: custom progress (from smart batch manager)
+      if (customProgress?.isActive) {
+        return {
+          percentage: Math.max(0, Math.min(100, customProgress.percentage || 0)),
+          label: customProgress.stage || 'Processing...',
+          showBar: true,
+          source: 'custom'
+        };
+      }
+      
+      // Third priority: download progress
+      if (isDownloading && progress) {
+        return {
+          percentage: Math.max(0, Math.min(100, Math.round((progress.current / progress.total) * 100))),
+          label: `Processing results: ${progress.current}/${progress.total}`,
+          showBar: true,
+          source: 'download'
+        };
+      }
+      
+      // Fourth priority: Enhanced OpenAI batch progress
+      if (job.status === 'in_progress' || job.status === 'finalizing') {
+        if (job.request_counts.completed > 0) {
+          return {
+            percentage: Math.max(0, Math.min(100, batchProgress)),
+            label: `OpenAI processing: ${job.request_counts.completed}/${job.request_counts.total} (${batchProgress}%)`,
+            showBar: true,
+            source: 'openai'
+          };
+        } else {
+          // Time-based progress estimate
+          let estimatedProgress = Math.min(50, 15 + (timeElapsed / 60) * 2); // Slow growth over time
+          let progressLabel = `Processing ${job.request_counts.total} requests...`;
+          
+          if (timeElapsed > 300) { // After 5 minutes
+            progressLabel += ` (${Math.floor(timeElapsed / 60)}m elapsed)`;
+          }
+          
+          return {
+            percentage: Math.max(0, Math.min(100, estimatedProgress)),
+            label: progressLabel,
+            showBar: true,
+            source: 'openai-enhanced'
+          };
+        }
+      }
+      
+      // Fifth priority: validating state
+      if (job.status === 'validating') {
+        return {
+          percentage: 5,
+          label: 'Validating batch request...',
+          showBar: true,
+          source: 'validating'
+        };
+      }
+      
+      return { showBar: false, source: 'none' };
+    } catch (error) {
+      console.error('[BATCH CARD ERROR] Progress info calculation failed:', error);
+      return { showBar: false, source: 'error' };
     }
-    
-    // Sixth priority: validating state
-    if (job.status === 'validating') {
-      return {
-        percentage: 5,
-        label: 'Validating batch request...',
-        showBar: true,
-        source: 'validating'
-      };
-    }
-    
-    return { showBar: false, source: 'none' };
   };
 
   const progressInfo = getProgressInfo();
   const { batchProgress } = calculateEnhancedProgress();
 
-  console.log(`[BATCH CARD] Job ${job.id} progress:`, {
+  console.log(`[BATCH CARD DEBUG] Job ${job.id.slice(-8)} progress info:`, {
     status: job.status,
-    requestCounts: job.request_counts,
-    unifiedProgress: unifiedProgress ? {
-      stage: unifiedProgress.stage,
-      percentage: unifiedProgress.percentage,
-      isActive: unifiedProgress.isActive,
-      jobId: unifiedProgress.jobId
-    } : null,
-    customProgress,
     progressInfo,
+    showBar: progressInfo.showBar,
     isDownloading,
-    downloadProgress: progress
+    hasProgress: !!progress
   });
 
   return (
@@ -270,13 +265,13 @@ const BatchJobCard = ({
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <span className="font-medium">Total Requests:</span> {job.request_counts.total}
+            <span className="font-medium">Total Requests:</span> {job.request_counts.total || 0}
           </div>
           <div>
-            <span className="font-medium">Completed:</span> {job.request_counts.completed}
+            <span className="font-medium">Completed:</span> {job.request_counts.completed || 0}
           </div>
           <div>
-            <span className="font-medium">Failed:</span> {job.request_counts.failed}
+            <span className="font-medium">Failed:</span> {job.request_counts.failed || 0}
           </div>
           <div>
             <span className="font-medium">Batch Progress:</span> {batchProgress}%

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BatchClassificationForm from "@/components/BatchClassificationForm";
@@ -19,17 +20,27 @@ const Index = () => {
   const [allResults, setAllResults] = useState<PayeeClassification[]>([]);
   const [hasApiKey, setHasApiKey] = useState(false);
 
+  console.log('[INDEX DEBUG] Component rendering, activeTab:', activeTab);
+
   useEffect(() => {
-    setHasApiKey(isOpenAIInitialized());
-    logMemoryUsage('Index component mount');
-    
-    // Load stored results on component mount
-    loadStoredResults();
+    try {
+      setHasApiKey(isOpenAIInitialized());
+      logMemoryUsage('Index component mount');
+      
+      // Load stored results on component mount
+      loadStoredResults();
+    } catch (error) {
+      console.error('[INDEX ERROR] Initialization failed:', error);
+    }
   }, []);
 
   // Log memory usage on tab changes
   useEffect(() => {
-    logMemoryUsage(`Tab change to ${activeTab}`);
+    try {
+      logMemoryUsage(`Tab change to ${activeTab}`);
+    } catch (error) {
+      console.error('[INDEX ERROR] Memory logging failed:', error);
+    }
   }, [activeTab]);
 
   const loadStoredResults = () => {
@@ -41,7 +52,7 @@ const Index = () => {
         console.log(`[INDEX] Loaded ${parsedResults.length} stored results`);
       }
     } catch (error) {
-      console.error('[INDEX] Error loading stored results:', error);
+      console.error('[INDEX ERROR] Error loading stored results:', error);
     }
   };
 
@@ -50,40 +61,52 @@ const Index = () => {
       localStorage.setItem('all_classification_results', JSON.stringify(results));
       console.log(`[INDEX] Saved ${results.length} results to storage`);
     } catch (error) {
-      console.error('[INDEX] Error saving results:', error);
+      console.error('[INDEX ERROR] Error saving results:', error);
     }
   };
 
-  // FIXED: Handle batch completion with proper row mapping
+  // Handle batch completion with proper row mapping
   const handleBatchComplete = (
     results: PayeeClassification[],
     summary: BatchProcessingResult
   ) => {
-    console.log(`[INDEX] Batch complete: ${results.length} results with exact row alignment`);
-    
-    setBatchResults(results);
-    setBatchSummary(summary);
-    
-    // Simple append - each result has a unique ID from its job
-    const updatedResults = [...allResults, ...results];
-    
-    setAllResults(updatedResults);
-    saveResults(updatedResults);
-    
-    setActiveTab("results");
-    logMemoryUsage('Batch processing complete');
+    try {
+      console.log(`[INDEX] Batch complete: ${results.length} results with exact row alignment`);
+      
+      setBatchResults(results);
+      setBatchSummary(summary);
+      
+      // Simple append - each result has a unique ID from its job
+      const updatedResults = [...allResults, ...results];
+      
+      setAllResults(updatedResults);
+      saveResults(updatedResults);
+      
+      setActiveTab("results");
+      logMemoryUsage('Batch processing complete');
+    } catch (error) {
+      console.error('[INDEX ERROR] Batch completion failed:', error);
+    }
   };
 
   const handleKeySet = () => {
-    setHasApiKey(true);
+    try {
+      setHasApiKey(true);
+    } catch (error) {
+      console.error('[INDEX ERROR] Key setting failed:', error);
+    }
   };
 
   const clearAllResults = () => {
-    setAllResults([]);
-    setBatchResults([]);
-    setBatchSummary(null);
-    localStorage.removeItem('all_classification_results');
-    console.log('[INDEX] Cleared all stored results');
+    try {
+      setAllResults([]);
+      setBatchResults([]);
+      setBatchSummary(null);
+      localStorage.removeItem('all_classification_results');
+      console.log('[INDEX] Cleared all stored results');
+    } catch (error) {
+      console.error('[INDEX ERROR] Clear results failed:', error);
+    }
   };
 
   if (!hasApiKey) {
@@ -109,6 +132,8 @@ const Index = () => {
     );
   }
 
+  console.log('[INDEX DEBUG] Rendering main app with hasApiKey:', hasApiKey);
+
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-background">
@@ -122,59 +147,61 @@ const Index = () => {
         </header>
 
         <main className="container px-4 pb-8">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="batch">File Processing</TabsTrigger>
-              <TabsTrigger value="keywords">Keyword Management</TabsTrigger>
-              <TabsTrigger value="results">All Results ({allResults.length})</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="batch" className="mt-6">
-              <ClassificationErrorBoundary context="File Processing">
-                <BatchClassificationForm onComplete={handleBatchComplete} />
-              </ClassificationErrorBoundary>
-            </TabsContent>
-            
-            <TabsContent value="keywords" className="mt-6">
-              <ClassificationErrorBoundary context="Keyword Management">
-                <KeywordExclusionManager />
-              </ClassificationErrorBoundary>
-            </TabsContent>
-            
-            <TabsContent value="results" className="mt-6">
-              <ClassificationErrorBoundary context="Results Display">
-                {batchSummary && batchResults.length > 0 && (
-                  <div className="mb-6">
-                    <h3 className="text-lg font-medium mb-4">Latest Batch Summary</h3>
-                    <BatchProcessingSummary summary={batchSummary} />
-                  </div>
-                )}
-                
-                <div>
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold">All Historical Classification Results</h2>
-                    {allResults.length > 0 && (
-                      <button
-                        onClick={clearAllResults}
-                        className="text-sm text-muted-foreground hover:text-destructive"
-                      >
-                        Clear All Results
-                      </button>
-                    )}
-                  </div>
-                  {allResults.length > 0 ? (
-                    <ClassificationResultTable results={allResults} />
-                  ) : (
-                    <div className="text-center py-8 border rounded-md">
-                      <p className="text-muted-foreground">
-                        No classification results yet. Upload a file to see results here.
-                      </p>
+          <ErrorBoundary>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="batch">File Processing</TabsTrigger>
+                <TabsTrigger value="keywords">Keyword Management</TabsTrigger>
+                <TabsTrigger value="results">All Results ({allResults.length})</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="batch" className="mt-6">
+                <ClassificationErrorBoundary context="File Processing">
+                  <BatchClassificationForm onComplete={handleBatchComplete} />
+                </ClassificationErrorBoundary>
+              </TabsContent>
+              
+              <TabsContent value="keywords" className="mt-6">
+                <ClassificationErrorBoundary context="Keyword Management">
+                  <KeywordExclusionManager />
+                </ClassificationErrorBoundary>
+              </TabsContent>
+              
+              <TabsContent value="results" className="mt-6">
+                <ClassificationErrorBoundary context="Results Display">
+                  {batchSummary && batchResults.length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-lg font-medium mb-4">Latest Batch Summary</h3>
+                      <BatchProcessingSummary summary={batchSummary} />
                     </div>
                   )}
-                </div>
-              </ClassificationErrorBoundary>
-            </TabsContent>
-          </Tabs>
+                  
+                  <div>
+                    <div className="flex justify-between items-center mb-4">
+                      <h2 className="text-xl font-bold">All Historical Classification Results</h2>
+                      {allResults.length > 0 && (
+                        <button
+                          onClick={clearAllResults}
+                          className="text-sm text-muted-foreground hover:text-destructive"
+                        >
+                          Clear All Results
+                        </button>
+                      )}
+                    </div>
+                    {allResults.length > 0 ? (
+                      <ClassificationResultTable results={allResults} />
+                    ) : (
+                      <div className="text-center py-8 border rounded-md">
+                        <p className="text-muted-foreground">
+                          No classification results yet. Upload a file to see results here.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </ClassificationErrorBoundary>
+              </TabsContent>
+            </Tabs>
+          </ErrorBoundary>
         </main>
 
         <footer className="bg-muted py-4 text-center text-sm text-muted-foreground">

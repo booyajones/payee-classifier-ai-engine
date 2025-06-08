@@ -29,47 +29,99 @@ export const UnifiedProgressProvider: React.FC<{ children: React.ReactNode }> = 
     message?: string, 
     jobId?: string
   ) => {
-    console.log(`[UNIFIED PROGRESS] ${id}: ${stage} (${percentage}%) - ${message || ''}`);
-    
-    setProgressStates(prev => ({
-      ...prev,
-      [id]: {
-        stage,
-        percentage: Math.max(0, Math.min(100, percentage)),
-        isActive: percentage < 100,
-        message,
-        jobId
+    try {
+      console.log(`[UNIFIED PROGRESS] ${id}: ${stage} (${percentage}%) - ${message || ''}`);
+      
+      // Validate inputs to prevent infinite loops
+      if (!id || typeof percentage !== 'number' || !stage) {
+        console.error('[UNIFIED PROGRESS ERROR] Invalid inputs:', { id, stage, percentage });
+        return;
       }
-    }));
+
+      // Clamp percentage to prevent invalid values
+      const clampedPercentage = Math.max(0, Math.min(100, percentage));
+      
+      setProgressStates(prev => {
+        // Prevent unnecessary updates that could cause re-renders
+        const existing = prev[id];
+        if (existing && 
+            existing.stage === stage && 
+            existing.percentage === clampedPercentage && 
+            existing.message === message &&
+            existing.jobId === jobId) {
+          return prev; // No change needed
+        }
+
+        return {
+          ...prev,
+          [id]: {
+            stage,
+            percentage: clampedPercentage,
+            isActive: clampedPercentage < 100,
+            message,
+            jobId
+          }
+        };
+      });
+    } catch (error) {
+      console.error('[UNIFIED PROGRESS ERROR] Update failed:', error);
+    }
   }, []);
 
   const completeProgress = useCallback((id: string, message?: string) => {
-    console.log(`[UNIFIED PROGRESS] ${id}: Completed - ${message || ''}`);
-    
-    setProgressStates(prev => ({
-      ...prev,
-      [id]: {
-        stage: 'Completed',
-        percentage: 100,
-        isActive: false,
-        message: message || 'Processing complete',
-        jobId: prev[id]?.jobId
+    try {
+      console.log(`[UNIFIED PROGRESS] ${id}: Completed - ${message || ''}`);
+      
+      if (!id) {
+        console.error('[UNIFIED PROGRESS ERROR] Invalid id for completion');
+        return;
       }
-    }));
+      
+      setProgressStates(prev => ({
+        ...prev,
+        [id]: {
+          stage: 'Completed',
+          percentage: 100,
+          isActive: false,
+          message: message || 'Processing complete',
+          jobId: prev[id]?.jobId
+        }
+      }));
+    } catch (error) {
+      console.error('[UNIFIED PROGRESS ERROR] Complete failed:', error);
+    }
   }, []);
 
   const clearProgress = useCallback((id: string) => {
-    console.log(`[UNIFIED PROGRESS] ${id}: Cleared`);
-    
-    setProgressStates(prev => {
-      const newStates = { ...prev };
-      delete newStates[id];
-      return newStates;
-    });
+    try {
+      console.log(`[UNIFIED PROGRESS] ${id}: Cleared`);
+      
+      if (!id) {
+        console.error('[UNIFIED PROGRESS ERROR] Invalid id for clearing');
+        return;
+      }
+      
+      setProgressStates(prev => {
+        const newStates = { ...prev };
+        delete newStates[id];
+        return newStates;
+      });
+    } catch (error) {
+      console.error('[UNIFIED PROGRESS ERROR] Clear failed:', error);
+    }
   }, []);
 
   const getProgress = useCallback((id: string): UnifiedProgressState | null => {
-    return progressStates[id] || null;
+    try {
+      if (!id) {
+        console.error('[UNIFIED PROGRESS ERROR] Invalid id for getting progress');
+        return null;
+      }
+      return progressStates[id] || null;
+    } catch (error) {
+      console.error('[UNIFIED PROGRESS ERROR] Get failed:', error);
+      return null;
+    }
   }, [progressStates]);
 
   return (
