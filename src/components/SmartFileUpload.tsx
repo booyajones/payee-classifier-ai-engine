@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,7 @@ import { parseUploadedFile } from '@/lib/utils';
 import { validateFile, validatePayeeData } from '@/lib/fileValidation';
 import { createPayeeRowMapping, PayeeRowData } from '@/lib/rowMapping';
 import { useSmartBatchManager } from '@/hooks/useSmartBatchManager';
-import { useProgressTracking } from '@/hooks/useProgressTracking';
+import { useUnifiedProgress } from '@/contexts/UnifiedProgressContext';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -33,7 +32,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { createSmartBatchJob, getSmartState } = useSmartBatchManager();
-  const { updateProgress, getProgress, completeProgress, clearProgress } = useProgressTracking();
+  const { updateProgress, getProgress, completeProgress, clearProgress } = useUnifiedProgress();
   const { toast } = useToast();
 
   const UPLOAD_ID = 'file-upload';
@@ -121,16 +120,20 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
 
       updateProgress(UPLOAD_ID, 'Creating batch job...', 50);
 
-      // Create smart batch job
+      // Create smart batch job with progress tracking
       const job = await createSmartBatchJob(
         payeeRowData,
         `Upload: ${fileName}`,
         (updatedJob) => {
+          console.log(`[SMART UPLOAD] Job ${updatedJob.id} updated: ${updatedJob.status}`);
           setCurrentJob(updatedJob);
+          
+          // Update progress with job ID for unified tracking
           const smartState = getSmartState(updatedJob.id);
-          updateProgress(UPLOAD_ID, smartState.currentStage, smartState.progress);
+          updateProgress(UPLOAD_ID, smartState.currentStage, smartState.progress, smartState.currentStage, updatedJob.id);
         },
         (results, summary, jobId) => {
+          console.log(`[SMART UPLOAD] Job ${jobId} completed with ${results.length} results`);
           setUploadState('complete');
           completeProgress(UPLOAD_ID, `Successfully processed ${results.length} payees!`);
           onProcessingComplete(results, summary, jobId);
@@ -140,7 +143,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
       if (job) {
         setCurrentJob(job);
         setUploadState('processing');
-        updateProgress(UPLOAD_ID, 'Batch job created! Processing payee classifications...', 70);
+        updateProgress(UPLOAD_ID, 'Batch job created! Processing payee classifications...', 70, 'OpenAI batch processing started', job.id);
         onBatchJobCreated(job, payeeRowData);
       } else {
         setUploadState('complete');
@@ -294,6 +297,11 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
               progress={currentProgress.percentage} 
               status={currentProgress.stage} 
             />
+            {currentProgress.jobId && (
+              <p className="text-xs text-muted-foreground">
+                Job ID: {currentProgress.jobId}
+              </p>
+            )}
             <p className="text-sm text-muted-foreground">
               This may take a few minutes depending on file size. You can leave this page - we'll save your progress.
             </p>

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle, Clock, Download, RefreshCw, Trash, Loader2, CheckCheck, AlertCircle } from "lucide-react";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
+import { useUnifiedProgress } from "@/contexts/UnifiedProgressContext";
 import BatchProcessingProgress from "../BatchProcessingProgress";
 
 interface BatchJobCardProps {
@@ -38,6 +39,11 @@ const BatchJobCard = ({
   onCancel,
   onDelete
 }: BatchJobCardProps) => {
+  const { getProgress } = useUnifiedProgress();
+
+  // Try to get unified progress for this job
+  const unifiedProgress = getProgress(`job-${job.id}`) || getProgress('file-upload');
+
   const formatDate = (timestamp: number) => {
     const date = new Date(timestamp * 1000);
     return date.toLocaleString('en-US', {
@@ -88,52 +94,95 @@ const BatchJobCard = ({
     ? Math.round((job.request_counts.completed / job.request_counts.total) * 100)
     : 0;
 
-  // Determine what progress to show - prioritize custom progress if available
+  // Determine what progress to show - prioritize unified progress, then custom, then others
   const getProgressInfo = () => {
+    // First priority: unified progress that matches this job
+    if (unifiedProgress?.isActive && unifiedProgress.jobId === job.id) {
+      return {
+        percentage: unifiedProgress.percentage,
+        label: unifiedProgress.stage,
+        showBar: true,
+        source: 'unified'
+      };
+    }
+    
+    // Second priority: unified progress from upload (during initial processing)
+    if (unifiedProgress?.isActive && !unifiedProgress.jobId && ['validating', 'in_progress'].includes(job.status)) {
+      return {
+        percentage: unifiedProgress.percentage,
+        label: unifiedProgress.stage,
+        showBar: true,
+        source: 'unified-upload'
+      };
+    }
+    
+    // Third priority: custom progress (from smart batch manager)
     if (customProgress?.isActive) {
       return {
         percentage: customProgress.percentage,
         label: customProgress.stage,
-        showBar: true
+        showBar: true,
+        source: 'custom'
       };
     }
     
+    // Fourth priority: download progress
     if (isDownloading && progress) {
       return {
         percentage: Math.round((progress.current / progress.total) * 100),
         label: `Processing results: ${progress.current}/${progress.total}`,
-        showBar: true
+        showBar: true,
+        source: 'download'
       };
     }
     
+    // Fifth priority: OpenAI batch progress
     if (job.status === 'in_progress' || job.status === 'finalizing') {
       if (job.request_counts.completed > 0) {
         return {
           percentage: batchProgress,
           label: `OpenAI processing: ${job.request_counts.completed}/${job.request_counts.total}`,
-          showBar: true
+          showBar: true,
+          source: 'openai'
         };
       } else {
         return {
-          percentage: 0,
+          percentage: 10,
           label: 'OpenAI batch processing started...',
-          showBar: true
+          showBar: true,
+          source: 'openai-start'
         };
       }
     }
     
+    // Sixth priority: validating state
     if (job.status === 'validating') {
       return {
-        percentage: 0,
+        percentage: 5,
         label: 'Validating batch request...',
-        showBar: true
+        showBar: true,
+        source: 'validating'
       };
     }
     
-    return { showBar: false };
+    return { showBar: false, source: 'none' };
   };
 
   const progressInfo = getProgressInfo();
+
+  console.log(`[BATCH CARD] Job ${job.id} progress:`, {
+    status: job.status,
+    unifiedProgress: unifiedProgress ? {
+      stage: unifiedProgress.stage,
+      percentage: unifiedProgress.percentage,
+      isActive: unifiedProgress.isActive,
+      jobId: unifiedProgress.jobId
+    } : null,
+    customProgress,
+    progressInfo,
+    isDownloading,
+    downloadProgress: progress
+  });
 
   return (
     <Card>
@@ -167,6 +216,11 @@ const BatchJobCard = ({
             {lastError && (
               <p className="text-xs text-red-600 mt-1">
                 Last refresh error: {lastError}
+              </p>
+            )}
+            {progressInfo.showBar && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Progress source: {progressInfo.source}
               </p>
             )}
           </div>

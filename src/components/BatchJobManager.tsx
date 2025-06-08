@@ -7,6 +7,7 @@ import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { PayeeRowData } from "@/lib/rowMapping";
 import { useBatchJobActions } from "./batch/useBatchJobActions";
 import { useSmartBatchManager } from "@/hooks/useSmartBatchManager";
+import { useUnifiedProgress } from "@/contexts/UnifiedProgressContext";
 import BatchJobCard from "./batch/BatchJobCard";
 import ConfirmationDialog from "./ConfirmationDialog";
 
@@ -45,6 +46,7 @@ const BatchJobManager = ({
   const [processingInProgress, setProcessingInProgress] = useState<Set<string>>(new Set());
 
   const { getSmartState } = useSmartBatchManager();
+  const { updateProgress } = useUnifiedProgress();
 
   const {
     refreshingJobs,
@@ -75,6 +77,9 @@ const BatchJobManager = ({
       
       // Mark as processing
       setProcessingInProgress(prev => new Set(prev).add(jobId));
+      
+      // Update unified progress during download completion
+      updateProgress(`job-${jobId}`, 'Download complete!', 100, `Successfully processed ${results.length} payees`, jobId);
       
       try {
         // Validate results before marking as processed
@@ -243,6 +248,12 @@ const BatchJobManager = ({
               percentage: smartState.progress,
               isActive: smartState.isProcessing
             } : undefined;
+            
+            // Update unified progress when downloading
+            if (isJobDownloading && progress) {
+              const downloadPercentage = Math.round((progress.current / progress.total) * 100);
+              updateProgress(`job-${job.id}`, `Downloading results: ${progress.current}/${progress.total}`, downloadPercentage, `Processing results: ${progress.current}/${progress.total}`, job.id);
+            }
             
             console.log(`[BATCH MANAGER] Rendering job ${job.id}: status=${job.status}, payeeCount=${payeeCount}, isProcessed=${isProcessed}, isProcessing=${isProcessing}`);
             
