@@ -5,8 +5,8 @@ export const DEFAULT_API_TIMEOUT = 20000; // Increased to 20 seconds for batch p
 // Optimized batch size for faster processing
 export const MAX_BATCH_SIZE = 15; // Increased for better throughput
 
-// Use the most reliable and fast model - UPDATED to current supported model
-export const CLASSIFICATION_MODEL = 'gpt-4.1-mini-2025-04-14';
+// Use the flagship model for best accuracy and reliability
+export const CLASSIFICATION_MODEL = 'gpt-4.1-2025-04-14';
 
 // Enhanced processing configuration
 export const ENHANCED_PROCESSING = {
