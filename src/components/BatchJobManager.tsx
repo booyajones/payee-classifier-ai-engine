@@ -56,15 +56,29 @@ const BatchJobManager = ({
     payeeRowDataMap,
     onJobUpdate,
     onJobComplete: (results, summary, jobId) => {
+      console.log(`[DEBUG] Batch job ${jobId} completion handler called with ${results.length} results`);
+      
       // Prevent duplicate processing
       if (processedJobs.has(jobId)) {
-        console.log(`[BATCH MANAGER] Job ${jobId} already processed, ignoring duplicate`);
+        console.log(`[DEBUG] Job ${jobId} already processed, ignoring duplicate`);
         return;
+      }
+      
+      // Validate results before marking as processed
+      if (results.length === 0) {
+        console.error(`[DEBUG] Job ${jobId} completed with 0 results - this is unexpected`);
+      }
+      
+      // Check for duplicates in results
+      const ids = results.map(r => r.id);
+      const uniqueIds = new Set(ids);
+      if (ids.length !== uniqueIds.size) {
+        console.warn(`[DEBUG] Job ${jobId} has ${ids.length - uniqueIds.size} duplicate result IDs`);
       }
       
       setProcessedJobs(prev => new Set(prev).add(jobId));
       onJobComplete(results, summary, jobId);
-      console.log(`[BATCH MANAGER] Job ${jobId} processed successfully, marked as completed`);
+      console.log(`[DEBUG] Job ${jobId} processed successfully, marked as completed`);
     }
   });
 
@@ -110,7 +124,10 @@ const BatchJobManager = ({
       isOpen: true,
       title: 'Remove Job from List',
       description,
-      onConfirm: () => onJobDelete(jobId),
+      onConfirm: () => {
+        console.log(`[DEBUG] Deleting job ${jobId} from list`);
+        onJobDelete(jobId);
+      },
       variant: 'destructive'
     });
   };
@@ -124,6 +141,8 @@ const BatchJobManager = ({
       </Alert>
     );
   }
+
+  console.log(`[DEBUG] BatchJobManager rendering ${filteredJobs.length} jobs (${jobs.length} total, ${finishedJobsCount} finished)`);
 
   return (
     <>
@@ -170,6 +189,8 @@ const BatchJobManager = ({
             const payeeRowData = payeeRowDataMap[job.id];
             const payeeCount = payeeRowData?.uniquePayeeNames.length || 0;
             const isProcessed = processedJobs.has(job.id);
+            
+            console.log(`[DEBUG] Rendering job ${job.id}: status=${job.status}, payeeCount=${payeeCount}, isProcessed=${isProcessed}`);
             
             return (
               <BatchJobCard
