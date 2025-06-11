@@ -1,12 +1,13 @@
 
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Clock, Download, RefreshCw, Trash, Loader2, CheckCheck, AlertCircle } from "lucide-react";
-import { BatchJob } from "@/lib/openai/trueBatchAPI";
-import { useUnifiedProgress } from "@/contexts/UnifiedProgressContext";
-import BatchProcessingProgress from "../BatchProcessingProgress";
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { AlertCircle, Calendar, RefreshCw, Download, X, Trash2, Users, Clock } from 'lucide-react';
+import { BatchJob } from '@/lib/openai/trueBatchAPI';
+import { useUnifiedProgress } from '@/contexts/UnifiedProgressContext';
+import BatchJobTimeoutIndicator from './BatchJobTimeoutIndicator';
 
 interface BatchJobCardProps {
   job: BatchJob;
@@ -14,14 +15,24 @@ interface BatchJobCardProps {
   isRefreshing: boolean;
   isDownloading: boolean;
   isPolling: boolean;
-  isCompleted?: boolean;
   progress?: { current: number; total: number };
+  customProgress?: {
+    stage: string;
+    percentage: number;
+    isActive: boolean;
+  };
   lastError?: string;
-  customProgress?: { stage: string; percentage: number; isActive: boolean };
-  onRefresh: (jobId: string) => void;
-  onDownload: (job: BatchJob) => void;
-  onCancel: (jobId: string) => void;
-  onDelete: (jobId: string) => void;
+  onRefresh: () => void;
+  onDownload: () => void;
+  onCancel: () => void;
+  onDelete: () => void;
+  isCompleted?: boolean;
+  // New timeout props
+  isStuck?: boolean;
+  shouldTimeout?: boolean;
+  elapsedTime?: string;
+  onRecover?: () => void;
+  isRecovering?: boolean;
 }
 
 const BatchJobCard = ({
@@ -30,324 +41,236 @@ const BatchJobCard = ({
   isRefreshing,
   isDownloading,
   isPolling,
-  isCompleted = false,
   progress,
-  lastError,
   customProgress,
+  lastError,
   onRefresh,
   onDownload,
   onCancel,
-  onDelete
+  onDelete,
+  isCompleted = false,
+  isStuck = false,
+  shouldTimeout = false,
+  elapsedTime = '',
+  onRecover = () => {},
+  isRecovering = false
 }: BatchJobCardProps) => {
   const { getProgress } = useUnifiedProgress();
-
-  console.log(`[BATCH CARD DEBUG] Rendering job ${job.id.slice(-8)}, status: ${job.status}`);
-
-  // Try to get unified progress for this job - with error handling
-  let unifiedProgress = null;
-  try {
-    unifiedProgress = getProgress(`job-${job.id}`) || getProgress('file-upload');
-  } catch (error) {
-    console.error(`[BATCH CARD ERROR] Progress retrieval failed:`, error);
-  }
-
-  const formatDate = (timestamp: number) => {
-    try {
-      const date = new Date(timestamp * 1000);
-      return date.toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      console.error('[BATCH CARD ERROR] Date formatting failed:', error);
-      return 'Invalid date';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'failed':
-      case 'expired':
-        return <XCircle className="h-4 w-4 text-red-500" />;
-      case 'cancelled':
-        return <XCircle className="h-4 w-4 text-gray-500" />;
-      case 'cancelling':
-        return <AlertCircle className="h-4 w-4 text-amber-500" />;
-      default:
-        return <Clock className="h-4 w-4 text-yellow-500" />;
-    }
-  };
+  const [showDetails, setShowDetails] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'failed':
-      case 'expired':
-        return 'bg-red-100 text-red-800';
-      case 'cancelled':
-        return 'bg-gray-100 text-gray-800';
-      case 'cancelling':
-        return 'bg-amber-100 text-amber-800';
-      case 'in_progress':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-yellow-100 text-yellow-800';
+      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
+      case 'failed': return 'bg-red-100 text-red-800 border-red-200';
+      case 'expired': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'cancelled': return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'in_progress': return shouldTimeout ? 'bg-red-100 text-red-800 border-red-200' : 
+                                isStuck ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : 
+                                'bg-blue-100 text-blue-800 border-blue-200';
+      case 'validating': return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'finalizing': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
-  // Enhanced progress calculation with better time-based estimates
-  const calculateEnhancedProgress = () => {
-    try {
-      const now = Date.now() / 1000;
-      const createdTime = job.created_at;
-      const inProgressTime = job.in_progress_at || createdTime;
-      const timeElapsed = now - inProgressTime;
-      
-      const batchProgress = job.request_counts.total > 0 
-        ? Math.round((job.request_counts.completed / job.request_counts.total) * 100)
-        : 0;
-
-      return { batchProgress, timeElapsed, inProgressTime };
-    } catch (error) {
-      console.error('[BATCH CARD ERROR] Progress calculation failed:', error);
-      return { batchProgress: 0, timeElapsed: 0, inProgressTime: 0 };
-    }
+  const getStatusDisplay = (status: string) => {
+    if (shouldTimeout) return 'Stuck';
+    if (isStuck && status === 'in_progress') return 'Slow Progress';
+    return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
   };
 
-  // Determine what progress to show with error handling
   const getProgressInfo = () => {
-    try {
-      const { batchProgress, timeElapsed } = calculateEnhancedProgress();
-      
-      // First priority: unified progress that matches this job
-      if (unifiedProgress?.isActive && unifiedProgress.jobId === job.id) {
-        return {
-          percentage: Math.max(0, Math.min(100, unifiedProgress.percentage || 0)),
-          label: unifiedProgress.stage || 'Processing...',
-          showBar: true,
-          source: 'unified'
-        };
-      }
-      
-      // Second priority: custom progress (from smart batch manager)
-      if (customProgress?.isActive) {
-        return {
-          percentage: Math.max(0, Math.min(100, customProgress.percentage || 0)),
-          label: customProgress.stage || 'Processing...',
-          showBar: true,
-          source: 'custom'
-        };
-      }
-      
-      // Third priority: download progress
-      if (isDownloading && progress) {
-        return {
-          percentage: Math.max(0, Math.min(100, Math.round((progress.current / progress.total) * 100))),
-          label: `Processing results: ${progress.current}/${progress.total}`,
-          showBar: true,
-          source: 'download'
-        };
-      }
-      
-      // Fourth priority: Enhanced OpenAI batch progress
-      if (job.status === 'in_progress' || job.status === 'finalizing') {
-        if (job.request_counts.completed > 0) {
-          return {
-            percentage: Math.max(0, Math.min(100, batchProgress)),
-            label: `OpenAI processing: ${job.request_counts.completed}/${job.request_counts.total} (${batchProgress}%)`,
-            showBar: true,
-            source: 'openai'
-          };
-        } else {
-          // Time-based progress estimate
-          let estimatedProgress = Math.min(50, 15 + (timeElapsed / 60) * 2); // Slow growth over time
-          let progressLabel = `Processing ${job.request_counts.total} requests...`;
-          
-          if (timeElapsed > 300) { // After 5 minutes
-            progressLabel += ` (${Math.floor(timeElapsed / 60)}m elapsed)`;
-          }
-          
-          return {
-            percentage: Math.max(0, Math.min(100, estimatedProgress)),
-            label: progressLabel,
-            showBar: true,
-            source: 'openai-enhanced'
-          };
-        }
-      }
-      
-      // Fifth priority: validating state
-      if (job.status === 'validating') {
-        return {
-          percentage: 5,
-          label: 'Validating batch request...',
-          showBar: true,
-          source: 'validating'
-        };
-      }
-      
-      return { showBar: false, source: 'none' };
-    } catch (error) {
-      console.error('[BATCH CARD ERROR] Progress info calculation failed:', error);
-      return { showBar: false, source: 'error' };
+    const unifiedProgress = getProgress(`job-${job.id}`);
+    
+    if (unifiedProgress && unifiedProgress.percentage > 0) {
+      return {
+        percentage: unifiedProgress.percentage,
+        label: unifiedProgress.stage || unifiedProgress.message || 'Processing...',
+        showBar: true,
+        source: 'unified'
+      };
     }
+
+    if (customProgress && customProgress.isActive) {
+      return {
+        percentage: customProgress.percentage,
+        label: customProgress.stage,
+        showBar: true,
+        source: 'custom'
+      };
+    }
+
+    if (progress) {
+      const percentage = Math.round((progress.current / progress.total) * 100);
+      return {
+        percentage,
+        label: `Downloading: ${progress.current}/${progress.total}`,
+        showBar: true,
+        source: 'download'
+      };
+    }
+
+    if (job.status === 'in_progress' && job.request_counts.total > 0) {
+      const percentage = Math.round((job.request_counts.completed / job.request_counts.total) * 100);
+      return {
+        percentage,
+        label: `${job.request_counts.completed}/${job.request_counts.total} completed`,
+        showBar: true,
+        source: 'batch'
+      };
+    }
+
+    return {
+      percentage: 0,
+      label: 'Ready',
+      showBar: false,
+      source: 'none'
+    };
   };
 
   const progressInfo = getProgressInfo();
-  const { batchProgress } = calculateEnhancedProgress();
+  const showBar = progressInfo.showBar || isDownloading;
+  const hasProgress = progressInfo.percentage > 0 || isDownloading;
 
+  console.log(`[BATCH CARD DEBUG] Rendering job ${job.id.slice(-8)}, status: ${job.status}`);
   console.log(`[BATCH CARD DEBUG] Job ${job.id.slice(-8)} progress info:`, {
     status: job.status,
     progressInfo,
-    showBar: progressInfo.showBar,
+    showBar,
     isDownloading,
-    hasProgress: !!progress
+    hasProgress
   });
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-sm flex items-center gap-2">
+    <Card className={`transition-all duration-200 ${isCompleted ? 'ring-2 ring-green-200' : ''}`}>
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between">
+          <div className="space-y-1 flex-1">
+            <CardTitle className="text-base font-medium flex items-center gap-2">
               Job {job.id.slice(-8)}
-              {isCompleted && (
-                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                  <CheckCheck className="h-3 w-3 mr-1" />
-                  Downloaded
+              {isCompleted && <Badge variant="outline" className="text-green-600 border-green-300">Completed</Badge>}
+              {elapsedTime && (
+                <Badge variant="outline" className="text-gray-600 border-gray-300 flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {elapsedTime}
                 </Badge>
               )}
             </CardTitle>
-            <CardDescription>
-              {job.metadata?.description || 'Payee classification batch'} • {payeeCount} payees
-              <br />
-              <span className="text-xs text-muted-foreground">
-                Created: {formatDate(job.created_at)}
+            <CardDescription className="flex items-center gap-4 text-sm">
+              <span className="flex items-center gap-1">
+                <Users className="h-3 w-3" />
+                {payeeCount} payees
               </span>
-              {job.completed_at && (
-                <>
-                  <br />
-                  <span className="text-xs text-muted-foreground">
-                    Completed: {formatDate(job.completed_at)}
-                  </span>
-                </>
-              )}
-              {job.in_progress_at && job.status === 'in_progress' && (
-                <>
-                  <br />
-                  <span className="text-xs text-muted-foreground">
-                    Started processing: {formatDate(job.in_progress_at)}
-                  </span>
-                </>
-              )}
+              <span className="flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                {new Date(job.created_at * 1000).toLocaleString()}
+              </span>
             </CardDescription>
-            {lastError && (
-              <p className="text-xs text-red-600 mt-1">
-                Last refresh error: {lastError}
-              </p>
-            )}
           </div>
           <div className="flex items-center gap-2">
-            {getStatusIcon(job.status)}
             <Badge className={getStatusColor(job.status)}>
-              {job.status.replace('_', ' ')}
+              {getStatusDisplay(job.status)}
             </Badge>
           </div>
         </div>
       </CardHeader>
-      
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="font-medium">Total Requests:</span> {job.request_counts.total || 0}
-          </div>
-          <div>
-            <span className="font-medium">Completed:</span> {job.request_counts.completed || 0}
-          </div>
-          <div>
-            <span className="font-medium">Failed:</span> {job.request_counts.failed || 0}
-          </div>
-          <div>
-            <span className="font-medium">Batch Progress:</span> {batchProgress}%
-          </div>
-        </div>
 
-        {progressInfo.showBar && (
+      <CardContent className="space-y-3">
+        {showBar && (
           <div className="space-y-2">
-            <BatchProcessingProgress
-              progress={progressInfo.percentage || 0}
-              status={progressInfo.label || 'Processing...'}
-            />
-            <p className="text-xs text-muted-foreground">
-              Progress source: {progressInfo.source}
-            </p>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">{progressInfo.label}</span>
+              <span className="font-medium">{progressInfo.percentage}%</span>
+            </div>
+            <Progress value={progressInfo.percentage} className="h-2" />
           </div>
         )}
 
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onRefresh(job.id)}
-            disabled={isRefreshing || isPolling}
-          >
-            {isRefreshing || isPolling ? (
-              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-            ) : (
-              <RefreshCw className="h-3 w-3 mr-1" />
+        {/* Timeout Indicator */}
+        <BatchJobTimeoutIndicator
+          job={job}
+          isStuck={isStuck}
+          shouldTimeout={shouldTimeout}
+          elapsedTime={elapsedTime}
+          onRecover={onRecover}
+          isRecovering={isRecovering}
+        />
+
+        {lastError && (
+          <div className="flex items-start gap-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <span>{lastError}</span>
+          </div>
+        )}
+
+        {showDetails && (
+          <div className="text-xs text-muted-foreground space-y-1 bg-gray-50 p-2 rounded">
+            <div>Created: {new Date(job.created_at * 1000).toLocaleString()}</div>
+            {job.in_progress_at && (
+              <div>Started: {new Date(job.in_progress_at * 1000).toLocaleString()}</div>
             )}
-            {isRefreshing || isPolling ? 'Refreshing...' : 'Refresh Status'}
+            {job.completed_at && (
+              <div>Completed: {new Date(job.completed_at * 1000).toLocaleString()}</div>
+            )}
+            <div>Requests: {job.request_counts.completed}/{job.request_counts.total} 
+              {job.request_counts.failed > 0 && ` (${job.request_counts.failed} failed)`}
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between pt-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowDetails(!showDetails)}
+            className="text-muted-foreground"
+          >
+            {showDetails ? 'Hide' : 'Show'} Details
           </Button>
 
-          {job.status === 'completed' && (
+          <div className="flex items-center gap-2">
             <Button
-              size="sm"
-              onClick={() => onDownload(job)}
-              disabled={isDownloading || isCompleted}
-              variant={isCompleted ? "outline" : "default"}
-            >
-              {isDownloading ? (
-                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-              ) : isCompleted ? (
-                <CheckCheck className="h-3 w-3 mr-1" />
-              ) : (
-                <Download className="h-3 w-3 mr-1" />
-              )}
-              {isDownloading 
-                ? (progress ? `Processing ${progress.current}/${progress.total}...` : 'Processing...')
-                : isCompleted
-                ? 'Already Downloaded'
-                : 'Download Results'
-              }
-            </Button>
-          )}
-
-          {['validating', 'in_progress'].includes(job.status) && (
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => onCancel(job.id)}
-            >
-              Cancel Job
-            </Button>
-          )}
-
-          {['completed', 'failed', 'expired', 'cancelled', 'cancelling'].includes(job.status) && (
-            <Button
-              size="sm"
               variant="outline"
-              onClick={() => onDelete(job.id)}
+              size="sm"
+              onClick={onRefresh}
+              disabled={isRefreshing || isPolling}
             >
-              <Trash className="h-3 w-3 mr-1" />
-              Remove from List
+              <RefreshCw className={`h-3 w-3 mr-1 ${(isRefreshing || isPolling) ? 'animate-spin' : ''}`} />
+              Refresh
             </Button>
-          )}
+
+            {job.status === 'completed' && !isCompleted && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={onDownload}
+                disabled={isDownloading}
+              >
+                <Download className={`h-3 w-3 mr-1 ${isDownloading ? 'animate-pulse' : ''}`} />
+                Download
+              </Button>
+            )}
+
+            {['validating', 'in_progress', 'finalizing'].includes(job.status) && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={onCancel}
+              >
+                <X className="h-3 w-3 mr-1" />
+                Cancel
+              </Button>
+            )}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDelete}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

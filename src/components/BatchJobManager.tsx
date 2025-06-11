@@ -7,6 +7,8 @@ import { useBatchJobActions } from "./batch/useBatchJobActions";
 import { useSmartBatchManager } from "@/hooks/useSmartBatchManager";
 import { useUnifiedProgress } from "@/contexts/UnifiedProgressContext";
 import { useBatchJobState } from "@/hooks/useBatchJobState";
+import { useBatchJobTimeout } from "@/hooks/useBatchJobTimeout";
+import { useEnhancedBatchRecovery } from "@/hooks/useEnhancedBatchRecovery";
 import BatchJobList from "./batch/BatchJobList";
 import BatchJobConfirmation from "./batch/BatchJobConfirmation";
 

@@ -22,6 +22,13 @@ interface BatchJobListProps {
   onDelete: (jobId: string) => void;
   getSmartState: (jobId: string) => any;
   updateProgress: (id: string, stage: string, percentage: number, message?: string, jobId?: string) => void;
+  // New timeout-related props
+  getTimeoutState: (jobId: string) => any;
+  isJobStuck: (jobId: string) => boolean;
+  shouldJobTimeout: (jobId: string) => boolean;
+  getFormattedElapsedTime: (jobId: string) => string;
+  onJobRecovery: (job: BatchJob) => void;
+  recoveringJobs: Set<string>;
 }
 
 const BatchJobList = ({
@@ -38,7 +45,14 @@ const BatchJobList = ({
   onCancel,
   onDelete,
   getSmartState,
-  updateProgress
+  updateProgress,
+  // New timeout-related props
+  getTimeoutState,
+  isJobStuck,
+  shouldJobTimeout,
+  getFormattedElapsedTime,
+  onJobRecovery,
+  recoveringJobs
 }: BatchJobListProps) => {
   const [hideFinishedJobs, setHideFinishedJobs] = useState(false);
 
@@ -109,6 +123,7 @@ const BatchJobList = ({
           const payeeCount = payeeRowData?.uniquePayeeNames.length || 0;
           const isProcessed = processedJobs.has(job.id);
           const isProcessing = processingInProgress.has(job.id);
+          const isRecovering = recoveringJobs.has(job.id);
           
           const smartState = getSmartState(job.id);
           const customProgress = smartState.isProcessing ? {
@@ -116,6 +131,11 @@ const BatchJobList = ({
             percentage: smartState.progress,
             isActive: smartState.isProcessing
           } : undefined;
+          
+          // Get timeout state
+          const isStuck = isJobStuck(job.id);
+          const shouldTimeout = shouldJobTimeout(job.id);
+          const elapsedTime = getFormattedElapsedTime(job.id);
           
           if (isJobDownloading && progress) {
             const downloadPercentage = Math.round((progress.current / progress.total) * 100);
@@ -138,6 +158,12 @@ const BatchJobList = ({
               onCancel={() => onCancel(job.id)}
               onDelete={() => onDelete(job.id)}
               isCompleted={isProcessed}
+              // New timeout props
+              isStuck={isStuck}
+              shouldTimeout={shouldTimeout}
+              elapsedTime={elapsedTime}
+              onRecover={() => onJobRecovery(job)}
+              isRecovering={isRecovering}
             />
           );
         })
