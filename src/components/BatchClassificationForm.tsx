@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,16 +9,17 @@ import BatchJobManager from "./BatchJobManager";
 import BatchResultsDisplay from "./BatchResultsDisplay";
 import { BatchJob, checkBatchJobStatus } from "@/lib/openai/trueBatchAPI";
 import { PayeeRowData } from "@/lib/rowMapping";
+import { 
+  saveBatchJob, 
+  updateBatchJobStatus, 
+  loadAllBatchJobs, 
+  deleteBatchJob 
+} from "@/lib/database/batchJobService";
 
 interface BatchClassificationFormProps {
   onBatchClassify?: (results: PayeeClassification[]) => void;
   onComplete?: (results: PayeeClassification[], summary: BatchProcessingResult) => void;
 }
-
-const STORAGE_KEYS = {
-  BATCH_JOBS: 'batch_classification_jobs',
-  PAYEE_ROW_DATA_MAP: 'batch_classification_payee_row_data'
-};
 
 const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassificationFormProps) => {
   const [batchResults, setBatchResults] = useState<PayeeClassification[]>([]);
@@ -28,46 +30,24 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
   const [isLoadingJobs, setIsLoadingJobs] = useState(true);
   const { toast } = useToast();
 
-  // Save ALL job data to localStorage
-  const saveToStorage = (jobs: BatchJob[], payeeRowDataMap: Record<string, PayeeRowData>) => {
-    try {
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          localStorage.setItem(STORAGE_KEYS.BATCH_JOBS, JSON.stringify(jobs));
-          localStorage.setItem(STORAGE_KEYS.PAYEE_ROW_DATA_MAP, JSON.stringify(payeeRowDataMap));
-          console.log(`[BATCH FORM] Successfully saved ${jobs.length} jobs with complete payee row data (attempt ${attempt + 1})`);
-          return;
-        } catch (saveError) {
-          console.warn(`[BATCH FORM] Save attempt ${attempt + 1} failed:`, saveError);
-          if (attempt === 2) throw saveError;
-        }
-      }
-    } catch (error) {
-      console.error('[BATCH FORM] CRITICAL: Failed to save job data after 3 attempts:', error);
-      toast({
-        title: "Storage Warning",
-        description: "Failed to save job data to browser storage. Jobs may be lost on refresh.",
-        variant: "destructive",
-      });
-    }
-  };
+  // Load jobs from database on component mount
+  useEffect(() => {
+    loadJobsFromDatabase();
+  }, []);
 
-  // Load and recover jobs from localStorage
-  const loadFromStorage = async () => {
+  const loadJobsFromDatabase = async () => {
     try {
-      const savedJobs = localStorage.getItem(STORAGE_KEYS.BATCH_JOBS);
-      const savedPayeeRowDataMap = localStorage.getItem(STORAGE_KEYS.PAYEE_ROW_DATA_MAP);
-
-      if (!savedJobs || !savedPayeeRowDataMap) {
-        console.log('[BATCH FORM] No saved jobs found');
+      setIsLoadingJobs(true);
+      
+      const { jobs, payeeRowDataMap } = await loadAllBatchJobs();
+      
+      if (jobs.length === 0) {
+        console.log('[BATCH FORM] No saved jobs found in database');
         setIsLoadingJobs(false);
         return;
       }
 
-      const jobs: BatchJob[] = JSON.parse(savedJobs);
-      const payeeRowDataMap: Record<string, PayeeRowData> = JSON.parse(savedPayeeRowDataMap);
-
-      console.log(`[BATCH FORM] Found ${jobs.length} saved jobs with complete payee row data, checking status...`);
+      console.log(`[BATCH FORM] Found ${jobs.length} saved jobs in database, checking status...`);
 
       const updatedJobs: BatchJob[] = [];
       const validPayeeRowDataMap: Record<string, PayeeRowData> = {};
@@ -79,11 +59,14 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
           updatedJobs.push(updatedJob);
           validPayeeRowDataMap[job.id] = payeeRowDataMap[job.id];
           
-          console.log(`[BATCH FORM] Job ${job.id} preserved with complete payee row data`);
-          
+          // Update database if status changed
           if (updatedJob.status !== job.status) {
             console.log(`[BATCH FORM] Job ${job.id} status changed: ${job.status} -> ${updatedJob.status}`);
+            await updateBatchJobStatus(updatedJob);
           }
+          
+          console.log(`[BATCH FORM] Job ${job.id} preserved with complete payee row data`);
+          
         } catch (error) {
           console.error(`[BATCH FORM] Job ${job.id} no longer valid, but keeping data for recovery:`, error);
           updatedJobs.push(job);
@@ -94,21 +77,19 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
       setBatchJobs(updatedJobs);
       setPayeeRowDataMap(validPayeeRowDataMap);
 
-      saveToStorage(updatedJobs, validPayeeRowDataMap);
-
       if (updatedJobs.length > 0) {
         setActiveTab("jobs");
         toast({
           title: "All Jobs Recovered",
-          description: `Restored ${updatedJobs.length} batch job(s) with complete original data from previous session.`,
+          description: `Restored ${updatedJobs.length} batch job(s) with complete original data from database.`,
         });
       }
 
     } catch (error) {
-      console.error('[BATCH FORM] Error loading from localStorage:', error);
+      console.error('[BATCH FORM] Error loading from database:', error);
       toast({
-        title: "Recovery Warning", 
-        description: "Some job data could not be recovered from previous session.",
+        title: "Database Error", 
+        description: "Could not load job data from database. Please refresh the page.",
         variant: "destructive"
       });
     } finally {
@@ -116,38 +97,33 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
     }
   };
 
-  // Load jobs on component mount
-  useEffect(() => {
-    loadFromStorage();
-  }, []);
-
-  // Save jobs whenever they change (with debouncing)
-  useEffect(() => {
-    if (!isLoadingJobs && batchJobs.length > 0) {
-      const timeoutId = setTimeout(() => {
-        saveToStorage(batchJobs, payeeRowDataMap);
-      }, 500);
+  const resetForm = async () => {
+    try {
+      // Clear all jobs from database
+      const deletePromises = batchJobs.map(job => deleteBatchJob(job.id));
+      await Promise.all(deletePromises);
       
-      return () => clearTimeout(timeoutId);
+      // Clear local state
+      setBatchResults([]);
+      setProcessingSummary(null);
+      setBatchJobs([]);
+      setPayeeRowDataMap({});
+      
+      toast({
+        title: "Form Reset",
+        description: "All batch jobs and data have been cleared from the database.",
+      });
+    } catch (error) {
+      console.error('[BATCH FORM] Error clearing jobs from database:', error);
+      toast({
+        title: "Reset Error",
+        description: "Failed to clear some jobs from database. Please refresh the page.",
+        variant: "destructive"
+      });
     }
-  }, [batchJobs, payeeRowDataMap, isLoadingJobs]);
-
-  const resetForm = () => {
-    setBatchResults([]);
-    setProcessingSummary(null);
-    setBatchJobs([]);
-    setPayeeRowDataMap({});
-    
-    localStorage.removeItem(STORAGE_KEYS.BATCH_JOBS);
-    localStorage.removeItem(STORAGE_KEYS.PAYEE_ROW_DATA_MAP);
-    
-    toast({
-      title: "Form Reset",
-      description: "All batch jobs and data have been cleared. You can now start over.",
-    });
   };
 
-  const handleFileUploadBatchJob = (batchJob: BatchJob, payeeRowData: PayeeRowData) => {
+  const handleFileUploadBatchJob = async (batchJob: BatchJob, payeeRowData: PayeeRowData) => {
     console.log(`[BATCH FORM] Adding new batch job with complete payee row data:`, {
       jobId: batchJob.id,
       uniquePayeeCount: payeeRowData.uniquePayeeNames.length,
@@ -155,28 +131,62 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
       mappingCount: payeeRowData.rowMappings.length
     });
     
-    setBatchJobs(prev => {
-      const newJobs = [...prev, batchJob];
-      console.log(`[BATCH FORM] Updated batch jobs count: ${newJobs.length}`);
-      return newJobs;
-    });
-    
-    setPayeeRowDataMap(prev => {
-      const newMap = { ...prev, [batchJob.id]: payeeRowData };
-      console.log(`[BATCH FORM] Added payee row data for job ${batchJob.id}`);
-      return newMap;
-    });
-    
-    setActiveTab("jobs");
+    try {
+      // Save to database
+      await saveBatchJob(batchJob, payeeRowData);
+      
+      // Update local state
+      setBatchJobs(prev => {
+        const newJobs = [...prev, batchJob];
+        console.log(`[BATCH FORM] Updated batch jobs count: ${newJobs.length}`);
+        return newJobs;
+      });
+      
+      setPayeeRowDataMap(prev => {
+        const newMap = { ...prev, [batchJob.id]: payeeRowData };
+        console.log(`[BATCH FORM] Added payee row data for job ${batchJob.id}`);
+        return newMap;
+      });
+      
+      setActiveTab("jobs");
+      
+      toast({
+        title: "Batch Job Saved",
+        description: `Job ${batchJob.id.slice(-8)} saved to database successfully.`,
+      });
+    } catch (error) {
+      console.error('[BATCH FORM] Error saving batch job to database:', error);
+      toast({
+        title: "Save Error",
+        description: "Failed to save batch job to database. Job may be lost on refresh.",
+        variant: "destructive"
+      });
+      
+      // Still update local state as fallback
+      setBatchJobs(prev => [...prev, batchJob]);
+      setPayeeRowDataMap(prev => ({ ...prev, [batchJob.id]: payeeRowData }));
+      setActiveTab("jobs");
+    }
   };
 
-  const handleJobUpdate = (updatedJob: BatchJob) => {
+  const handleJobUpdate = async (updatedJob: BatchJob) => {
     console.log(`[BATCH FORM] Updating job:`, updatedJob);
-    setBatchJobs(prev => {
-      const newJobs = prev.map(job => job.id === updatedJob.id ? updatedJob : job);
-      console.log(`[BATCH FORM] Updated batch jobs after update:`, newJobs);
-      return newJobs;
-    });
+    
+    try {
+      // Update database
+      await updateBatchJobStatus(updatedJob);
+      
+      // Update local state
+      setBatchJobs(prev => {
+        const newJobs = prev.map(job => job.id === updatedJob.id ? updatedJob : job);
+        console.log(`[BATCH FORM] Updated batch jobs after update:`, newJobs);
+        return newJobs;
+      });
+    } catch (error) {
+      console.error('[BATCH FORM] Error updating job in database:', error);
+      // Still update local state
+      setBatchJobs(prev => prev.map(job => job.id === updatedJob.id ? updatedJob : job));
+    }
   };
 
   const handleJobComplete = (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => {
@@ -196,19 +206,38 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
     setActiveTab("results");
   };
 
-  const handleJobDelete = (jobId: string) => {
+  const handleJobDelete = async (jobId: string) => {
     console.log(`[BATCH FORM] Deleting job: ${jobId}`);
-    setBatchJobs(prev => {
-      const newJobs = prev.filter(job => job.id !== jobId);
-      console.log(`[BATCH FORM] Batch jobs after deletion:`, newJobs);
-      return newJobs;
-    });
-    setPayeeRowDataMap(prev => {
-      const newMap = { ...prev };
-      delete newMap[jobId];
-      console.log(`[BATCH FORM] Payee row data map after deletion:`, newMap);
-      return newMap;
-    });
+    
+    try {
+      // Delete from database
+      await deleteBatchJob(jobId);
+      
+      // Update local state
+      setBatchJobs(prev => {
+        const newJobs = prev.filter(job => job.id !== jobId);
+        console.log(`[BATCH FORM] Batch jobs after deletion:`, newJobs);
+        return newJobs;
+      });
+      setPayeeRowDataMap(prev => {
+        const newMap = { ...prev };
+        delete newMap[jobId];
+        console.log(`[BATCH FORM] Payee row data map after deletion:`, newMap);
+        return newMap;
+      });
+      
+      toast({
+        title: "Job Deleted",
+        description: `Job ${jobId.slice(-8)} removed from database.`,
+      });
+    } catch (error) {
+      console.error('[BATCH FORM] Error deleting job from database:', error);
+      toast({
+        title: "Delete Error",
+        description: "Failed to delete job from database.",
+        variant: "destructive"
+      });
+    }
   };
 
   console.log(`[BATCH FORM] RENDER - Active tab: ${activeTab}, Batch jobs: ${batchJobs.length}, Results: ${batchResults.length}, Loading: ${isLoadingJobs}`);
@@ -219,7 +248,7 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
         <CardHeader>
           <CardTitle>Batch Payee Classification</CardTitle>
           <CardDescription>
-            Loading and verifying all saved batch jobs...
+            Loading and verifying all saved batch jobs from database...
           </CardDescription>
         </CardHeader>
         <CardContent className="py-8">

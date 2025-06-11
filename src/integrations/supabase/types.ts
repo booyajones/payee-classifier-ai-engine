@@ -9,6 +9,84 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      batch_jobs: {
+        Row: {
+          app_created_at: string
+          app_updated_at: string
+          cancelled_at_timestamp: number | null
+          completed_at_timestamp: number | null
+          created_at_timestamp: number
+          errors: Json | null
+          expired_at_timestamp: number | null
+          failed_at_timestamp: number | null
+          file_headers: string[] | null
+          file_name: string | null
+          finalizing_at_timestamp: number | null
+          id: string
+          in_progress_at_timestamp: number | null
+          metadata: Json | null
+          original_file_data: Json
+          output_file_id: string | null
+          request_counts_completed: number
+          request_counts_failed: number
+          request_counts_total: number
+          row_mappings: Json
+          selected_payee_column: string | null
+          status: string
+          unique_payee_names: string[]
+        }
+        Insert: {
+          app_created_at?: string
+          app_updated_at?: string
+          cancelled_at_timestamp?: number | null
+          completed_at_timestamp?: number | null
+          created_at_timestamp: number
+          errors?: Json | null
+          expired_at_timestamp?: number | null
+          failed_at_timestamp?: number | null
+          file_headers?: string[] | null
+          file_name?: string | null
+          finalizing_at_timestamp?: number | null
+          id: string
+          in_progress_at_timestamp?: number | null
+          metadata?: Json | null
+          original_file_data: Json
+          output_file_id?: string | null
+          request_counts_completed?: number
+          request_counts_failed?: number
+          request_counts_total?: number
+          row_mappings: Json
+          selected_payee_column?: string | null
+          status: string
+          unique_payee_names: string[]
+        }
+        Update: {
+          app_created_at?: string
+          app_updated_at?: string
+          cancelled_at_timestamp?: number | null
+          completed_at_timestamp?: number | null
+          created_at_timestamp?: number
+          errors?: Json | null
+          expired_at_timestamp?: number | null
+          failed_at_timestamp?: number | null
+          file_headers?: string[] | null
+          file_name?: string | null
+          finalizing_at_timestamp?: number | null
+          id?: string
+          in_progress_at_timestamp?: number | null
+          metadata?: Json | null
+          original_file_data?: Json
+          output_file_id?: string | null
+          request_counts_completed?: number
+          request_counts_failed?: number
+          request_counts_total?: number
+          row_mappings?: Json
+          selected_payee_column?: string | null
+          status?: string
+          unique_payee_names?: string[]
+        }
+        Relationships: []
+      }
       payee_classifications: {
         Row: {
           batch_id: string | null

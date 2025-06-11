@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { validateFile, validatePayeeData } from "@/lib/fileValidation";
 import { handleError, showErrorToast, showRetryableErrorToast } from "@/lib/errorHandler";
 import { useRetry } from "@/hooks/useRetry";
 import { createPayeeRowMapping, PayeeRowData } from "@/lib/rowMapping";
+import { saveBatchJob } from "@/lib/database/batchJobService";
 
 interface FileUploadFormProps {
   onBatchJobCreated: (batchJob: BatchJob, payeeRowData: PayeeRowData) => void;
@@ -149,7 +151,7 @@ const FileUploadForm = ({
         return;
       }
 
-      // FIXED: Create proper row mapping instead of just extracting payee names
+      // Create proper row mapping
       const payeeRowData = createPayeeRowMapping(originalFileData, selectedColumn);
       
       setFileInfo({
@@ -168,7 +170,20 @@ const FileUploadForm = ({
       
       console.log(`[FILE UPLOAD] Batch job created successfully:`, batchJob);
 
-      // FIXED: Pass the complete PayeeRowData object instead of separate arrays
+      try {
+        // Save to database immediately
+        await saveBatchJob(batchJob, payeeRowData);
+        console.log(`[FILE UPLOAD] Batch job saved to database successfully`);
+      } catch (dbError) {
+        console.error('[FILE UPLOAD] Error saving to database, continuing with in-memory storage:', dbError);
+        toast({
+          title: "Database Warning",
+          description: "Job created but failed to save to database. Data may be lost on refresh.",
+          variant: "destructive"
+        });
+      }
+
+      // Pass the complete PayeeRowData object
       onBatchJobCreated(batchJob, payeeRowData);
       
       toast({
