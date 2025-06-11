@@ -57,9 +57,9 @@ export const saveBatchJob = async (
     unique_payee_names: payeeRowData.uniquePayeeNames,
     original_file_data: payeeRowData.originalFileData,
     row_mappings: payeeRowData.rowMappings,
-    file_name: payeeRowData.fileName || undefined,
-    file_headers: payeeRowData.fileHeaders || undefined,
-    selected_payee_column: payeeRowData.selectedPayeeColumn || undefined,
+    file_name: (payeeRowData as any).fileName || undefined,
+    file_headers: (payeeRowData as any).fileHeaders || undefined,
+    selected_payee_column: (payeeRowData as any).selectedPayeeColumn || undefined,
   };
 
   const { error } = await supabase
@@ -173,9 +173,9 @@ export const loadAllBatchJobs = async (): Promise<{
       uniquePayeeNames: record.unique_payee_names,
       originalFileData: Array.isArray(record.original_file_data) ? record.original_file_data : [],
       rowMappings: Array.isArray(record.row_mappings) ? record.row_mappings : [],
-      fileName: record.file_name || undefined,
-      fileHeaders: record.file_headers || undefined,
-      selectedPayeeColumn: record.selected_payee_column || undefined,
+      ...(record.file_name && { fileName: record.file_name }),
+      ...(record.file_headers && { fileHeaders: record.file_headers }),
+      ...(record.selected_payee_column && { selectedPayeeColumn: record.selected_payee_column }),
     };
 
     jobs.push(batchJob);
