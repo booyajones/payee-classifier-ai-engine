@@ -52,7 +52,7 @@ export const saveBatchJob = async (
     request_counts_completed: batchJob.request_counts.completed,
     request_counts_failed: batchJob.request_counts.failed,
     metadata: batchJob.metadata || null,
-    errors: batchJob.errors || null,
+    errors: (batchJob as any).errors || null,
     output_file_id: batchJob.output_file_id || undefined,
     unique_payee_names: payeeRowData.uniquePayeeNames,
     original_file_data: payeeRowData.originalFileData,
@@ -92,12 +92,12 @@ export const updateBatchJobStatus = async (
     completed_at_timestamp: batchJob.completed_at || undefined,
     failed_at_timestamp: batchJob.failed_at || undefined,
     expired_at_timestamp: batchJob.expired_at || undefined,
-    cancelled_at_timestamp: batchJob.cancelled_at || undefined,
+    cancelled_at_timestamp: (batchJob as any).cancelled_at || undefined,
     request_counts_total: batchJob.request_counts.total,
     request_counts_completed: batchJob.request_counts.completed,
     request_counts_failed: batchJob.request_counts.failed,
     metadata: batchJob.metadata || null,
-    errors: batchJob.errors || null,
+    errors: (batchJob as any).errors || null,
     output_file_id: batchJob.output_file_id || undefined,
   };
 
@@ -166,13 +166,17 @@ export const loadAllBatchJobs = async (): Promise<{
         completed: record.request_counts_completed,
         failed: record.request_counts_failed
       },
-      metadata: record.metadata || null
+      metadata: record.metadata as any || null
     };
+
+    // Type-safe casting for PayeeRowData
+    const originalFileData = Array.isArray(record.original_file_data) ? record.original_file_data : [];
+    const rowMappings = Array.isArray(record.row_mappings) ? record.row_mappings : [];
 
     const payeeRowData: PayeeRowData = {
       uniquePayeeNames: record.unique_payee_names,
-      originalFileData: Array.isArray(record.original_file_data) ? record.original_file_data : [],
-      rowMappings: Array.isArray(record.row_mappings) ? record.row_mappings : [],
+      originalFileData,
+      rowMappings: rowMappings as any[],
       ...(record.file_name && { fileName: record.file_name }),
       ...(record.file_headers && { fileHeaders: record.file_headers }),
       ...(record.selected_payee_column && { selectedPayeeColumn: record.selected_payee_column }),
