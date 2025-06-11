@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { isOpenAIInitialized } from "@/lib/openai/client";
 import { logMemoryUsage } from "@/lib/openai/apiUtils";
+import { deduplicateClassifications } from "@/lib/resultDeduplication";
 
 export const useIndexState = () => {
   const [activeTab, setActiveTab] = useState("batch");
@@ -56,7 +57,7 @@ export const useIndexState = () => {
     }
   };
 
-  // Handle batch completion with proper row mapping
+  // Handle batch completion with proper deduplication
   const handleBatchComplete = (
     results: PayeeClassification[],
     summary: BatchProcessingResult
@@ -67,17 +68,21 @@ export const useIndexState = () => {
       setBatchResults(results);
       setBatchSummary(summary);
       
-      // Remove duplicates before adding to allResults
-      const existingIds = new Set(allResults.map(r => r.id));
-      const newResults = results.filter(r => !existingIds.has(r.id));
+      // Combine all results and use proper deduplication
+      const combinedResults = [...allResults, ...results];
+      console.log(`[INDEX] Before deduplication: ${combinedResults.length} total results`);
       
-      if (newResults.length > 0) {
-        const updatedResults = [...allResults, ...newResults];
-        setAllResults(updatedResults);
-        saveResults(updatedResults);
-        console.log(`[INDEX] Added ${newResults.length} new results, ${results.length - newResults.length} duplicates filtered`);
+      // Use the proper deduplication function that checks row indices and content
+      const deduplicatedResults = deduplicateClassifications(combinedResults);
+      console.log(`[INDEX] After deduplication: ${deduplicatedResults.length} results (removed ${combinedResults.length - deduplicatedResults.length} duplicates)`);
+      
+      // Only update if there are actual new results after deduplication
+      if (deduplicatedResults.length > allResults.length) {
+        setAllResults(deduplicatedResults);
+        saveResults(deduplicatedResults);
+        console.log(`[INDEX] Added ${deduplicatedResults.length - allResults.length} new unique results`);
       } else {
-        console.log(`[INDEX] All ${results.length} results were duplicates, not adding to storage`);
+        console.log(`[INDEX] No new unique results to add - all ${results.length} results were duplicates`);
       }
       
       setActiveTab("results");
