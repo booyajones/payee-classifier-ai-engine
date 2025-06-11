@@ -11,8 +11,12 @@ export interface BatchJob {
   expired_at?: number;
   finalizing_at?: number;
   in_progress_at?: number;
+  cancelled_at?: number; // Added missing property
   output_file_id?: string;
   error_file_id?: string;
+  errors?: any; // Added missing property
+  input_file_id?: string; // Added missing property
+  completion_window?: string; // Added missing property
   request_counts: {
     total: number;
     completed: number;
@@ -127,8 +131,12 @@ export async function createBatchJob(
       expired_at: batch.expired_at || undefined,
       finalizing_at: batch.finalizing_at || undefined,
       in_progress_at: batch.in_progress_at || undefined,
+      cancelled_at: batch.cancelled_at || undefined,
       output_file_id: batch.output_file_id || undefined,
       error_file_id: batch.error_file_id || undefined,
+      errors: batch.errors || undefined,
+      input_file_id: file.id,
+      completion_window: '24h',
       request_counts: {
         total: batch.request_counts?.total || payeeNames.length,
         completed: batch.request_counts?.completed || 0,
@@ -160,8 +168,12 @@ export async function checkBatchJobStatus(batchId: string): Promise<BatchJob> {
       expired_at: batch.expired_at || undefined,
       finalizing_at: batch.finalizing_at || undefined,
       in_progress_at: batch.in_progress_at || undefined,
+      cancelled_at: batch.cancelled_at || undefined,
       output_file_id: batch.output_file_id || undefined,
       error_file_id: batch.error_file_id || undefined,
+      errors: batch.errors || undefined,
+      input_file_id: batch.input_file_id || undefined,
+      completion_window: batch.completion_window || undefined,
       request_counts: {
         total: batch.request_counts?.total || 0,
         completed: batch.request_counts?.completed || 0,
@@ -298,8 +310,12 @@ export async function cancelBatchJob(batchId: string): Promise<BatchJob> {
       expired_at: batch.expired_at || undefined,
       finalizing_at: batch.finalizing_at || undefined,
       in_progress_at: batch.in_progress_at || undefined,
+      cancelled_at: batch.cancelled_at || undefined,
       output_file_id: batch.output_file_id || undefined,
       error_file_id: batch.error_file_id || undefined,
+      errors: batch.errors || undefined,
+      input_file_id: batch.input_file_id || undefined,
+      completion_window: batch.completion_window || undefined,
       request_counts: {
         total: batch.request_counts?.total || 0,
         completed: batch.request_counts?.completed || 0,
