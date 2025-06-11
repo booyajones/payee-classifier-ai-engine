@@ -9,7 +9,60 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      payee_classifications: {
+        Row: {
+          batch_id: string | null
+          classification: string
+          confidence: number
+          created_at: string
+          id: string
+          keyword_exclusion: Json | null
+          matching_rules: string[] | null
+          original_data: Json | null
+          payee_name: string
+          processing_method: string | null
+          processing_tier: string
+          reasoning: string
+          row_index: number | null
+          similarity_scores: Json | null
+          updated_at: string
+        }
+        Insert: {
+          batch_id?: string | null
+          classification: string
+          confidence: number
+          created_at?: string
+          id?: string
+          keyword_exclusion?: Json | null
+          matching_rules?: string[] | null
+          original_data?: Json | null
+          payee_name: string
+          processing_method?: string | null
+          processing_tier: string
+          reasoning: string
+          row_index?: number | null
+          similarity_scores?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          batch_id?: string | null
+          classification?: string
+          confidence?: number
+          created_at?: string
+          id?: string
+          keyword_exclusion?: Json | null
+          matching_rules?: string[] | null
+          original_data?: Json | null
+          payee_name?: string
+          processing_method?: string | null
+          processing_tier?: string
+          reasoning?: string
+          row_index?: number | null
+          similarity_scores?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
