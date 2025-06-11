@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
@@ -145,7 +146,6 @@ export const loadAllBatchJobs = async (): Promise<{
   data.forEach((record) => {
     const batchJob: BatchJob = {
       id: record.id,
-      endpoint: '/v1/chat/completions',
       errors: record.errors || null,
       input_file_id: 'db-stored',
       completion_window: '24h',
