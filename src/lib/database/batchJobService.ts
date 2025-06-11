@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
@@ -47,7 +46,7 @@ export const saveBatchJob = async (
     completed_at_timestamp: batchJob.completed_at || undefined,
     failed_at_timestamp: batchJob.failed_at || undefined,
     expired_at_timestamp: batchJob.expired_at || undefined,
-    cancelled_at_timestamp: batchJob.cancelled_at || undefined,
+    cancelled_at_timestamp: (batchJob as any).cancelled_at || undefined,
     request_counts_total: batchJob.request_counts.total,
     request_counts_completed: batchJob.request_counts.completed,
     request_counts_failed: batchJob.request_counts.failed,
@@ -146,7 +145,6 @@ export const loadAllBatchJobs = async (): Promise<{
   data.forEach((record) => {
     const batchJob: BatchJob = {
       id: record.id,
-      object: 'batch',
       endpoint: '/v1/chat/completions',
       errors: record.errors || null,
       input_file_id: 'db-stored',
