@@ -40,6 +40,8 @@ const BatchJobManager = ({
     onConfirm: () => {}
   });
 
+  const [recoveringJobs, setRecoveringJobs] = useState<Set<string>>(new Set());
+
   const { getSmartState } = useSmartBatchManager();
   const { updateProgress } = useUnifiedProgress();
   const {
@@ -51,6 +53,16 @@ const BatchJobManager = ({
     isJobProcessed,
     isJobProcessing
   } = useBatchJobState();
+
+  // Initialize timeout and recovery hooks
+  const {
+    getTimeoutState,
+    isJobStuck,
+    shouldJobTimeout,
+    getFormattedElapsedTime
+  } = useBatchJobTimeout(jobs);
+
+  const { recoverStuckJob } = useEnhancedBatchRecovery();
 
   const {
     refreshingJobs,
@@ -121,6 +133,35 @@ const BatchJobManager = ({
     }
   });
 
+  const handleJobRecovery = async (job: BatchJob) => {
+    const payeeRowData = payeeRowDataMap[job.id];
+    if (!payeeRowData) {
+      console.error(`[RECOVERY] No payee row data found for job ${job.id}`);
+      return;
+    }
+
+    setRecoveringJobs(prev => new Set([...prev, job.id]));
+    
+    try {
+      console.log(`[RECOVERY] Starting recovery for job ${job.id}`);
+      const success = await recoverStuckJob(job, payeeRowData, onJobComplete);
+      
+      if (success) {
+        console.log(`[RECOVERY] Job ${job.id} recovery completed successfully`);
+      } else {
+        console.error(`[RECOVERY] Job ${job.id} recovery failed`);
+      }
+    } catch (error) {
+      console.error(`[RECOVERY] Error during job ${job.id} recovery:`, error);
+    } finally {
+      setRecoveringJobs(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(job.id);
+        return newSet;
+      });
+    }
+  };
+
   const showCancelConfirmation = (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
@@ -180,6 +221,12 @@ const BatchJobManager = ({
         onDelete={showDeleteConfirmation}
         getSmartState={getSmartState}
         updateProgress={updateProgress}
+        getTimeoutState={getTimeoutState}
+        isJobStuck={isJobStuck}
+        shouldJobTimeout={shouldJobTimeout}
+        getFormattedElapsedTime={getFormattedElapsedTime}
+        onJobRecovery={handleJobRecovery}
+        recoveringJobs={recoveringJobs}
       />
 
       <BatchJobConfirmation
