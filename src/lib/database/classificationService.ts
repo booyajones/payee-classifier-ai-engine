@@ -99,8 +99,8 @@ export const loadAllClassificationResults = async (): Promise<PayeeClassificatio
       processingTier: record.processing_tier as any,
       processingMethod: record.processing_method || undefined,
       matchingRules: record.matching_rules || undefined,
-      similarityScores: record.similarity_scores || undefined,
-      keywordExclusion: record.keyword_exclusion || {
+      similarityScores: record.similarity_scores as any || undefined,
+      keywordExclusion: record.keyword_exclusion as any || {
         isExcluded: false,
         matchedKeywords: [],
         confidence: 0,
