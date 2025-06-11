@@ -42,9 +42,9 @@ export const saveClassificationResults = async (
     processing_tier: result.result.processingTier,
     processing_method: result.result.processingMethod || null,
     matching_rules: result.result.matchingRules || null,
-    similarity_scores: result.result.similarityScores || null,
-    keyword_exclusion: result.result.keywordExclusion || null,
-    original_data: result.originalData || null,
+    similarity_scores: result.result.similarityScores ? JSON.parse(JSON.stringify(result.result.similarityScores)) : null,
+    keyword_exclusion: result.result.keywordExclusion ? JSON.parse(JSON.stringify(result.result.keywordExclusion)) : null,
+    original_data: result.originalData ? JSON.parse(JSON.stringify(result.originalData)) : null,
     row_index: result.rowIndex || null,
     batch_id: batchId || null,
   }));
@@ -89,7 +89,7 @@ export const loadAllClassificationResults = async (): Promise<PayeeClassificatio
   console.log(`[DB SERVICE] Loaded ${data.length} classification results from database`);
 
   // Convert database records back to PayeeClassification format
-  const results: PayeeClassification[] = data.map((record) => ({
+  const results: PayeeClassification[] = data.map((record): PayeeClassification => ({
     id: record.id,
     payeeName: record.payee_name,
     result: {
