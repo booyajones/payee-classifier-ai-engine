@@ -1,20 +1,18 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
-import SmartFileUpload from "./SmartFileUpload";
-import BatchJobManager from "./BatchJobManager";
-import BatchResultsDisplay from "./BatchResultsDisplay";
-import { BatchJob, checkBatchJobStatus } from "@/lib/openai/trueBatchAPI";
+import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeRowData } from "@/lib/rowMapping";
 import { 
   saveBatchJob, 
   updateBatchJobStatus, 
-  loadAllBatchJobs, 
   deleteBatchJob 
 } from "@/lib/database/batchJobService";
+import { useBatchFormState } from "@/hooks/useBatchFormState";
+import BatchJobLoader from "./batch/BatchJobLoader";
+import BatchFormTabs from "./batch/BatchFormTabs";
 
 interface BatchClassificationFormProps {
   onBatchClassify?: (results: PayeeClassification[]) => void;
@@ -22,79 +20,32 @@ interface BatchClassificationFormProps {
 }
 
 const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassificationFormProps) => {
-  const [batchResults, setBatchResults] = useState<PayeeClassification[]>([]);
-  const [processingSummary, setProcessingSummary] = useState<BatchProcessingResult | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("upload");
-  const [batchJobs, setBatchJobs] = useState<BatchJob[]>([]);
-  const [payeeRowDataMap, setPayeeRowDataMap] = useState<Record<string, PayeeRowData>>({});
+  const {
+    batchResults,
+    setBatchResults,
+    processingSummary,
+    setProcessingSummary,
+    activeTab,
+    setActiveTab,
+    batchJobs,
+    setBatchJobs,
+    payeeRowDataMap,
+    setPayeeRowDataMap,
+  } = useBatchFormState();
+
   const [isLoadingJobs, setIsLoadingJobs] = useState(true);
   const { toast } = useToast();
 
-  // Load jobs from database on component mount
-  useEffect(() => {
-    loadJobsFromDatabase();
-  }, []);
-
-  const loadJobsFromDatabase = async () => {
-    try {
-      setIsLoadingJobs(true);
-      
-      const { jobs, payeeRowDataMap } = await loadAllBatchJobs();
-      
-      if (jobs.length === 0) {
-        console.log('[BATCH FORM] No saved jobs found in database');
-        setIsLoadingJobs(false);
-        return;
-      }
-
-      console.log(`[BATCH FORM] Found ${jobs.length} saved jobs in database, checking status...`);
-
-      const updatedJobs: BatchJob[] = [];
-      const validPayeeRowDataMap: Record<string, PayeeRowData> = {};
-
-      for (const job of jobs) {
-        try {
-          console.log(`[BATCH FORM] Checking status of job ${job.id}`);
-          const updatedJob = await checkBatchJobStatus(job.id);
-          updatedJobs.push(updatedJob);
-          validPayeeRowDataMap[job.id] = payeeRowDataMap[job.id];
-          
-          // Update database if status changed
-          if (updatedJob.status !== job.status) {
-            console.log(`[BATCH FORM] Job ${job.id} status changed: ${job.status} -> ${updatedJob.status}`);
-            await updateBatchJobStatus(updatedJob);
-          }
-          
-          console.log(`[BATCH FORM] Job ${job.id} preserved with complete payee row data`);
-          
-        } catch (error) {
-          console.error(`[BATCH FORM] Job ${job.id} no longer valid, but keeping data for recovery:`, error);
-          updatedJobs.push(job);
-          validPayeeRowDataMap[job.id] = payeeRowDataMap[job.id];
-        }
-      }
-
-      setBatchJobs(updatedJobs);
-      setPayeeRowDataMap(validPayeeRowDataMap);
-
-      if (updatedJobs.length > 0) {
-        setActiveTab("jobs");
-        toast({
-          title: "All Jobs Recovered",
-          description: `Restored ${updatedJobs.length} batch job(s) with complete original data from database.`,
-        });
-      }
-
-    } catch (error) {
-      console.error('[BATCH FORM] Error loading from database:', error);
-      toast({
-        title: "Database Error", 
-        description: "Could not load job data from database. Please refresh the page.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoadingJobs(false);
+  const handleJobsLoaded = (jobs: BatchJob[], payeeDataMap: Record<string, PayeeRowData>) => {
+    setBatchJobs(jobs);
+    setPayeeRowDataMap(payeeDataMap);
+    if (jobs.length > 0) {
+      setActiveTab("jobs");
     }
+  };
+
+  const handleLoadingComplete = () => {
+    setIsLoadingJobs(false);
   };
 
   const resetForm = async () => {
@@ -244,20 +195,10 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
 
   if (isLoadingJobs) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Batch Payee Classification</CardTitle>
-          <CardDescription>
-            Loading and verifying all saved batch jobs from database...
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="py-8">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="text-muted-foreground mt-2">Checking for previous batch jobs and data...</p>
-          </div>
-        </CardContent>
-      </Card>
+      <BatchJobLoader 
+        onJobsLoaded={handleJobsLoaded}
+        onLoadingComplete={handleLoadingComplete}
+      />
     );
   }
 
@@ -270,49 +211,19 @@ const BatchClassificationForm = ({ onBatchClassify, onComplete }: BatchClassific
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="upload">File Upload</TabsTrigger>
-            <TabsTrigger value="jobs">
-              Batch Jobs {batchJobs.length > 0 && `(${batchJobs.length})`}
-            </TabsTrigger>
-            <TabsTrigger value="results">Results</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="upload" className="mt-4">
-            <SmartFileUpload 
-              onBatchJobCreated={handleFileUploadBatchJob}
-              onProcessingComplete={handleJobComplete}
-            />
-          </TabsContent>
-
-          <TabsContent value="jobs" className="mt-4">
-            {batchJobs.length === 0 ? (
-              <div className="text-center py-8 border rounded-md">
-                <p className="text-muted-foreground">
-                  No batch jobs yet. Upload a file to see jobs here.
-                </p>
-              </div>
-            ) : (
-              <BatchJobManager
-                jobs={batchJobs}
-                payeeRowDataMap={payeeRowDataMap}
-                onJobUpdate={handleJobUpdate}
-                onJobComplete={handleJobComplete}
-                onJobDelete={handleJobDelete}
-              />
-            )}
-          </TabsContent>
-          
-          <TabsContent value="results" className="mt-4">
-            <BatchResultsDisplay
-              batchResults={batchResults}
-              processingSummary={processingSummary}
-              onReset={resetForm}
-              isProcessing={false}
-            />
-          </TabsContent>
-        </Tabs>
+        <BatchFormTabs
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          batchJobs={batchJobs}
+          payeeRowDataMap={payeeRowDataMap}
+          batchResults={batchResults}
+          processingSummary={processingSummary}
+          onFileUploadBatchJob={handleFileUploadBatchJob}
+          onJobUpdate={handleJobUpdate}
+          onJobComplete={handleJobComplete}
+          onJobDelete={handleJobDelete}
+          onReset={resetForm}
+        />
       </CardContent>
     </Card>
   );
