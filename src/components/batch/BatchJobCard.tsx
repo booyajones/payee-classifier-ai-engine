@@ -1,15 +1,14 @@
 
 import React, { useState, useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { AlertCircle, Calendar, RefreshCw, Download, X, Trash2, Users, Clock, BarChart3 } from 'lucide-react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
-import { useUnifiedProgress } from '@/contexts/UnifiedProgressContext';
 import { PayeeRowData } from '@/lib/rowMapping';
-import { checkKeywordExclusion } from '@/lib/classification/enhancedKeywordExclusion';
 import BatchJobTimeoutIndicator from './BatchJobTimeoutIndicator';
+import BatchJobHeader from './BatchJobHeader';
+import BatchJobProgress from './BatchJobProgress';
+import BatchJobDetails from './BatchJobDetails';
+import BatchJobActions from './BatchJobActions';
 
 interface BatchJobCardProps {
   job: BatchJob;
@@ -58,7 +57,6 @@ const BatchJobCard = React.memo(({
   onRecover = () => {},
   isRecovering = false
 }: BatchJobCardProps) => {
-  const { getProgress } = useUnifiedProgress();
   const [showDetails, setShowDetails] = useState(false);
 
   // Memoize status color calculation
@@ -84,155 +82,27 @@ const BatchJobCard = React.memo(({
     return job.status.charAt(0).toUpperCase() + job.status.slice(1).replace('_', ' ');
   }, [job.status, shouldTimeout, isStuck]);
 
-  // Memoize payee statistics
-  const payeeStats = useMemo(() => {
-    if (!payeeData) return null;
-
-    // Check which payees would be excluded by keywords
-    const exclusionResults = payeeData.uniquePayeeNames.map(name => ({
-      name,
-      exclusion: checkKeywordExclusion(name)
-    }));
-
-    const excludedPayees = exclusionResults.filter(r => r.exclusion.isExcluded);
-    const nonExcludedPayees = exclusionResults.filter(r => !r.exclusion.isExcluded);
-
-    // Simple heuristic for business vs individual classification
-    // This is a preview - actual classification happens during processing
-    const businessIndicators = ['LLC', 'INC', 'CORP', 'LTD', 'CO', 'COMPANY', 'CORPORATION', 'LIMITED'];
-    const individualIndicators = ['MR', 'MRS', 'MS', 'DR', 'MISS'];
-
-    const businessCount = nonExcludedPayees.filter(p => {
-      const upperName = p.name.toUpperCase();
-      return businessIndicators.some(indicator => upperName.includes(indicator));
-    }).length;
-
-    const individualCount = nonExcludedPayees.filter(p => {
-      const upperName = p.name.toUpperCase();
-      return individualIndicators.some(indicator => upperName.includes(indicator)) ||
-             (!businessIndicators.some(indicator => upperName.includes(indicator)) && 
-              upperName.split(' ').length >= 2);
-    }).length;
-
-    const unknownCount = nonExcludedPayees.length - businessCount - individualCount;
-
-    return {
-      total: payeeData.uniquePayeeNames.length,
-      excluded: excludedPayees.length,
-      business: businessCount,
-      individual: individualCount,
-      unknown: unknownCount,
-      excludedPayees: excludedPayees.slice(0, 5), // Show first 5 excluded payees
-      hasMoreExcluded: excludedPayees.length > 5
-    };
-  }, [payeeData]);
-
-  // Memoize progress info calculation
-  const progressInfo = useMemo(() => {
-    // For completed jobs, show 100% progress
-    if (job.status === 'completed' && isCompleted) {
-      return {
-        percentage: 100,
-        label: 'Processing complete',
-        showBar: true,
-        source: 'completed'
-      };
-    }
-
-    const unifiedProgress = getProgress(`job-${job.id}`);
-    
-    if (unifiedProgress && unifiedProgress.percentage > 0) {
-      return {
-        percentage: unifiedProgress.percentage,
-        label: unifiedProgress.stage || unifiedProgress.message || 'Processing...',
-        showBar: true,
-        source: 'unified'
-      };
-    }
-
-    if (customProgress && customProgress.isActive) {
-      return {
-        percentage: customProgress.percentage,
-        label: customProgress.stage,
-        showBar: true,
-        source: 'custom'
-      };
-    }
-
-    if (progress && progress.total > 0) {
-      const percentage = Math.round((progress.current / progress.total) * 100);
-      return {
-        percentage,
-        label: `Downloading: ${progress.current}/${progress.total}`,
-        showBar: true,
-        source: 'download'
-      };
-    }
-
-    if (job.status === 'in_progress' && job.request_counts.total > 0) {
-      const percentage = Math.round((job.request_counts.completed / job.request_counts.total) * 100);
-      return {
-        percentage,
-        label: `${job.request_counts.completed}/${job.request_counts.total} completed`,
-        showBar: true,
-        source: 'batch'
-      };
-    }
-
-    return {
-      percentage: 0,
-      label: 'Ready',
-      showBar: false,
-      source: 'none'
-    };
-  }, [job.status, job.id, job.request_counts, isCompleted, getProgress, customProgress, progress]);
-
-  const showBar = progressInfo.showBar || isDownloading;
-
   return (
     <Card className={`transition-all duration-200 ${isCompleted ? 'ring-2 ring-green-200' : ''}`}>
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1 flex-1">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              Job {job.id.slice(-8)}
-              {isCompleted && <Badge variant="outline" className="text-green-600 border-green-300">Completed</Badge>}
-              {elapsedTime && (
-                <Badge variant="outline" className="text-gray-600 border-gray-300 flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {elapsedTime}
-                </Badge>
-              )}
-            </CardTitle>
-            <CardDescription className="flex items-center gap-4 text-sm">
-              <span className="flex items-center gap-1">
-                <Users className="h-3 w-3" />
-                {payeeCount} payees
-              </span>
-              <span className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                {new Date(job.created_at * 1000).toLocaleString()}
-              </span>
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge className={statusColor}>
-              {statusDisplay}
-            </Badge>
-          </div>
-        </div>
+        <BatchJobHeader
+          job={job}
+          payeeCount={payeeCount}
+          isCompleted={isCompleted}
+          elapsedTime={elapsedTime}
+          statusColor={statusColor}
+          statusDisplay={statusDisplay}
+        />
       </CardHeader>
 
       <CardContent className="space-y-3">
-        {showBar && (
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">{progressInfo.label}</span>
-              <span className="font-medium">{progressInfo.percentage}%</span>
-            </div>
-            <Progress value={progressInfo.percentage} className="h-2" />
-          </div>
-        )}
+        <BatchJobProgress
+          job={job}
+          isCompleted={isCompleted}
+          isDownloading={isDownloading}
+          progress={progress}
+          customProgress={customProgress}
+        />
 
         <BatchJobTimeoutIndicator
           job={job}
@@ -243,83 +113,12 @@ const BatchJobCard = React.memo(({
           isRecovering={isRecovering}
         />
 
-        {lastError && (
-          <div className="flex items-start gap-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
-            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-            <span>{lastError}</span>
-          </div>
-        )}
-
         {showDetails && (
-          <div className="space-y-3">
-            <div className="text-xs text-muted-foreground space-y-1 bg-gray-50 p-2 rounded">
-              <div>Created: {new Date(job.created_at * 1000).toLocaleString()}</div>
-              {job.in_progress_at && (
-                <div>Started: {new Date(job.in_progress_at * 1000).toLocaleString()}</div>
-              )}
-              {job.completed_at && (
-                <div>Completed: {new Date(job.completed_at * 1000).toLocaleString()}</div>
-              )}
-              <div>Requests: {job.request_counts.completed}/{job.request_counts.total} 
-                {job.request_counts.failed > 0 && ` (${job.request_counts.failed} failed)`}
-              </div>
-            </div>
-
-            {payeeStats && (
-              <div className="bg-blue-50 p-3 rounded border border-blue-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <BarChart3 className="h-4 w-4 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-800">Payee Summary</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total:</span>
-                      <span className="font-medium">{payeeStats.total}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Businesses:</span>
-                      <span className="font-medium text-blue-600">{payeeStats.business}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Individuals:</span>
-                      <span className="font-medium text-green-600">{payeeStats.individual}</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Excluded:</span>
-                      <span className="font-medium text-red-600">{payeeStats.excluded}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Unknown:</span>
-                      <span className="font-medium text-gray-600">{payeeStats.unknown}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                {payeeStats.excluded > 0 && (
-                  <div className="mt-2 pt-2 border-t border-blue-200">
-                    <div className="text-xs text-muted-foreground mb-1">
-                      Excluded payees {payeeStats.hasMoreExcluded ? `(showing first 5 of ${payeeStats.excluded})` : ''}:
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {payeeStats.excludedPayees.map((excluded, index) => (
-                        <Badge 
-                          key={index} 
-                          variant="destructive" 
-                          className="text-xs px-1 py-0"
-                          title={`Excluded: ${excluded.exclusion.matchedKeywords.join(', ')}`}
-                        >
-                          {excluded.name.length > 15 ? `${excluded.name.substring(0, 15)}...` : excluded.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <BatchJobDetails
+            job={job}
+            payeeData={payeeData}
+            lastError={lastError}
+          />
         )}
 
         <div className="flex items-center justify-between pt-2">
@@ -332,49 +131,17 @@ const BatchJobCard = React.memo(({
             {showDetails ? 'Hide' : 'Show'} Details
           </Button>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onRefresh}
-              disabled={isRefreshing || isPolling}
-            >
-              <RefreshCw className={`h-3 w-3 mr-1 ${(isRefreshing || isPolling) ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-
-            {job.status === 'completed' && !isCompleted && (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={onDownload}
-                disabled={isDownloading}
-              >
-                <Download className={`h-3 w-3 mr-1 ${isDownloading ? 'animate-pulse' : ''}`} />
-                Download
-              </Button>
-            )}
-
-            {['validating', 'in_progress', 'finalizing'].includes(job.status) && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={onCancel}
-              >
-                <X className="h-3 w-3 mr-1" />
-                Cancel
-              </Button>
-            )}
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onDelete}
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash2 className="h-3 w-3" />
-            </Button>
-          </div>
+          <BatchJobActions
+            job={job}
+            isCompleted={isCompleted}
+            isRefreshing={isRefreshing}
+            isDownloading={isDownloading}
+            isPolling={isPolling}
+            onRefresh={onRefresh}
+            onDownload={onDownload}
+            onCancel={onCancel}
+            onDelete={onDelete}
+          />
         </div>
       </CardContent>
     </Card>

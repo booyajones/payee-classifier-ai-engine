@@ -1,0 +1,58 @@
+
+import React from 'react';
+import { CardDescription, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Calendar, Users, Clock } from 'lucide-react';
+import { BatchJob } from '@/lib/openai/trueBatchAPI';
+
+interface BatchJobHeaderProps {
+  job: BatchJob;
+  payeeCount: number;
+  isCompleted: boolean;
+  elapsedTime: string;
+  statusColor: string;
+  statusDisplay: string;
+}
+
+const BatchJobHeader = ({
+  job,
+  payeeCount,
+  isCompleted,
+  elapsedTime,
+  statusColor,
+  statusDisplay
+}: BatchJobHeaderProps) => {
+  return (
+    <div className="flex items-start justify-between">
+      <div className="space-y-1 flex-1">
+        <CardTitle className="text-base font-medium flex items-center gap-2">
+          Job {job.id.slice(-8)}
+          {isCompleted && <Badge variant="outline" className="text-green-600 border-green-300">Completed</Badge>}
+          {elapsedTime && (
+            <Badge variant="outline" className="text-gray-600 border-gray-300 flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {elapsedTime}
+            </Badge>
+          )}
+        </CardTitle>
+        <CardDescription className="flex items-center gap-4 text-sm">
+          <span className="flex items-center gap-1">
+            <Users className="h-3 w-3" />
+            {payeeCount} payees
+          </span>
+          <span className="flex items-center gap-1">
+            <Calendar className="h-3 w-3" />
+            {new Date(job.created_at * 1000).toLocaleString()}
+          </span>
+        </CardDescription>
+      </div>
+      <div className="flex items-center gap-2">
+        <Badge className={statusColor}>
+          {statusDisplay}
+        </Badge>
+      </div>
+    </div>
+  );
+};
+
+export default BatchJobHeader;
