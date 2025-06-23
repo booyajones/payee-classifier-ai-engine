@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
@@ -152,11 +153,10 @@ export const loadAllBatchJobs = async (): Promise<{
       output_file_id: record.output_file_id || null,
       created_at: record.created_at_timestamp,
       in_progress_at: record.in_progress_at_timestamp || null,
-      expires_at: record.expired_at_timestamp || null,
+      expired_at: record.expired_at_timestamp || null,
       finalizing_at: record.finalizing_at_timestamp || null,
       completed_at: record.completed_at_timestamp || null,
       failed_at: record.failed_at_timestamp || null,
-      expired_at: record.expired_at_timestamp || null,
       cancelled_at: record.cancelled_at_timestamp || null,
       request_counts: {
         total: record.request_counts_total,
