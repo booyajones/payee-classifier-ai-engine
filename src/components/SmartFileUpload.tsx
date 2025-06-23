@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileCheck } from 'lucide-react';
 import { useUnifiedBatchManager } from '@/hooks/useUnifiedBatchManager';
@@ -13,6 +12,8 @@ import EnhancedUploadProgressDisplay from './upload/EnhancedUploadProgressDispla
 import UploadErrorDisplay from './upload/UploadErrorDisplay';
 import UploadSuccessDisplay from './upload/UploadSuccessDisplay';
 import FileCorruptionDetector from './upload/FileCorruptionDetector';
+import { Badge } from '@/components/ui/badge';
+import PerformanceMonitoringDashboard from './upload/PerformanceMonitoringDashboard';
 
 interface SmartFileUploadProps {
   onBatchJobCreated: (batchJob: BatchJob, payeeRowData: PayeeRowData) => void;
@@ -102,10 +103,13 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
         <CardTitle className="flex items-center gap-2">
           <FileCheck className="h-5 w-5" />
           File Upload & Classification
+          <Badge variant="outline" className="ml-auto">
+            Performance Enhanced
+          </Badge>
         </CardTitle>
         <CardDescription>
           Upload your payee file and select the column containing payee names. 
-          Supports files up to 100MB with intelligent processing for large files.
+          Enhanced with intelligent caching, streaming processing, and memory optimization for files up to 500MB.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -139,12 +143,24 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
         )}
 
         {isProcessing && (
-          <EnhancedUploadProgressDisplay
-            uploadState={uploadState}
-            uploadId={UPLOAD_ID}
-            showMemoryStats={true}
-            showProgressHistory={false}
-          />
+          <>
+            <EnhancedUploadProgressDisplay
+              uploadState={uploadState}
+              uploadId={UPLOAD_ID}
+              showMemoryStats={true}
+              showProgressHistory={false}
+            />
+            
+            {/* Performance monitoring for large files */}
+            {(fileData?.length || 0) > 10000 && (
+              <div className="mt-4">
+                <PerformanceMonitoringDashboard 
+                  isVisible={true}
+                  compact={true}
+                />
+              </div>
+            )}
+          </>
         )}
 
         {uploadState === 'complete' && (
