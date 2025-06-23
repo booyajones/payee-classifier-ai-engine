@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { PayeeRowData } from "@/lib/rowMapping";
@@ -41,6 +40,7 @@ const BatchJobManager = ({
   });
 
   const [recoveringJobs, setRecoveringJobs] = useState<Set<string>>(new Set());
+  const [autoPollingJobs, setAutoPollingJobs] = useState<Set<string>>(new Set());
 
   const { getSmartState } = useSmartBatchManager();
   const { updateProgress } = useUnifiedProgress();
@@ -133,6 +133,59 @@ const BatchJobManager = ({
     }
   });
 
+  // Auto-refresh jobs that are in active states
+  useEffect(() => {
+    const activeStates = ['validating', 'in_progress', 'finalizing'];
+    const newAutoPollingJobs = new Set<string>();
+
+    jobs.forEach(job => {
+      if (activeStates.includes(job.status) && !autoPollingJobs.has(job.id)) {
+        console.log(`[AUTO POLLING] Starting auto-refresh for job ${job.id} with status: ${job.status}`);
+        newAutoPollingJobs.add(job.id);
+        
+        // Start auto-refresh for this job
+        const startAutoRefresh = () => {
+          const refreshInterval = setInterval(() => {
+            const currentJob = jobs.find(j => j.id === job.id);
+            if (!currentJob || !activeStates.includes(currentJob.status)) {
+              console.log(`[AUTO POLLING] Stopping auto-refresh for job ${job.id} - status: ${currentJob?.status || 'not found'}`);
+              clearInterval(refreshInterval);
+              setAutoPollingJobs(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(job.id);
+                return newSet;
+              });
+              return;
+            }
+            
+            console.log(`[AUTO POLLING] Auto-refreshing job ${job.id}`);
+            handleRefreshJob(job.id);
+          }, 15000); // Refresh every 15 seconds
+
+          // Clean up interval after 30 minutes to prevent infinite polling
+          setTimeout(() => {
+            console.log(`[AUTO POLLING] Timeout reached for job ${job.id}, stopping auto-refresh`);
+            clearInterval(refreshInterval);
+            setAutoPollingJobs(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(job.id);
+              return newSet;
+            });
+          }, 30 * 60 * 1000); // 30 minutes
+        };
+
+        startAutoRefresh();
+      }
+    });
+
+    setAutoPollingJobs(prev => new Set([...prev, ...newAutoPollingJobs]));
+
+    // Cleanup function
+    return () => {
+      // Intervals are cleaned up by the individual jobs when they complete or timeout
+    };
+  }, [jobs, handleRefreshJob]);
+
   const handleJobRecovery = async (job: BatchJob) => {
     const payeeRowData = payeeRowDataMap[job.id];
     if (!payeeRowData) {
@@ -202,7 +255,7 @@ const BatchJobManager = ({
     });
   };
 
-  console.log(`[BATCH MANAGER] Rendering ${jobs.length} jobs`);
+  console.log(`[BATCH MANAGER] Rendering ${jobs.length} jobs, ${autoPollingJobs.size} auto-polling`);
 
   return (
     <>
