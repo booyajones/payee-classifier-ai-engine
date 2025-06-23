@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { PayeeRowData } from "@/lib/rowMapping";
@@ -22,7 +22,7 @@ interface BatchJobManagerProps {
   onJobDelete: (jobId: string) => void;
 }
 
-const BatchJobManager = ({ 
+const BatchJobManager = React.memo(({ 
   jobs, 
   payeeRowDataMap,
   onJobUpdate, 
@@ -43,13 +43,69 @@ const BatchJobManager = ({
     isJobProcessing
   } = useBatchJobState();
 
-  // Initialize timeout hook
   const {
     getTimeoutState,
     isJobStuck,
     shouldJobTimeout,
     getFormattedElapsedTime
   } = useBatchJobTimeout(jobs);
+
+  // Memoize the completion handler to prevent recreating it on every render
+  const handleJobComplete = useCallback((results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => {
+    console.log(`[BATCH MANAGER] Job ${jobId} completion handler called with ${results.length} results`);
+    
+    if (isJobProcessed(jobId)) {
+      console.log(`[BATCH MANAGER] Job ${jobId} already processed, ignoring duplicate`);
+      return;
+    }
+    
+    if (isJobProcessing(jobId)) {
+      console.log(`[BATCH MANAGER] Job ${jobId} processing already in progress, ignoring`);
+      return;
+    }
+    
+    markJobAsProcessing(jobId);
+    updateProgress(`job-${jobId}`, 'Download complete!', 100, `Successfully processed ${results.length} payees`, jobId);
+    
+    try {
+      if (results.length === 0) {
+        console.error(`[BATCH MANAGER] Job ${jobId} completed with 0 results - this is unexpected`);
+        return;
+      }
+      
+      const ids = results.map(r => r.id);
+      const uniqueIds = new Set(ids);
+      if (ids.length !== uniqueIds.size) {
+        console.warn(`[BATCH MANAGER] Job ${jobId} has ${ids.length - uniqueIds.size} duplicate result IDs`);
+        
+        const seenIds = new Set<string>();
+        const deduplicatedResults = results.filter(result => {
+          if (seenIds.has(result.id)) {
+            return false;
+          }
+          seenIds.add(result.id);
+          return true;
+        });
+        
+        console.log(`[BATCH MANAGER] Deduplicated ${results.length} results to ${deduplicatedResults.length}`);
+        results = deduplicatedResults;
+      }
+      
+      const rowIndices = results.map(r => r.rowIndex).filter(idx => idx !== undefined);
+      const uniqueRowIndices = new Set(rowIndices);
+      if (rowIndices.length !== uniqueRowIndices.size) {
+        console.error(`[BATCH MANAGER] Job ${jobId} has duplicate row indices`);
+        return;
+      }
+      
+      markJobAsProcessed(jobId);
+      onJobComplete(results, summary, jobId);
+      console.log(`[BATCH MANAGER] Job ${jobId} processed successfully, marked as completed`);
+      
+    } finally {
+      removeJobFromProcessing(jobId);
+    }
+  }, [isJobProcessed, isJobProcessing, markJobAsProcessing, updateProgress, markJobAsProcessed, onJobComplete, removeJobFromProcessing]);
 
   const {
     refreshingJobs,
@@ -63,64 +119,10 @@ const BatchJobManager = ({
     jobs,
     payeeRowDataMap,
     onJobUpdate,
-    onJobComplete: (results, summary, jobId) => {
-      console.log(`[BATCH MANAGER] Job ${jobId} completion handler called with ${results.length} results`);
-      
-      if (isJobProcessed(jobId)) {
-        console.log(`[BATCH MANAGER] Job ${jobId} already processed, ignoring duplicate`);
-        return;
-      }
-      
-      if (isJobProcessing(jobId)) {
-        console.log(`[BATCH MANAGER] Job ${jobId} processing already in progress, ignoring`);
-        return;
-      }
-      
-      markJobAsProcessing(jobId);
-      updateProgress(`job-${jobId}`, 'Download complete!', 100, `Successfully processed ${results.length} payees`, jobId);
-      
-      try {
-        if (results.length === 0) {
-          console.error(`[BATCH MANAGER] Job ${jobId} completed with 0 results - this is unexpected`);
-          return;
-        }
-        
-        const ids = results.map(r => r.id);
-        const uniqueIds = new Set(ids);
-        if (ids.length !== uniqueIds.size) {
-          console.warn(`[BATCH MANAGER] Job ${jobId} has ${ids.length - uniqueIds.size} duplicate result IDs`);
-          
-          const seenIds = new Set<string>();
-          const deduplicatedResults = results.filter(result => {
-            if (seenIds.has(result.id)) {
-              return false;
-            }
-            seenIds.add(result.id);
-            return true;
-          });
-          
-          console.log(`[BATCH MANAGER] Deduplicated ${results.length} results to ${deduplicatedResults.length}`);
-          results = deduplicatedResults;
-        }
-        
-        const rowIndices = results.map(r => r.rowIndex).filter(idx => idx !== undefined);
-        const uniqueRowIndices = new Set(rowIndices);
-        if (rowIndices.length !== uniqueRowIndices.size) {
-          console.error(`[BATCH MANAGER] Job ${jobId} has duplicate row indices`);
-          return;
-        }
-        
-        markJobAsProcessed(jobId);
-        onJobComplete(results, summary, jobId);
-        console.log(`[BATCH MANAGER] Job ${jobId} processed successfully, marked as completed`);
-        
-      } finally {
-        removeJobFromProcessing(jobId);
-      }
-    }
+    onJobComplete: handleJobComplete
   });
 
-  // Use auto-polling hook
+  // Use auto-polling hook with stabilized setter
   useBatchJobAutoPolling({
     jobs,
     autoPollingJobs,
@@ -128,13 +130,11 @@ const BatchJobManager = ({
     handleRefreshJob
   });
 
-  // Use recovery hook
   const { recoveringJobs, handleJobRecovery } = useBatchJobRecovery({
     payeeRowDataMap,
-    onJobComplete
+    onJobComplete: handleJobComplete
   });
 
-  // Use confirmation dialogs hook
   const {
     confirmDialog,
     showCancelConfirmation,
@@ -146,32 +146,56 @@ const BatchJobManager = ({
     onJobDelete
   });
 
+  // Memoize the job list props to prevent unnecessary re-renders
+  const jobListProps = useMemo(() => ({
+    jobs,
+    payeeRowDataMap,
+    refreshingJobs,
+    downloadingJobs,
+    downloadProgress,
+    pollingStates,
+    processedJobs,
+    processingInProgress,
+    onRefresh: handleRefreshJob,
+    onDownload: handleDownloadResults,
+    onCancel: showCancelConfirmation,
+    onDelete: showDeleteConfirmation,
+    getSmartState,
+    updateProgress,
+    getTimeoutState,
+    isJobStuck,
+    shouldJobTimeout,
+    getFormattedElapsedTime,
+    onJobRecovery: handleJobRecovery,
+    recoveringJobs,
+  }), [
+    jobs,
+    payeeRowDataMap,
+    refreshingJobs,
+    downloadingJobs,
+    downloadProgress,
+    pollingStates,
+    processedJobs,
+    processingInProgress,
+    handleRefreshJob,
+    handleDownloadResults,
+    showCancelConfirmation,
+    showDeleteConfirmation,
+    getSmartState,
+    updateProgress,
+    getTimeoutState,
+    isJobStuck,
+    shouldJobTimeout,
+    getFormattedElapsedTime,
+    handleJobRecovery,
+    recoveringJobs
+  ]);
+
   console.log(`[BATCH MANAGER] Rendering ${jobs.length} jobs, ${autoPollingJobs.size} auto-polling`);
 
   return (
     <>
-      <BatchJobList
-        jobs={jobs}
-        payeeRowDataMap={payeeRowDataMap}
-        refreshingJobs={refreshingJobs}
-        downloadingJobs={downloadingJobs}
-        downloadProgress={downloadProgress}
-        pollingStates={pollingStates}
-        processedJobs={processedJobs}
-        processingInProgress={processingInProgress}
-        onRefresh={handleRefreshJob}
-        onDownload={handleDownloadResults}
-        onCancel={showCancelConfirmation}
-        onDelete={showDeleteConfirmation}
-        getSmartState={getSmartState}
-        updateProgress={updateProgress}
-        getTimeoutState={getTimeoutState}
-        isJobStuck={isJobStuck}
-        shouldJobTimeout={shouldJobTimeout}
-        getFormattedElapsedTime={getFormattedElapsedTime}
-        onJobRecovery={handleJobRecovery}
-        recoveringJobs={recoveringJobs}
-      />
+      <BatchJobList {...jobListProps} />
 
       <BatchJobConfirmation
         isOpen={confirmDialog.isOpen}
@@ -183,6 +207,8 @@ const BatchJobManager = ({
       />
     </>
   );
-};
+});
+
+BatchJobManager.displayName = 'BatchJobManager';
 
 export default BatchJobManager;

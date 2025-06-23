@@ -1,26 +1,26 @@
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 
-interface UnifiedProgressState {
+interface ProgressState {
   stage: string;
   percentage: number;
-  isActive: boolean;
   message?: string;
   jobId?: string;
 }
 
 interface UnifiedProgressContextType {
-  progressStates: Record<string, UnifiedProgressState>;
+  getProgress: (id: string) => ProgressState | null;
   updateProgress: (id: string, stage: string, percentage: number, message?: string, jobId?: string) => void;
   completeProgress: (id: string, message?: string) => void;
   clearProgress: (id: string) => void;
-  getProgress: (id: string) => UnifiedProgressState | null;
+  clearAllProgress: () => void;
 }
 
 const UnifiedProgressContext = createContext<UnifiedProgressContextType | undefined>(undefined);
 
 export const UnifiedProgressProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [progressStates, setProgressStates] = useState<Record<string, UnifiedProgressState>>({});
+  const [progressMap, setProgressMap] = useState<Record<string, ProgressState>>({});
+  const lastUpdateRef = useRef<Record<string, number>>({});
 
   const updateProgress = useCallback((
     id: string, 
@@ -29,109 +29,77 @@ export const UnifiedProgressProvider: React.FC<{ children: React.ReactNode }> = 
     message?: string, 
     jobId?: string
   ) => {
-    try {
-      console.log(`[UNIFIED PROGRESS] ${id}: ${stage} (${percentage}%) - ${message || ''}`);
-      
-      // Validate inputs to prevent infinite loops
-      if (!id || typeof percentage !== 'number' || !stage) {
-        console.error('[UNIFIED PROGRESS ERROR] Invalid inputs:', { id, stage, percentage });
-        return;
-      }
-
-      // Clamp percentage to prevent invalid values
-      const clampedPercentage = Math.max(0, Math.min(100, percentage));
-      
-      setProgressStates(prev => {
-        // Prevent unnecessary updates that could cause re-renders
-        const existing = prev[id];
-        if (existing && 
-            existing.stage === stage && 
-            existing.percentage === clampedPercentage && 
-            existing.message === message &&
-            existing.jobId === jobId) {
-          return prev; // No change needed
-        }
-
-        return {
-          ...prev,
-          [id]: {
-            stage,
-            percentage: clampedPercentage,
-            isActive: clampedPercentage < 100,
-            message,
-            jobId
-          }
-        };
-      });
-    } catch (error) {
-      console.error('[UNIFIED PROGRESS ERROR] Update failed:', error);
+    const now = Date.now();
+    const lastUpdate = lastUpdateRef.current[id] || 0;
+    
+    // Throttle updates to prevent excessive re-renders (max 1 update per 500ms per ID)
+    if (now - lastUpdate < 500 && percentage < 100) {
+      return;
     }
+    
+    lastUpdateRef.current[id] = now;
+    
+    setProgressMap(prev => ({
+      ...prev,
+      [id]: {
+        stage,
+        percentage: Math.min(100, Math.max(0, percentage)),
+        message,
+        jobId
+      }
+    }));
   }, []);
 
   const completeProgress = useCallback((id: string, message?: string) => {
-    try {
-      console.log(`[UNIFIED PROGRESS] ${id}: Completed - ${message || ''}`);
-      
-      if (!id) {
-        console.error('[UNIFIED PROGRESS ERROR] Invalid id for completion');
-        return;
+    setProgressMap(prev => ({
+      ...prev,
+      [id]: {
+        stage: 'Complete',
+        percentage: 100,
+        message: message || 'Processing complete',
+        jobId: prev[id]?.jobId
       }
-      
-      setProgressStates(prev => ({
-        ...prev,
-        [id]: {
-          stage: 'Completed',
-          percentage: 100,
-          isActive: false,
-          message: message || 'Processing complete',
-          jobId: prev[id]?.jobId
-        }
-      }));
-    } catch (error) {
-      console.error('[UNIFIED PROGRESS ERROR] Complete failed:', error);
-    }
+    }));
+    
+    // Auto-clear completed progress after 30 seconds
+    setTimeout(() => {
+      setProgressMap(prev => {
+        const newMap = { ...prev };
+        delete newMap[id];
+        return newMap;
+      });
+      delete lastUpdateRef.current[id];
+    }, 30000);
   }, []);
 
   const clearProgress = useCallback((id: string) => {
-    try {
-      console.log(`[UNIFIED PROGRESS] ${id}: Cleared`);
-      
-      if (!id) {
-        console.error('[UNIFIED PROGRESS ERROR] Invalid id for clearing');
-        return;
-      }
-      
-      setProgressStates(prev => {
-        const newStates = { ...prev };
-        delete newStates[id];
-        return newStates;
-      });
-    } catch (error) {
-      console.error('[UNIFIED PROGRESS ERROR] Clear failed:', error);
-    }
+    setProgressMap(prev => {
+      const newMap = { ...prev };
+      delete newMap[id];
+      return newMap;
+    });
+    delete lastUpdateRef.current[id];
   }, []);
 
-  const getProgress = useCallback((id: string): UnifiedProgressState | null => {
-    try {
-      if (!id) {
-        console.error('[UNIFIED PROGRESS ERROR] Invalid id for getting progress');
-        return null;
-      }
-      return progressStates[id] || null;
-    } catch (error) {
-      console.error('[UNIFIED PROGRESS ERROR] Get failed:', error);
-      return null;
-    }
-  }, [progressStates]);
+  const clearAllProgress = useCallback(() => {
+    setProgressMap({});
+    lastUpdateRef.current = {};
+  }, []);
+
+  const getProgress = useCallback((id: string) => {
+    return progressMap[id] || null;
+  }, [progressMap]);
+
+  const value = {
+    getProgress,
+    updateProgress,
+    completeProgress,
+    clearProgress,
+    clearAllProgress
+  };
 
   return (
-    <UnifiedProgressContext.Provider value={{
-      progressStates,
-      updateProgress,
-      completeProgress,
-      clearProgress,
-      getProgress
-    }}>
+    <UnifiedProgressContext.Provider value={value}>
       {children}
     </UnifiedProgressContext.Provider>
   );

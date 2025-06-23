@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,6 @@ interface BatchJobCardProps {
   onCancel: () => void;
   onDelete: () => void;
   isCompleted?: boolean;
-  // New timeout props
   isStuck?: boolean;
   shouldTimeout?: boolean;
   elapsedTime?: string;
@@ -35,7 +34,7 @@ interface BatchJobCardProps {
   isRecovering?: boolean;
 }
 
-const BatchJobCard = ({
+const BatchJobCard = React.memo(({
   job,
   payeeCount,
   isRefreshing,
@@ -58,8 +57,9 @@ const BatchJobCard = ({
   const { getProgress } = useUnifiedProgress();
   const [showDetails, setShowDetails] = useState(false);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
+  // Memoize status color calculation
+  const statusColor = useMemo(() => {
+    switch (job.status) {
       case 'completed': return 'bg-green-100 text-green-800 border-green-200';
       case 'failed': return 'bg-red-100 text-red-800 border-red-200';
       case 'expired': return 'bg-orange-100 text-orange-800 border-orange-200';
@@ -71,15 +71,27 @@ const BatchJobCard = ({
       case 'finalizing': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
-  };
+  }, [job.status, shouldTimeout, isStuck]);
 
-  const getStatusDisplay = (status: string) => {
+  // Memoize status display
+  const statusDisplay = useMemo(() => {
     if (shouldTimeout) return 'Stuck';
-    if (isStuck && status === 'in_progress') return 'Slow Progress';
-    return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
-  };
+    if (isStuck && job.status === 'in_progress') return 'Slow Progress';
+    return job.status.charAt(0).toUpperCase() + job.status.slice(1).replace('_', ' ');
+  }, [job.status, shouldTimeout, isStuck]);
 
-  const getProgressInfo = () => {
+  // Memoize progress info calculation
+  const progressInfo = useMemo(() => {
+    // For completed jobs, show 100% progress
+    if (job.status === 'completed' && isCompleted) {
+      return {
+        percentage: 100,
+        label: 'Processing complete',
+        showBar: true,
+        source: 'completed'
+      };
+    }
+
     const unifiedProgress = getProgress(`job-${job.id}`);
     
     if (unifiedProgress && unifiedProgress.percentage > 0) {
@@ -100,7 +112,7 @@ const BatchJobCard = ({
       };
     }
 
-    if (progress) {
+    if (progress && progress.total > 0) {
       const percentage = Math.round((progress.current / progress.total) * 100);
       return {
         percentage,
@@ -126,20 +138,9 @@ const BatchJobCard = ({
       showBar: false,
       source: 'none'
     };
-  };
+  }, [job.status, job.id, job.request_counts, isCompleted, getProgress, customProgress, progress]);
 
-  const progressInfo = getProgressInfo();
   const showBar = progressInfo.showBar || isDownloading;
-  const hasProgress = progressInfo.percentage > 0 || isDownloading;
-
-  console.log(`[BATCH CARD DEBUG] Rendering job ${job.id.slice(-8)}, status: ${job.status}`);
-  console.log(`[BATCH CARD DEBUG] Job ${job.id.slice(-8)} progress info:`, {
-    status: job.status,
-    progressInfo,
-    showBar,
-    isDownloading,
-    hasProgress
-  });
 
   return (
     <Card className={`transition-all duration-200 ${isCompleted ? 'ring-2 ring-green-200' : ''}`}>
@@ -168,8 +169,8 @@ const BatchJobCard = ({
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            <Badge className={getStatusColor(job.status)}>
-              {getStatusDisplay(job.status)}
+            <Badge className={statusColor}>
+              {statusDisplay}
             </Badge>
           </div>
         </div>
@@ -186,7 +187,6 @@ const BatchJobCard = ({
           </div>
         )}
 
-        {/* Timeout Indicator */}
         <BatchJobTimeoutIndicator
           job={job}
           isStuck={isStuck}
@@ -275,6 +275,8 @@ const BatchJobCard = ({
       </CardContent>
     </Card>
   );
-};
+});
+
+BatchJobCard.displayName = 'BatchJobCard';
 
 export default BatchJobCard;
