@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useMemo } from "react";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { PayeeRowData } from "@/lib/rowMapping";
@@ -11,7 +11,8 @@ import { useBatchJobTimeout } from "@/hooks/useBatchJobTimeout";
 import { useBatchJobAutoPolling } from "./batch/BatchJobAutoPolling";
 import { useBatchJobRecovery } from "./batch/BatchJobRecovery";
 import { useBatchJobConfirmationDialogs } from "./batch/BatchJobConfirmationDialogs";
-import BatchJobList from "./batch/BatchJobList";
+import { useBatchJobManagerState } from "@/hooks/useBatchJobManagerState";
+import BatchJobContainer from "./batch/BatchJobContainer";
 import BatchJobConfirmation from "./batch/BatchJobConfirmation";
 
 interface BatchJobManagerProps {
@@ -29,10 +30,9 @@ const BatchJobManager = React.memo(({
   onJobComplete, 
   onJobDelete 
 }: BatchJobManagerProps) => {
-  const [autoPollingJobs, setAutoPollingJobs] = useState<Set<string>>(new Set());
-
   const { getSmartState } = useSmartBatchManager();
   const { updateProgress } = useUnifiedProgress();
+  
   const {
     processedJobs,
     processingInProgress,
@@ -50,62 +50,29 @@ const BatchJobManager = React.memo(({
     getFormattedElapsedTime
   } = useBatchJobTimeout(jobs);
 
-  // Memoize the completion handler to prevent recreating it on every render
-  const handleJobComplete = useCallback((results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => {
-    console.log(`[BATCH MANAGER] Job ${jobId} completion handler called with ${results.length} results`);
-    
-    if (isJobProcessed(jobId)) {
-      console.log(`[BATCH MANAGER] Job ${jobId} already processed, ignoring duplicate`);
-      return;
-    }
-    
-    if (isJobProcessing(jobId)) {
-      console.log(`[BATCH MANAGER] Job ${jobId} processing already in progress, ignoring`);
-      return;
-    }
-    
-    markJobAsProcessing(jobId);
-    updateProgress(`job-${jobId}`, 'Download complete!', 100, `Successfully processed ${results.length} payees`, jobId);
-    
-    try {
-      if (results.length === 0) {
-        console.error(`[BATCH MANAGER] Job ${jobId} completed with 0 results - this is unexpected`);
-        return;
-      }
-      
-      const ids = results.map(r => r.id);
-      const uniqueIds = new Set(ids);
-      if (ids.length !== uniqueIds.size) {
-        console.warn(`[BATCH MANAGER] Job ${jobId} has ${ids.length - uniqueIds.size} duplicate result IDs`);
-        
-        const seenIds = new Set<string>();
-        const deduplicatedResults = results.filter(result => {
-          if (seenIds.has(result.id)) {
-            return false;
-          }
-          seenIds.add(result.id);
-          return true;
-        });
-        
-        console.log(`[BATCH MANAGER] Deduplicated ${results.length} results to ${deduplicatedResults.length}`);
-        results = deduplicatedResults;
-      }
-      
-      const rowIndices = results.map(r => r.rowIndex).filter(idx => idx !== undefined);
-      const uniqueRowIndices = new Set(rowIndices);
-      if (rowIndices.length !== uniqueRowIndices.size) {
-        console.error(`[BATCH MANAGER] Job ${jobId} has duplicate row indices`);
-        return;
-      }
-      
-      markJobAsProcessed(jobId);
-      onJobComplete(results, summary, jobId);
-      console.log(`[BATCH MANAGER] Job ${jobId} processed successfully, marked as completed`);
-      
-    } finally {
-      removeJobFromProcessing(jobId);
-    }
-  }, [isJobProcessed, isJobProcessing, markJobAsProcessing, updateProgress, markJobAsProcessed, onJobComplete, removeJobFromProcessing]);
+  const {
+    autoPollingJobs,
+    setAutoPollingJobs,
+    handleJobComplete: baseHandleJobComplete
+  } = useBatchJobManagerState();
+
+  // Memoize the completion handler with all dependencies
+  const handleJobComplete = useMemo(() => 
+    (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) =>
+      baseHandleJobComplete(
+        results, 
+        summary, 
+        jobId,
+        isJobProcessed,
+        isJobProcessing,
+        markJobAsProcessing,
+        markJobAsProcessed,
+        removeJobFromProcessing,
+        updateProgress,
+        onJobComplete
+      ), 
+    [baseHandleJobComplete, isJobProcessed, isJobProcessing, markJobAsProcessing, markJobAsProcessed, removeJobFromProcessing, updateProgress, onJobComplete]
+  );
 
   const {
     refreshingJobs,
@@ -122,7 +89,6 @@ const BatchJobManager = React.memo(({
     onJobComplete: handleJobComplete
   });
 
-  // Use auto-polling hook with stabilized setter
   useBatchJobAutoPolling({
     jobs,
     autoPollingJobs,
@@ -146,7 +112,7 @@ const BatchJobManager = React.memo(({
     onJobDelete
   });
 
-  // Memoize the job list props to prevent unnecessary re-renders
+  // Memoize the job list props
   const jobListProps = useMemo(() => ({
     jobs,
     payeeRowDataMap,
@@ -191,11 +157,13 @@ const BatchJobManager = React.memo(({
     recoveringJobs
   ]);
 
-  console.log(`[BATCH MANAGER] Rendering ${jobs.length} jobs, ${autoPollingJobs.size} auto-polling`);
-
   return (
     <>
-      <BatchJobList {...jobListProps} />
+      <BatchJobContainer 
+        jobs={jobs}
+        payeeRowDataMap={payeeRowDataMap}
+        listProps={jobListProps}
+      />
 
       <BatchJobConfirmation
         isOpen={confirmDialog.isOpen}
