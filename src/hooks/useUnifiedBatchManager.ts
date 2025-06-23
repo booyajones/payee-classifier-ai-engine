@@ -1,0 +1,193 @@
+
+import { useCallback, useState } from 'react';
+import { useToast } from '@/components/ui/use-toast';
+import { BatchJob, createBatchJob } from '@/lib/openai/trueBatchAPI';
+import { PayeeRowData } from '@/lib/rowMapping';
+import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
+import { saveBatchJob, updateBatchJobStatus, deleteBatchJob } from '@/lib/database/batchJobService';
+import { batchProcessingService } from '@/lib/services/batchProcessingService';
+import { DEFAULT_CLASSIFICATION_CONFIG } from '@/lib/classification/config';
+
+interface BatchManagerState {
+  jobs: BatchJob[];
+  payeeDataMap: Record<string, PayeeRowData>;
+  processing: Set<string>;
+  errors: Record<string, string>;
+}
+
+interface BatchCreationOptions {
+  description?: string;
+  onJobUpdate?: (job: BatchJob) => void;
+  onJobComplete?: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void;
+}
+
+export const useUnifiedBatchManager = () => {
+  const { toast } = useToast();
+  const [state, setState] = useState<BatchManagerState>({
+    jobs: [],
+    payeeDataMap: {},
+    processing: new Set(),
+    errors: {}
+  });
+
+  const createBatch = useCallback(async (
+    payeeRowData: PayeeRowData,
+    options: BatchCreationOptions = {}
+  ): Promise<BatchJob | null> => {
+    const { description, onJobUpdate, onJobComplete } = options;
+    
+    console.log(`[UNIFIED BATCH] Creating batch for ${payeeRowData.uniquePayeeNames.length} payees`);
+    
+    try {
+      // Validate input
+      batchProcessingService.validateBatchInput(
+        payeeRowData.uniquePayeeNames, 
+        payeeRowData.originalFileData
+      );
+
+      // For large files, use local processing
+      if (payeeRowData.uniquePayeeNames.length > 45000) {
+        console.log(`[UNIFIED BATCH] Large file detected, using local processing`);
+        
+        toast({
+          title: "Large File Processing",
+          description: "Processing large file locally with enhanced algorithms",
+        });
+
+        const result = await batchProcessingService.processBatch(
+          payeeRowData.uniquePayeeNames,
+          {
+            ...DEFAULT_CLASSIFICATION_CONFIG,
+            offlineMode: true,
+            aiThreshold: 75
+          },
+          payeeRowData.originalFileData
+        );
+
+        if (onJobComplete) {
+          onJobComplete(result.results, result, 'local-processing');
+        }
+
+        return null;
+      }
+
+      // Create OpenAI batch job for smaller files
+      const job = await createBatchJob(payeeRowData.uniquePayeeNames, description);
+      await saveBatchJob(job, payeeRowData);
+      
+      // Update state
+      setState(prev => ({
+        ...prev,
+        jobs: [...prev.jobs, job],
+        payeeDataMap: { ...prev.payeeDataMap, [job.id]: payeeRowData }
+      }));
+      
+      toast({
+        title: "Batch Job Created",
+        description: `Job ${job.id.substring(0, 8)}... created successfully`,
+      });
+
+      return job;
+
+    } catch (error) {
+      console.error('[UNIFIED BATCH] Creation failed:', error);
+      
+      toast({
+        title: "Batch Creation Failed",
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: "destructive"
+      });
+      
+      throw error;
+    }
+  }, [toast]);
+
+  const updateJob = useCallback(async (updatedJob: BatchJob) => {
+    try {
+      await updateBatchJobStatus(updatedJob);
+      setState(prev => ({
+        ...prev,
+        jobs: prev.jobs.map(job => job.id === updatedJob.id ? updatedJob : job)
+      }));
+    } catch (error) {
+      console.error('[UNIFIED BATCH] Update failed:', error);
+      setState(prev => ({
+        ...prev,
+        errors: { ...prev.errors, [updatedJob.id]: 'Failed to update job status' }
+      }));
+    }
+  }, []);
+
+  const deleteJob = useCallback(async (jobId: string) => {
+    try {
+      await deleteBatchJob(jobId);
+      setState(prev => ({
+        ...prev,
+        jobs: prev.jobs.filter(job => job.id !== jobId),
+        payeeDataMap: Object.fromEntries(
+          Object.entries(prev.payeeDataMap).filter(([id]) => id !== jobId)
+        ),
+        errors: Object.fromEntries(
+          Object.entries(prev.errors).filter(([id]) => id !== jobId)
+        )
+      }));
+      
+      toast({
+        title: "Job Deleted",
+        description: `Job ${jobId.slice(-8)} removed successfully`,
+      });
+    } catch (error) {
+      console.error('[UNIFIED BATCH] Delete failed:', error);
+      toast({
+        title: "Delete Error",
+        description: "Failed to delete job",
+        variant: "destructive"
+      });
+    }
+  }, [toast]);
+
+  const clearAll = useCallback(async () => {
+    try {
+      const deletePromises = state.jobs.map(job => deleteBatchJob(job.id));
+      await Promise.all(deletePromises);
+      
+      setState({
+        jobs: [],
+        payeeDataMap: {},
+        processing: new Set(),
+        errors: {}
+      });
+      
+      toast({
+        title: "All Jobs Cleared",
+        description: "All batch jobs have been removed",
+      });
+    } catch (error) {
+      console.error('[UNIFIED BATCH] Clear all failed:', error);
+      toast({
+        title: "Clear Error",
+        description: "Some jobs could not be cleared",
+        variant: "destructive"
+      });
+    }
+  }, [state.jobs, toast]);
+
+  return {
+    // State
+    jobs: state.jobs,
+    payeeDataMap: state.payeeDataMap,
+    processing: state.processing,
+    errors: state.errors,
+    
+    // Actions
+    createBatch,
+    updateJob,
+    deleteJob,
+    clearAll,
+    
+    // Utilities
+    getJobData: useCallback((jobId: string) => state.payeeDataMap[jobId], [state.payeeDataMap]),
+    isProcessing: useCallback((jobId: string) => state.processing.has(jobId), [state.processing]),
+    getError: useCallback((jobId: string) => state.errors[jobId], [state.errors])
+  };
+};

@@ -2,10 +2,8 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
-import { BatchJob } from "@/lib/openai/trueBatchAPI";
-import { PayeeRowData } from "@/lib/rowMapping";
-import { useBatchFormState } from "@/hooks/useBatchFormState";
-import { useBatchFormActions } from "./useBatchFormActions";
+import { useUnifiedBatchManager } from "@/hooks/useUnifiedBatchManager";
+import { useSimplifiedBatchForm } from "@/hooks/useSimplifiedBatchForm";
 import BatchJobLoader from "./BatchJobLoader";
 import BatchFormHeader from "./BatchFormHeader";
 import BatchFormContent from "./BatchFormContent";
@@ -18,12 +16,11 @@ interface BatchFormContainerProps {
 const BatchFormContainer = ({ onBatchClassify, onComplete }: BatchFormContainerProps) => {
   const [isLoadingJobs, setIsLoadingJobs] = useState(true);
   
-  const formState = useBatchFormState();
-  const formActions = useBatchFormActions(formState, { onBatchClassify, onComplete });
+  const batchManager = useUnifiedBatchManager();
+  const formState = useSimplifiedBatchForm();
 
-  const handleJobsLoaded = (jobs: BatchJob[], payeeDataMap: Record<string, PayeeRowData>) => {
-    formState.setBatchJobs(jobs);
-    formState.setPayeeRowDataMap(payeeDataMap);
+  const handleJobsLoaded = (jobs: any[], payeeDataMap: any) => {
+    // Jobs are now managed by the unified batch manager
     if (jobs.length > 0) {
       formState.setActiveTab("jobs");
     }
@@ -31,6 +28,27 @@ const BatchFormContainer = ({ onBatchClassify, onComplete }: BatchFormContainerP
 
   const handleLoadingComplete = () => {
     setIsLoadingJobs(false);
+  };
+
+  const handleFileUploadBatchJob = async (batchJob: any, payeeRowData: any) => {
+    // The unified manager already handles saving, so we just need to switch tabs
+    formState.setActiveTab("jobs");
+  };
+
+  const handleJobComplete = (
+    results: PayeeClassification[], 
+    summary: BatchProcessingResult, 
+    jobId: string
+  ) => {
+    formState.handleJobComplete(results, summary);
+    
+    if (onBatchClassify) {
+      onBatchClassify(results);
+    }
+    
+    if (onComplete) {
+      onComplete(results, summary);
+    }
   };
 
   if (isLoadingJobs) {
@@ -49,15 +67,15 @@ const BatchFormContainer = ({ onBatchClassify, onComplete }: BatchFormContainerP
         <BatchFormContent
           activeTab={formState.activeTab}
           onTabChange={formState.setActiveTab}
-          batchJobs={formState.batchJobs}
-          payeeRowDataMap={formState.payeeRowDataMap}
+          batchJobs={batchManager.jobs}
+          payeeRowDataMap={batchManager.payeeDataMap}
           batchResults={formState.batchResults}
           processingSummary={formState.processingSummary}
-          onFileUploadBatchJob={formActions.handleFileUploadBatchJob}
-          onJobUpdate={formActions.handleJobUpdate}
-          onJobComplete={formActions.handleJobComplete}
-          onJobDelete={formActions.handleJobDelete}
-          onReset={formActions.resetForm}
+          onFileUploadBatchJob={handleFileUploadBatchJob}
+          onJobUpdate={batchManager.updateJob}
+          onJobComplete={handleJobComplete}
+          onJobDelete={batchManager.deleteJob}
+          onReset={formState.reset}
         />
       </CardContent>
     </Card>

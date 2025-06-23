@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileCheck } from 'lucide-react';
-import { useConsolidatedBatchManager } from '@/hooks/useConsolidatedBatchManager';
+import { useUnifiedBatchManager } from '@/hooks/useUnifiedBatchManager';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
 import { PayeeRowData } from '@/lib/rowMapping';
@@ -18,7 +18,7 @@ interface SmartFileUploadProps {
 }
 
 const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileUploadProps) => {
-  const { createBatchJob: createConsolidatedBatchJob } = useConsolidatedBatchManager();
+  const { createBatch } = useUnifiedBatchManager();
   
   const {
     uploadState,
@@ -56,7 +56,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
     try {
       const jobDescription = `Upload: ${fileName} (${payeeRowData.uniquePayeeNames.length} unique payees)`;
 
-      const job = await createConsolidatedBatchJob(payeeRowData, {
+      const job = await createBatch(payeeRowData, {
         description: jobDescription,
         onJobUpdate: (updatedJob) => {
           console.log(`[SMART UPLOAD] Job ${updatedJob.id} updated: ${updatedJob.status}`);
