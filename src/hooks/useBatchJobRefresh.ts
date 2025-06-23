@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { BatchJob, checkBatchJobStatus } from "@/lib/openai/trueBatchAPI";
 import { handleError, showRetryableErrorToast } from "@/lib/errorHandler";
-import { useRetry } from "@/hooks/useRetry";
+import { useApiRetry } from "@/hooks/useRetry";
 
 export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
   const [refreshingJobs, setRefreshingJobs] = useState<Set<string>>(new Set());
@@ -12,18 +12,32 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
   const {
     execute: refreshJobWithRetry,
     isRetrying: isRefreshRetrying
-  } = useRetry(checkBatchJobStatus, { maxRetries: 2, baseDelay: 1000 });
+  } = useApiRetry(checkBatchJobStatus, { 
+    maxRetries: 2, 
+    baseDelay: 1000,
+    onRetry: (attempt, error) => {
+      console.log(`[JOB REFRESH] Retry attempt ${attempt}: ${error.message}`);
+    },
+    onMaxRetriesReached: (error) => {
+      console.error(`[JOB REFRESH] Max retries reached: ${error.message}`);
+    }
+  });
 
   const handleRefreshJob = async (jobId: string) => {
     setRefreshingJobs(prev => new Set(prev).add(jobId));
     try {
-      console.log(`[DEBUG] Refreshing job ${jobId}`);
+      console.log(`[JOB REFRESH] Refreshing job ${jobId}`);
       const updatedJob = await refreshJobWithRetry(jobId);
-      console.log(`[DEBUG] Job ${jobId} updated status:`, updatedJob.status);
+      console.log(`[JOB REFRESH] Job ${jobId} updated status:`, updatedJob.status);
       onJobUpdate(updatedJob);
+      
+      toast({
+        title: "Job Status Updated",
+        description: `Job status refreshed: ${updatedJob.status}`,
+      });
     } catch (error) {
       const appError = handleError(error, 'Job Status Refresh');
-      console.error(`[DEBUG] Error refreshing job ${jobId}:`, error);
+      console.error(`[JOB REFRESH] Error refreshing job ${jobId}:`, error);
       
       showRetryableErrorToast(
         appError, 
