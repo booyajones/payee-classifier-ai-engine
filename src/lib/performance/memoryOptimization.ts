@@ -1,3 +1,4 @@
+import React from 'react';
 
 /**
  * Memory optimization utilities for large file processing

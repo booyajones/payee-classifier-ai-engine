@@ -1,5 +1,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import React from 'react';
 import { MemoryOptimizer } from '@/lib/performance/memoryOptimization';
 
 interface PerformanceMetrics {
