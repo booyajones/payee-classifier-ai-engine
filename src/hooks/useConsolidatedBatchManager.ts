@@ -6,6 +6,7 @@ import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
 import { saveBatchJob } from '@/lib/database/batchJobService';
 import { useToast } from '@/components/ui/use-toast';
 import { batchProcessingService } from '@/lib/services/batchProcessingService';
+import { DEFAULT_CLASSIFICATION_CONFIG } from '@/lib/classification/config';
 
 interface BatchCreationOptions {
   description?: string;
@@ -42,7 +43,11 @@ export const useConsolidatedBatchManager = () => {
 
         const result = await batchProcessingService.processBatch(
           payeeRowData.uniquePayeeNames,
-          { offlineMode: true, aiThreshold: 75 },
+          {
+            ...DEFAULT_CLASSIFICATION_CONFIG,
+            offlineMode: true,
+            aiThreshold: 75
+          },
           payeeRowData.originalFileData
         );
 
