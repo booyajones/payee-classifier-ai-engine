@@ -53,25 +53,51 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
     updateProgress(UPLOAD_ID, 'Creating batch job...', 50);
 
     try {
+      // Check if file needs chunking
+      const needsChunking = payeeRowData.uniquePayeeNames.length > 45000;
+      const jobDescription = needsChunking 
+        ? `Large Upload: ${fileName} (${payeeRowData.uniquePayeeNames.length} unique payees - will be chunked)`
+        : `Upload: ${fileName} (${payeeRowData.uniquePayeeNames.length} unique payees)`;
+
       const job = await createSmartBatchJob(
         payeeRowData,
-        `Upload: ${fileName} (${payeeRowData.uniquePayeeNames.length} unique payees)`,
+        jobDescription,
         (updatedJob) => {
           console.log(`[SMART UPLOAD] Job ${updatedJob.id} updated: ${updatedJob.status}`);
           const smartState = getSmartState(updatedJob.id);
-          updateProgress(UPLOAD_ID, smartState.currentStage, smartState.progress, smartState.currentStage, updatedJob.id);
+          
+          // Enhanced progress for chunked jobs
+          const isChunked = updatedJob.id.startsWith('chunked-');
+          updateProgress(
+            UPLOAD_ID, 
+            smartState.currentStage, 
+            smartState.progress, 
+            isChunked ? `Chunked processing: ${smartState.currentStage}` : smartState.currentStage, 
+            updatedJob.id
+          );
         },
         (results, summary, jobId) => {
           console.log(`[SMART UPLOAD] Job ${jobId} completed with ${results.length} results`);
           setUploadState('complete');
-          completeProgress(UPLOAD_ID, `Successfully processed ${results.length} payees!`);
+          
+          const isChunked = jobId.startsWith('chunked-');
+          const successMessage = isChunked 
+            ? `Successfully processed ${results.length} payees from chunked large file!`
+            : `Successfully processed ${results.length} payees!`;
+            
+          completeProgress(UPLOAD_ID, successMessage);
           onProcessingComplete(results, summary, jobId);
         }
       );
 
       if (job) {
         setUploadState('processing');
-        updateProgress(UPLOAD_ID, 'Batch job created! Processing payee classifications...', 70, 'OpenAI batch processing started', job.id);
+        const isChunked = job.id.startsWith('chunked-');
+        const progressMessage = isChunked
+          ? 'Large file chunked! Processing multiple batch jobs...'
+          : 'Batch job created! Processing payee classifications...';
+        
+        updateProgress(UPLOAD_ID, progressMessage, 70, 'OpenAI batch processing started', job.id);
         onBatchJobCreated(job, payeeRowData);
       } else {
         setUploadState('complete');

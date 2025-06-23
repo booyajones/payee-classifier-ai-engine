@@ -1,6 +1,6 @@
 
 import { Progress } from "@/components/ui/progress";
-import { Clock, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { Clock, Loader2, CheckCircle, AlertCircle, Package } from "lucide-react";
 
 interface BatchProcessingProgressProps {
   progress: number;
@@ -11,6 +11,9 @@ interface BatchProcessingProgressProps {
   totalSteps?: number;
   isComplete?: boolean;
   hasError?: boolean;
+  isChunked?: boolean;
+  completedChunks?: number;
+  totalChunks?: number;
 }
 
 const BatchProcessingProgress = ({ 
@@ -21,11 +24,15 @@ const BatchProcessingProgress = ({
   currentStep,
   totalSteps,
   isComplete = false,
-  hasError = false
+  hasError = false,
+  isChunked = false,
+  completedChunks = 0,
+  totalChunks = 0
 }: BatchProcessingProgressProps) => {
   const getStatusIcon = () => {
     if (hasError) return <AlertCircle className="h-4 w-4 text-red-500" />;
     if (isComplete) return <CheckCircle className="h-4 w-4 text-green-500" />;
+    if (isChunked) return <Package className="h-4 w-4 text-blue-500" />;
     return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
   };
 
@@ -60,6 +67,14 @@ const BatchProcessingProgress = ({
       
       {/* Additional Info */}
       <div className="space-y-1 text-xs text-muted-foreground">
+        {/* Chunked Processing Info */}
+        {isChunked && totalChunks > 1 && (
+          <div className="flex items-center gap-1">
+            <Package className="h-3 w-3" />
+            <span>Processing in {totalChunks} chunks - {completedChunks} completed</span>
+          </div>
+        )}
+
         {currentStep && totalSteps && (
           <div className="flex items-center gap-1">
             <span>Step {currentStep} of {totalSteps}</span>
@@ -75,8 +90,10 @@ const BatchProcessingProgress = ({
         
         {progress > 0 && !isComplete && !hasError && (
           <div>
-            Processing may take several minutes for large files. 
-            You can safely leave this page - your progress will be saved.
+            {isChunked && totalChunks > 1 
+              ? `Large file split into ${totalChunks} chunks for efficient processing. You can safely leave this page.`
+              : "Processing may take several minutes for large files. You can safely leave this page - your progress will be saved."
+            }
           </div>
         )}
       </div>

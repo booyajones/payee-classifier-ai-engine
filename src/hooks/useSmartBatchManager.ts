@@ -3,17 +3,12 @@ import { useCallback } from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
-import { useSmartBatchCreation } from './useSmartBatchCreation';
+import { useChunkedBatchManager } from './useChunkedBatchManager';
 import { useSmartBatchMonitoring } from './useSmartBatchMonitoring';
 
 export const useSmartBatchManager = () => {
-  const { createBatchWithFallback, handleQuotaFallback } = useSmartBatchCreation();
-  const { 
-    initializeSmartState, 
-    startIntelligentMonitoring, 
-    getSmartState, 
-    cleanup 
-  } = useSmartBatchMonitoring();
+  const { createChunkedBatchJob, getChunkedProgress } = useChunkedBatchManager();
+  const { getSmartState, cleanup } = useSmartBatchMonitoring();
 
   const createSmartBatchJob = useCallback(async (
     payeeRowData: PayeeRowData,
@@ -21,30 +16,32 @@ export const useSmartBatchManager = () => {
     onJobUpdate?: (job: BatchJob) => void,
     onJobComplete?: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void
   ): Promise<BatchJob | null> => {
-    try {
-      const job = await createBatchWithFallback(payeeRowData, description);
-      
-      if (!job) {
-        // Local processing was used
-        const localResults = await handleQuotaFallback(payeeRowData);
-        return null;
-      }
+    console.log(`[SMART BATCH] Creating batch job for ${payeeRowData.uniquePayeeNames.length} unique payees`);
+    
+    // Use chunked batch manager which will automatically handle large files
+    return await createChunkedBatchJob(payeeRowData, description, onJobUpdate, onJobComplete);
+  }, [createChunkedBatchJob]);
 
-      // Initialize smart state and start monitoring
-      initializeSmartState(job.id);
-      startIntelligentMonitoring(job, payeeRowData, onJobUpdate, onJobComplete);
-
-      return job;
-
-    } catch (error) {
-      console.error('[SMART BATCH] Job creation failed:', error);
-      throw error;
+  const getEnhancedSmartState = useCallback((jobId: string) => {
+    // Check if this is a chunked job
+    if (jobId.startsWith('chunked-')) {
+      const chunkedProgress = getChunkedProgress(jobId);
+      return {
+        isProcessing: chunkedProgress.completedChunks < chunkedProgress.totalChunks,
+        currentStage: chunkedProgress.status,
+        progress: chunkedProgress.overall,
+        autoRetryCount: 0,
+        hasQuotaIssue: false
+      };
     }
-  }, [createBatchWithFallback, handleQuotaFallback, initializeSmartState, startIntelligentMonitoring]);
+
+    // Regular job state
+    return getSmartState(jobId);
+  }, [getSmartState, getChunkedProgress]);
 
   return {
     createSmartBatchJob,
-    getSmartState,
+    getSmartState: getEnhancedSmartState,
     cleanup
   };
 };
