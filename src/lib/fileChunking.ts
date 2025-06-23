@@ -9,7 +9,7 @@ export interface FileChunk {
   totalChunks: number;
   uniquePayeeNames: string[];
   originalFileData: any[];
-  rowMappings: Record<string, number[]>;
+  rowMappings: any[]; // Keep as RowMapping[] equivalent
   chunkId: string;
 }
 
@@ -46,21 +46,22 @@ export const chunkPayeeData = (payeeRowData: PayeeRowData): FileChunk[] => {
     
     const chunkPayeeNames = uniquePayeeNames.slice(startIndex, endIndex);
     
-    // Create row mappings for this chunk
-    const chunkRowMappings: Record<string, number[]> = {};
-    const chunkOriginalData: any[] = [];
+    // Create a set of unique payee indices for this chunk
+    const chunkPayeeIndices = new Set<number>();
+    for (let j = startIndex; j < endIndex; j++) {
+      chunkPayeeIndices.add(j);
+    }
     
-    chunkPayeeNames.forEach(payeeName => {
-      if (rowMappings[payeeName]) {
-        chunkRowMappings[payeeName] = rowMappings[payeeName];
-        // Add corresponding original data rows
-        rowMappings[payeeName].forEach(rowIndex => {
-          if (!chunkOriginalData.some((_, idx) => idx === rowIndex)) {
-            chunkOriginalData[rowIndex] = originalFileData[rowIndex];
-          }
-        });
-      }
-    });
+    // Filter row mappings to only include rows for payees in this chunk
+    const chunkRowMappings = rowMappings.filter(mapping => 
+      chunkPayeeIndices.has(mapping.uniquePayeeIndex)
+    );
+    
+    // Get the original file data rows that correspond to this chunk
+    const chunkOriginalRowIndices = new Set(chunkRowMappings.map(mapping => mapping.originalRowIndex));
+    const chunkOriginalData = originalFileData.filter((_, index) => 
+      chunkOriginalRowIndices.has(index)
+    );
 
     chunks.push({
       chunkIndex: i,
