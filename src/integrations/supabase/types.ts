@@ -34,6 +34,7 @@ export type Database = {
           selected_payee_column: string | null
           status: string
           unique_payee_names: string[]
+          updated_at: string | null
         }
         Insert: {
           app_created_at?: string
@@ -59,6 +60,7 @@ export type Database = {
           selected_payee_column?: string | null
           status: string
           unique_payee_names: string[]
+          updated_at?: string | null
         }
         Update: {
           app_created_at?: string
@@ -84,6 +86,7 @@ export type Database = {
           selected_payee_column?: string | null
           status?: string
           unique_payee_names?: string[]
+          updated_at?: string | null
         }
         Relationships: []
       }

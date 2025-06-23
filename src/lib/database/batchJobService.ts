@@ -27,6 +27,7 @@ export interface DatabaseBatchJob {
   selected_payee_column?: string;
   app_created_at: string;
   app_updated_at: string;
+  updated_at?: string;
 }
 
 /**
@@ -43,28 +44,28 @@ export const saveBatchJob = async (
     throw new Error('Missing required batch job data for database persistence');
   }
 
-  const dbRecord: Omit<DatabaseBatchJob, 'app_created_at' | 'app_updated_at'> = {
+  const dbRecord = {
     id: batchJob.id,
     status: batchJob.status,
     created_at_timestamp: batchJob.created_at,
-    in_progress_at_timestamp: batchJob.in_progress_at || undefined,
-    finalizing_at_timestamp: batchJob.finalizing_at || undefined,
-    completed_at_timestamp: batchJob.completed_at || undefined,
-    failed_at_timestamp: batchJob.failed_at || undefined,
-    expired_at_timestamp: batchJob.expired_at || undefined,
-    cancelled_at_timestamp: batchJob.cancelled_at || undefined,
+    in_progress_at_timestamp: batchJob.in_progress_at || null,
+    finalizing_at_timestamp: batchJob.finalizing_at || null,
+    completed_at_timestamp: batchJob.completed_at || null,
+    failed_at_timestamp: batchJob.failed_at || null,
+    expired_at_timestamp: batchJob.expired_at || null,
+    cancelled_at_timestamp: batchJob.cancelled_at || null,
     request_counts_total: batchJob.request_counts.total,
     request_counts_completed: batchJob.request_counts.completed,
     request_counts_failed: batchJob.request_counts.failed,
     metadata: batchJob.metadata || null,
     errors: batchJob.errors || null,
-    output_file_id: batchJob.output_file_id || undefined,
+    output_file_id: batchJob.output_file_id || null,
     unique_payee_names: payeeRowData.uniquePayeeNames,
     original_file_data: payeeRowData.originalFileData,
     row_mappings: payeeRowData.rowMappings,
-    file_name: (payeeRowData as any).fileName || undefined,
-    file_headers: (payeeRowData as any).fileHeaders || undefined,
-    selected_payee_column: (payeeRowData as any).selectedPayeeColumn || undefined,
+    file_name: (payeeRowData as any).fileName || null,
+    file_headers: (payeeRowData as any).fileHeaders || null,
+    selected_payee_column: (payeeRowData as any).selectedPayeeColumn || null,
   };
 
   console.log(`[DB BATCH SERVICE] Saving job data:`, {
@@ -95,22 +96,22 @@ export const saveBatchJob = async (
 export const updateBatchJobStatus = async (
   batchJob: BatchJob
 ): Promise<void> => {
-  console.log(`[DB BATCH SERVICE] Updating batch job ${batchJob.id} status from database to ${batchJob.status}`);
+  console.log(`[DB BATCH SERVICE] Updating batch job ${batchJob.id} status to ${batchJob.status}`);
 
   const updateData = {
     status: batchJob.status,
-    in_progress_at_timestamp: batchJob.in_progress_at || undefined,
-    finalizing_at_timestamp: batchJob.finalizing_at || undefined,
-    completed_at_timestamp: batchJob.completed_at || undefined,
-    failed_at_timestamp: batchJob.failed_at || undefined,
-    expired_at_timestamp: batchJob.expired_at || undefined,
-    cancelled_at_timestamp: batchJob.cancelled_at || undefined,
+    in_progress_at_timestamp: batchJob.in_progress_at || null,
+    finalizing_at_timestamp: batchJob.finalizing_at || null,
+    completed_at_timestamp: batchJob.completed_at || null,
+    failed_at_timestamp: batchJob.failed_at || null,
+    expired_at_timestamp: batchJob.expired_at || null,
+    cancelled_at_timestamp: batchJob.cancelled_at || null,
     request_counts_total: batchJob.request_counts.total,
     request_counts_completed: batchJob.request_counts.completed,
     request_counts_failed: batchJob.request_counts.failed,
     metadata: batchJob.metadata || null,
     errors: batchJob.errors || null,
-    output_file_id: batchJob.output_file_id || undefined,
+    output_file_id: batchJob.output_file_id || null,
   };
 
   const { error } = await supabase
