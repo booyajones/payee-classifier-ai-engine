@@ -17,7 +17,7 @@ interface BatchCreationOptions {
 export const useConsolidatedBatchManager = () => {
   const { toast } = useToast();
 
-  const createBatchJob = useCallback(async (
+  const createBatchJobHandler = useCallback(async (
     payeeRowData: PayeeRowData,
     options: BatchCreationOptions = {}
   ): Promise<BatchJob | null> => {
@@ -61,7 +61,7 @@ export const useConsolidatedBatchManager = () => {
       // Create OpenAI batch job for smaller files - pass only the string array
       const job = await createBatchJob(payeeRowData.uniquePayeeNames, description);
       
-      // Save to database
+      // Save to database - pass the job and payeeRowData
       await saveBatchJob(job, payeeRowData);
       
       toast({
@@ -85,6 +85,6 @@ export const useConsolidatedBatchManager = () => {
   }, [toast]);
 
   return {
-    createBatchJob
+    createBatchJob: createBatchJobHandler
   };
 };
