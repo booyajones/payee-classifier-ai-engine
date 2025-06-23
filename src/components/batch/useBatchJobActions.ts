@@ -21,8 +21,10 @@ export const useBatchJobActions = ({
   onJobUpdate,
   onJobComplete
 }: UseBatchJobActionsProps) => {
-  const { pollingStates, refreshSpecificJob } = useBatchJobPolling(jobs, onJobUpdate);
+  // Ensure onJobUpdate is passed to the refresh hook
   const { refreshingJobs, handleRefreshJob: baseHandleRefreshJob } = useBatchJobRefresh(onJobUpdate);
+  
+  const { pollingStates, refreshSpecificJob } = useBatchJobPolling(jobs, onJobUpdate);
   const { handleCancelJob, handleCancelDownload } = useBatchJobCancellation(onJobUpdate);
   
   const {

@@ -32,7 +32,7 @@ const BatchJobList = ({
   } = useBatchJobActions({
     jobs,
     payeeRowDataMap,
-    onJobUpdate,
+    onJobUpdate, // Ensure this is passed correctly
     onJobComplete
   });
 
