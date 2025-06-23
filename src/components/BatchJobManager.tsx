@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState } from "react";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { PayeeRowData } from "@/lib/rowMapping";
@@ -7,7 +8,9 @@ import { useSmartBatchManager } from "@/hooks/useSmartBatchManager";
 import { useUnifiedProgress } from "@/contexts/UnifiedProgressContext";
 import { useBatchJobState } from "@/hooks/useBatchJobState";
 import { useBatchJobTimeout } from "@/hooks/useBatchJobTimeout";
-import { useEnhancedBatchRecovery } from "@/hooks/useEnhancedBatchRecovery";
+import { useBatchJobAutoPolling } from "./batch/BatchJobAutoPolling";
+import { useBatchJobRecovery } from "./batch/BatchJobRecovery";
+import { useBatchJobConfirmationDialogs } from "./batch/BatchJobConfirmationDialogs";
 import BatchJobList from "./batch/BatchJobList";
 import BatchJobConfirmation from "./batch/BatchJobConfirmation";
 
@@ -26,20 +29,6 @@ const BatchJobManager = ({
   onJobComplete, 
   onJobDelete 
 }: BatchJobManagerProps) => {
-  const [confirmDialog, setConfirmDialog] = useState<{
-    isOpen: boolean;
-    title: string;
-    description: string;
-    onConfirm: () => void;
-    variant?: 'default' | 'destructive';
-  }>({
-    isOpen: false,
-    title: '',
-    description: '',
-    onConfirm: () => {}
-  });
-
-  const [recoveringJobs, setRecoveringJobs] = useState<Set<string>>(new Set());
   const [autoPollingJobs, setAutoPollingJobs] = useState<Set<string>>(new Set());
 
   const { getSmartState } = useSmartBatchManager();
@@ -54,15 +43,13 @@ const BatchJobManager = ({
     isJobProcessing
   } = useBatchJobState();
 
-  // Initialize timeout and recovery hooks
+  // Initialize timeout hook
   const {
     getTimeoutState,
     isJobStuck,
     shouldJobTimeout,
     getFormattedElapsedTime
   } = useBatchJobTimeout(jobs);
-
-  const { recoverStuckJob } = useEnhancedBatchRecovery();
 
   const {
     refreshingJobs,
@@ -133,127 +120,31 @@ const BatchJobManager = ({
     }
   });
 
-  // Auto-refresh jobs that are in active states
-  useEffect(() => {
-    const activeStates = ['validating', 'in_progress', 'finalizing'];
-    const newAutoPollingJobs = new Set<string>();
+  // Use auto-polling hook
+  useBatchJobAutoPolling({
+    jobs,
+    autoPollingJobs,
+    setAutoPollingJobs,
+    handleRefreshJob
+  });
 
-    jobs.forEach(job => {
-      if (activeStates.includes(job.status) && !autoPollingJobs.has(job.id)) {
-        console.log(`[AUTO POLLING] Starting auto-refresh for job ${job.id} with status: ${job.status}`);
-        newAutoPollingJobs.add(job.id);
-        
-        // Start auto-refresh for this job
-        const startAutoRefresh = () => {
-          const refreshInterval = setInterval(() => {
-            const currentJob = jobs.find(j => j.id === job.id);
-            if (!currentJob || !activeStates.includes(currentJob.status)) {
-              console.log(`[AUTO POLLING] Stopping auto-refresh for job ${job.id} - status: ${currentJob?.status || 'not found'}`);
-              clearInterval(refreshInterval);
-              setAutoPollingJobs(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(job.id);
-                return newSet;
-              });
-              return;
-            }
-            
-            console.log(`[AUTO POLLING] Auto-refreshing job ${job.id}`);
-            handleRefreshJob(job.id);
-          }, 15000); // Refresh every 15 seconds
+  // Use recovery hook
+  const { recoveringJobs, handleJobRecovery } = useBatchJobRecovery({
+    payeeRowDataMap,
+    onJobComplete
+  });
 
-          // Clean up interval after 30 minutes to prevent infinite polling
-          setTimeout(() => {
-            console.log(`[AUTO POLLING] Timeout reached for job ${job.id}, stopping auto-refresh`);
-            clearInterval(refreshInterval);
-            setAutoPollingJobs(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(job.id);
-              return newSet;
-            });
-          }, 30 * 60 * 1000); // 30 minutes
-        };
-
-        startAutoRefresh();
-      }
-    });
-
-    setAutoPollingJobs(prev => new Set([...prev, ...newAutoPollingJobs]));
-
-    // Cleanup function
-    return () => {
-      // Intervals are cleaned up by the individual jobs when they complete or timeout
-    };
-  }, [jobs, handleRefreshJob]);
-
-  const handleJobRecovery = async (job: BatchJob) => {
-    const payeeRowData = payeeRowDataMap[job.id];
-    if (!payeeRowData) {
-      console.error(`[RECOVERY] No payee row data found for job ${job.id}`);
-      return;
-    }
-
-    setRecoveringJobs(prev => new Set([...prev, job.id]));
-    
-    try {
-      console.log(`[RECOVERY] Starting recovery for job ${job.id}`);
-      const success = await recoverStuckJob(job, payeeRowData, onJobComplete);
-      
-      if (success) {
-        console.log(`[RECOVERY] Job ${job.id} recovery completed successfully`);
-      } else {
-        console.error(`[RECOVERY] Job ${job.id} recovery failed`);
-      }
-    } catch (error) {
-      console.error(`[RECOVERY] Error during job ${job.id} recovery:`, error);
-    } finally {
-      setRecoveringJobs(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(job.id);
-        return newSet;
-      });
-    }
-  };
-
-  const showCancelConfirmation = (jobId: string) => {
-    const job = jobs.find(j => j.id === jobId);
-    if (!job) return;
-    
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Cancel Batch Job',
-      description: `Are you sure you want to cancel this job? This action cannot be undone and you may be charged for completed requests.`,
-      onConfirm: () => handleCancelJob(job.id),
-      variant: 'destructive'
-    });
-  };
-
-  const showDeleteConfirmation = (jobId: string) => {
-    const job = jobs.find(j => j.id === jobId);
-    const jobStatus = job?.status || 'unknown';
-    
-    let description = '';
-    if (jobStatus === 'cancelling') {
-      description = 'This job is currently being cancelled. Removing it will hide it from your view but the cancellation will continue on OpenAI\'s side.';
-    } else if (['cancelled', 'failed', 'expired'].includes(jobStatus)) {
-      description = 'This will remove the job from your list. The job data will no longer be visible, but this does not affect the actual OpenAI batch job.';
-    } else if (jobStatus === 'completed') {
-      description = 'This will remove the completed job from your list. You can still download results before removing if needed.';
-    } else {
-      description = 'This will remove the job from your view. This does not cancel or affect the actual OpenAI batch job.';
-    }
-
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Remove Job from List',
-      description,
-      onConfirm: () => {
-        console.log(`[DEBUG] Deleting job ${jobId} from list`);
-        onJobDelete(jobId);
-      },
-      variant: 'destructive'
-    });
-  };
+  // Use confirmation dialogs hook
+  const {
+    confirmDialog,
+    showCancelConfirmation,
+    showDeleteConfirmation,
+    closeConfirmDialog
+  } = useBatchJobConfirmationDialogs({
+    jobs,
+    handleCancelJob,
+    onJobDelete
+  });
 
   console.log(`[BATCH MANAGER] Rendering ${jobs.length} jobs, ${autoPollingJobs.size} auto-polling`);
 
@@ -288,7 +179,7 @@ const BatchJobManager = ({
         description={confirmDialog.description}
         variant={confirmDialog.variant}
         onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onCancel={closeConfirmDialog}
       />
     </>
   );
