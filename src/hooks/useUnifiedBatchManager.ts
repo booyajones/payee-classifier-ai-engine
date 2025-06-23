@@ -1,4 +1,3 @@
-
 import { useCallback, useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { BatchJob, createBatchJob } from '@/lib/openai/trueBatchAPI';
@@ -39,11 +38,8 @@ export const useUnifiedBatchManager = () => {
     console.log(`[UNIFIED BATCH] Creating batch for ${payeeRowData.uniquePayeeNames.length} payees`);
     
     try {
-      // Validate input
-      batchProcessingService.validateBatchInput(
-        payeeRowData.uniquePayeeNames, 
-        payeeRowData.originalFileData
-      );
+      // Validate input - pass the complete PayeeRowData object
+      batchProcessingService.validateBatchInput(payeeRowData);
 
       // For large files, use local processing
       if (payeeRowData.uniquePayeeNames.length > 45000) {

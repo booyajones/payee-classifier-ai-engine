@@ -26,11 +26,8 @@ export const useConsolidatedBatchManager = () => {
     console.log(`[CONSOLIDATED BATCH] Creating batch job for ${payeeRowData.uniquePayeeNames.length} unique payees`);
     
     try {
-      // Validate input
-      batchProcessingService.validateBatchInput(
-        payeeRowData.uniquePayeeNames, 
-        payeeRowData.originalFileData
-      );
+      // Validate input - pass the complete PayeeRowData object
+      batchProcessingService.validateBatchInput(payeeRowData);
 
       // For large files (>45k payees), fall back to local processing
       if (payeeRowData.uniquePayeeNames.length > 45000) {
