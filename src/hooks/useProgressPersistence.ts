@@ -1,0 +1,237 @@
+import { useState, useCallback, useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
+
+interface ProgressState {
+  id: string;
+  percentage: number;
+  stage: string;
+  message: string;
+  timestamp: number;
+  jobId?: string;
+  status?: string;
+  metadata?: Record<string, any>;
+}
+
+interface ProgressHistory {
+  [key: string]: ProgressState[];
+}
+
+const STORAGE_KEY = 'lovable_progress_state';
+const MAX_HISTORY_PER_ID = 50;
+const CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+
+export const useProgressPersistence = () => {
+  const [progressStates, setProgressStates] = useState<Record<string, ProgressState>>({});
+  const [progressHistory, setProgressHistory] = useState<ProgressHistory>({});
+  const { toast } = useToast();
+
+  // Load persisted progress on mount
+  useEffect(() => {
+    loadPersistedProgress();
+    
+    // Set up periodic cleanup
+    const cleanupInterval = setInterval(cleanupOldProgress, CLEANUP_INTERVAL);
+    return () => clearInterval(cleanupInterval);
+  }, []);
+
+  const loadPersistedProgress = useCallback(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const data = JSON.parse(stored);
+        setProgressStates(data.current || {});
+        setProgressHistory(data.history || {});
+        
+        console.log('[PROGRESS PERSISTENCE] Loaded persisted progress:', Object.keys(data.current || {}));
+      }
+    } catch (error) {
+      console.warn('[PROGRESS PERSISTENCE] Failed to load persisted progress:', error);
+    }
+  }, []);
+
+  const persistProgress = useCallback((current: Record<string, ProgressState>, history: ProgressHistory) => {
+    try {
+      const data = { current, history, timestamp: Date.now() };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (error) {
+      console.warn('[PROGRESS PERSISTENCE] Failed to persist progress:', error);
+      
+      // If storage is full, try to clean up and retry
+      cleanupOldProgress();
+      try {
+        const data = { current, history, timestamp: Date.now() };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (retryError) {
+        toast({
+          title: "Storage Warning",
+          description: "Unable to save progress. Your browser storage may be full.",
+          variant: "destructive",
+        });
+      }
+    }
+  }, [toast]);
+
+  const updateProgress = useCallback((
+    id: string,
+    message: string,
+    percentage: number = 0,
+    stage: string = 'Processing',
+    jobId?: string,
+    metadata?: Record<string, any>
+  ) => {
+    const newState: ProgressState = {
+      id,
+      percentage: Math.max(0, Math.min(100, percentage)),
+      stage,
+      message,
+      timestamp: Date.now(),
+      jobId,
+      metadata
+    };
+
+    setProgressStates(prev => {
+      const updated = { ...prev, [id]: newState };
+      
+      // Update history
+      setProgressHistory(prevHistory => {
+        const updatedHistory = { ...prevHistory };
+        if (!updatedHistory[id]) {
+          updatedHistory[id] = [];
+        }
+        
+        // Add to history, keeping only recent entries
+        updatedHistory[id] = [
+          ...updatedHistory[id].slice(-MAX_HISTORY_PER_ID + 1),
+          newState
+        ];
+        
+        // Persist both current state and history
+        persistProgress(updated, updatedHistory);
+        
+        return updatedHistory;
+      });
+      
+      return updated;
+    });
+
+    console.log(`[PROGRESS PERSISTENCE] Updated progress for ${id}: ${percentage}% - ${message}`);
+  }, [persistProgress]);
+
+  const completeProgress = useCallback((id: string, finalMessage: string = 'Completed') => {
+    updateProgress(id, finalMessage, 100, 'Complete');
+    
+    // Keep completed progress for a short time before cleanup
+    setTimeout(() => {
+      setProgressStates(prev => {
+        const updated = { ...prev };
+        delete updated[id];
+        
+        setProgressHistory(prevHistory => {
+          persistProgress(updated, prevHistory);
+          return prevHistory;
+        });
+        
+        return updated;
+      });
+    }, 30000); // Keep for 30 seconds
+  }, [updateProgress]);
+
+  const clearProgress = useCallback((id: string) => {
+    setProgressStates(prev => {
+      const updated = { ...prev };
+      delete updated[id];
+      
+      setProgressHistory(prevHistory => {
+        const updatedHistory = { ...prevHistory };
+        delete updatedHistory[id];
+        persistProgress(updated, updatedHistory);
+        return updatedHistory;
+      });
+      
+      return updated;
+    });
+    
+    console.log(`[PROGRESS PERSISTENCE] Cleared progress for ${id}`);
+  }, [persistProgress]);
+
+  const getProgress = useCallback((id: string): ProgressState | null => {
+    return progressStates[id] || null;
+  }, [progressStates]);
+
+  const getProgressHistory = useCallback((id: string): ProgressState[] => {
+    return progressHistory[id] || [];
+  }, [progressHistory]);
+
+  const getAllActiveProgress = useCallback((): ProgressState[] => {
+    return Object.values(progressStates).filter(state => state.percentage < 100);
+  }, [progressStates]);
+
+  const cleanupOldProgress = useCallback(() => {
+    const cutoffTime = Date.now() - CLEANUP_INTERVAL;
+    
+    setProgressStates(prev => {
+      const updated = { ...prev };
+      let hasChanges = false;
+      
+      Object.keys(updated).forEach(id => {
+        if (updated[id].timestamp < cutoffTime && updated[id].percentage === 100) {
+          delete updated[id];
+          hasChanges = true;
+        }
+      });
+      
+      if (hasChanges) {
+        setProgressHistory(prevHistory => {
+          const updatedHistory = { ...prevHistory };
+          
+          // Clean up old history entries
+          Object.keys(updatedHistory).forEach(id => {
+            updatedHistory[id] = updatedHistory[id].filter(
+              state => state.timestamp > cutoffTime
+            );
+            
+            if (updatedHistory[id].length === 0) {
+              delete updatedHistory[id];
+            }
+          });
+          
+          persistProgress(updated, updatedHistory);
+          return updatedHistory;
+        });
+        
+        console.log('[PROGRESS PERSISTENCE] Cleaned up old progress data');
+      }
+      
+      return updated;
+    });
+  }, [persistProgress]);
+
+  const exportProgress = useCallback(() => {
+    const exportData = {
+      current: progressStates,
+      history: progressHistory,
+      exportedAt: new Date().toISOString()
+    };
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `progress-export-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [progressStates, progressHistory]);
+
+  return {
+    updateProgress,
+    completeProgress,
+    clearProgress,
+    getProgress,
+    getProgressHistory,
+    getAllActiveProgress,
+    cleanupOldProgress,
+    exportProgress,
+    progressStates,
+    progressHistory
+  };
+};
