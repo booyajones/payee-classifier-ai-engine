@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileCheck } from 'lucide-react';
 import { useSmartBatchManager } from '@/hooks/useSmartBatchManager';
@@ -17,7 +18,7 @@ interface SmartFileUploadProps {
 }
 
 const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileUploadProps) => {
-  const { createSmartBatchJob, getSmartState } = useSmartBatchManager();
+  const { createSmartBatchJob, getSmartState, isChunkedJob } = useSmartBatchManager();
   
   const {
     uploadState,
@@ -67,12 +68,16 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
           const smartState = getSmartState(updatedJob.id);
           
           // Enhanced progress for chunked jobs
-          const isChunked = updatedJob.id.startsWith('chunked-');
+          const chunked = isChunkedJob(updatedJob.id);
+          const progressMessage = chunked 
+            ? `Chunked processing: ${smartState.currentStage} (${smartState.completedChunks}/${smartState.totalChunks} chunks)`
+            : smartState.currentStage;
+            
           updateProgress(
             UPLOAD_ID, 
-            smartState.currentStage, 
+            progressMessage, 
             smartState.progress, 
-            isChunked ? `Chunked processing: ${smartState.currentStage}` : smartState.currentStage, 
+            smartState.currentStage, 
             updatedJob.id
           );
         },
@@ -80,8 +85,8 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
           console.log(`[SMART UPLOAD] Job ${jobId} completed with ${results.length} results`);
           setUploadState('complete');
           
-          const isChunked = jobId.startsWith('chunked-');
-          const successMessage = isChunked 
+          const chunked = isChunkedJob(jobId);
+          const successMessage = chunked 
             ? `Successfully processed ${results.length} payees from chunked large file!`
             : `Successfully processed ${results.length} payees!`;
             
@@ -92,9 +97,9 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
 
       if (job) {
         setUploadState('processing');
-        const isChunked = job.id.startsWith('chunked-');
-        const progressMessage = isChunked
-          ? 'Large file chunked! Processing multiple batch jobs...'
+        const chunked = isChunkedJob(job.id);
+        const progressMessage = chunked
+          ? 'Large file automatically chunked! Processing multiple batch jobs...'
           : 'Batch job created! Processing payee classifications...';
         
         updateProgress(UPLOAD_ID, progressMessage, 70, 'OpenAI batch processing started', job.id);
@@ -122,7 +127,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
         </CardTitle>
         <CardDescription>
           Upload your payee file and select the column containing payee names. 
-          Supports files up to 100MB with 100,000 rows.
+          Supports files up to 100MB with 100,000 rows. Large files are automatically split into chunks.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -12,6 +12,7 @@ export const useChunkedBatchManager = () => {
   const [chunkJobs, setChunkJobs] = useState<Record<string, ChunkJobResult[]>>({});
   const [chunkProgress, setChunkProgress] = useState<Record<string, Record<string, { current: number; total: number; status: string }>>>({});
   const [chunkResults, setChunkResults] = useState<Record<string, PayeeClassification[]>>({});
+  const [parentJobMetadata, setParentJobMetadata] = useState<Record<string, { isChunked: boolean; totalChunks: number; completedChunks: number }>>({});
 
   const { createBatchWithFallback } = useSmartBatchCreation();
   const { initializeSmartState, startIntelligentMonitoring, getSmartState } = useSmartBatchMonitoring();
@@ -41,7 +42,7 @@ export const useChunkedBatchManager = () => {
       
       const chunkJobResults: ChunkJobResult[] = [];
       let completedChunks = 0;
-      let firstChunkJobId = '';
+      let parentJobId = '';
 
       // Create batch jobs for each chunk
       for (const chunk of chunks) {
@@ -54,7 +55,17 @@ export const useChunkedBatchManager = () => {
           if (chunkJob) {
             // Use the first chunk's job ID as the parent job ID (it's a real OpenAI batch ID)
             if (chunk.chunkIndex === 0) {
-              firstChunkJobId = chunkJob.id;
+              parentJobId = chunkJob.id;
+              
+              // Mark this job as a chunked parent job
+              setParentJobMetadata(prev => ({
+                ...prev,
+                [parentJobId]: {
+                  isChunked: true,
+                  totalChunks: chunks.length,
+                  completedChunks: 0
+                }
+              }));
             }
 
             const chunkResult: ChunkJobResult = {
@@ -65,8 +76,7 @@ export const useChunkedBatchManager = () => {
 
             chunkJobResults.push(chunkResult);
 
-            // Initialize chunk progress using the first chunk job ID as parent
-            const parentJobId = firstChunkJobId || chunkJob.id;
+            // Initialize chunk progress using the parent job ID
             setChunkProgress(prevProgress => ({
               ...prevProgress,
               [parentJobId]: {
@@ -83,7 +93,6 @@ export const useChunkedBatchManager = () => {
               (updatedJob) => {
                 // Update individual chunk progress
                 const smartState = getSmartState(updatedJob.id);
-                const parentJobId = firstChunkJobId;
                 
                 setChunkProgress(currentProgress => {
                   const updatedProgress = { ...currentProgress[parentJobId] };
@@ -95,14 +104,22 @@ export const useChunkedBatchManager = () => {
 
                   const overallProgress = calculateChunkedProgress(updatedProgress);
                   
-                  // Create a synthetic parent job for progress reporting
-                  const parentJob: BatchJob = {
-                    ...updatedJob,
-                    id: parentJobId,
-                    status: overallProgress.completedChunks === chunks.length ? 'completed' : 'in_progress'
-                  };
-
-                  if (onJobUpdate) {
+                  // Update parent job metadata
+                  setParentJobMetadata(prev => ({
+                    ...prev,
+                    [parentJobId]: {
+                      ...prev[parentJobId],
+                      completedChunks: overallProgress.completedChunks
+                    }
+                  }));
+                  
+                  // Create a synthetic status update for the parent job for UI purposes only
+                  if (onJobUpdate && chunk.chunkIndex === 0) {
+                    const parentJob: BatchJob = {
+                      ...updatedJob,
+                      id: parentJobId,
+                      status: overallProgress.completedChunks === chunks.length ? 'completed' : 'in_progress'
+                    };
                     onJobUpdate(parentJob);
                   }
 
@@ -113,7 +130,6 @@ export const useChunkedBatchManager = () => {
                 // Handle individual chunk completion
                 console.log(`[CHUNKED BATCH] Chunk ${chunk.chunkIndex + 1} completed with ${results.length} results`);
                 
-                const parentJobId = firstChunkJobId;
                 setChunkResults(prevResults => ({
                   ...prevResults,
                   [parentJobId]: [...(prevResults[parentJobId] || []), ...results]
@@ -156,10 +172,10 @@ export const useChunkedBatchManager = () => {
         }
       }
 
-      // Store chunk jobs using the first chunk job ID as parent
-      setChunkJobs(prevJobs => ({ ...prevJobs, [firstChunkJobId]: chunkJobResults }));
-      setChunkProgress(prevProgress => ({ ...prevProgress, [firstChunkJobId]: {} }));
-      setChunkResults(prevResults => ({ ...prevResults, [firstChunkJobId]: [] }));
+      // Store chunk jobs using the parent job ID (first chunk's real OpenAI job ID)
+      setChunkJobs(prevJobs => ({ ...prevJobs, [parentJobId]: chunkJobResults }));
+      setChunkProgress(prevProgress => ({ ...prevProgress, [parentJobId]: {} }));
+      setChunkResults(prevResults => ({ ...prevResults, [parentJobId]: [] }));
 
       toast({
         title: "Large File Processing Started",
@@ -175,15 +191,21 @@ export const useChunkedBatchManager = () => {
     }
   }, [createBatchWithFallback, initializeSmartState, startIntelligentMonitoring, getSmartState, toast]);
 
-  const getChunkedProgress = useCallback((parentJobId: string) => {
-    const progress = chunkProgress[parentJobId] || {};
+  const getChunkedProgress = useCallback((jobId: string) => {
+    const progress = chunkProgress[jobId] || {};
     return calculateChunkedProgress(progress);
   }, [chunkProgress]);
+
+  const isChunkedJob = useCallback((jobId: string) => {
+    return parentJobMetadata[jobId]?.isChunked || false;
+  }, [parentJobMetadata]);
 
   return {
     createChunkedBatchJob,
     getChunkedProgress,
+    isChunkedJob,
     chunkJobs,
-    chunkProgress
+    chunkProgress,
+    parentJobMetadata
   };
 };

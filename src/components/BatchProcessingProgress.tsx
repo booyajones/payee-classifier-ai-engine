@@ -71,7 +71,7 @@ const BatchProcessingProgress = ({
         {isChunked && totalChunks > 1 && (
           <div className="flex items-center gap-1">
             <Package className="h-3 w-3" />
-            <span>Processing in {totalChunks} chunks - {completedChunks} completed</span>
+            <span>Processing large file in {totalChunks} chunks - {completedChunks} completed</span>
           </div>
         )}
 
@@ -91,7 +91,7 @@ const BatchProcessingProgress = ({
         {progress > 0 && !isComplete && !hasError && (
           <div>
             {isChunked && totalChunks > 1 
-              ? `Large file split into ${totalChunks} chunks for efficient processing. You can safely leave this page.`
+              ? `Large file automatically split into ${totalChunks} chunks for efficient processing. You can safely leave this page.`
               : "Processing may take several minutes for large files. You can safely leave this page - your progress will be saved."
             }
           </div>

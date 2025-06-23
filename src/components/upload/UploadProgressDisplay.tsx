@@ -1,6 +1,7 @@
 
 import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { useUnifiedProgress } from '@/contexts/UnifiedProgressContext';
+import { useSmartBatchManager } from '@/hooks/useSmartBatchManager';
 import BatchProcessingProgress from '../BatchProcessingProgress';
 import { UploadState } from '@/hooks/useSmartFileUpload';
 
@@ -11,6 +12,7 @@ interface UploadProgressDisplayProps {
 
 const UploadProgressDisplay = ({ uploadState, uploadId }: UploadProgressDisplayProps) => {
   const { getProgress } = useUnifiedProgress();
+  const { getSmartState } = useSmartBatchManager();
   const currentProgress = getProgress(uploadId);
 
   const getStatusIcon = () => {
@@ -30,6 +32,9 @@ const UploadProgressDisplay = ({ uploadState, uploadId }: UploadProgressDisplayP
     return null;
   }
 
+  // Get enhanced state info if we have a job ID
+  const smartState = currentProgress.jobId ? getSmartState(currentProgress.jobId) : null;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -38,7 +43,12 @@ const UploadProgressDisplay = ({ uploadState, uploadId }: UploadProgressDisplayP
       </div>
       <BatchProcessingProgress 
         progress={currentProgress.percentage} 
-        status={currentProgress.stage} 
+        status={currentProgress.stage}
+        isChunked={smartState?.isChunked || false}
+        completedChunks={smartState?.completedChunks || 0}
+        totalChunks={smartState?.totalChunks || 0}
+        isComplete={uploadState === 'complete'}
+        hasError={uploadState === 'error'}
       />
       {currentProgress.jobId && (
         <p className="text-xs text-muted-foreground">
@@ -46,7 +56,10 @@ const UploadProgressDisplay = ({ uploadState, uploadId }: UploadProgressDisplayP
         </p>
       )}
       <p className="text-sm text-muted-foreground">
-        This may take a few minutes depending on file size. You can leave this page - we'll save your progress.
+        {smartState?.isChunked 
+          ? "Large file processing: Multiple batch jobs are running in parallel. This may take several minutes."
+          : "This may take a few minutes depending on file size. You can leave this page - we'll save your progress."
+        }
       </p>
     </div>
   );
