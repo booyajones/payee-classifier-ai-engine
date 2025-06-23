@@ -82,10 +82,10 @@ export const useChunkedBatchManager = () => {
               (updatedJob) => {
                 // Update individual chunk progress
                 const smartState = getSmartState(updatedJob.id);
-                setChunkProgress(prev => ({
-                  ...prev,
+                setChunkProgress(prevProgress => ({
+                  ...prevProgress,
                   [parentJobId]: {
-                    ...prev[parentJobId],
+                    ...prevProgress[parentJobId],
                     [updatedJob.id]: {
                       current: Math.round((smartState.progress / 100) * chunk.uniquePayeeNames.length),
                       total: chunk.uniquePayeeNames.length,
@@ -95,33 +95,37 @@ export const useChunkedBatchManager = () => {
                 }));
 
                 // Calculate and report overall progress
-                const currentProgress = { ...prev[parentJobId] };
-                currentProgress[updatedJob.id] = {
-                  current: Math.round((smartState.progress / 100) * chunk.uniquePayeeNames.length),
-                  total: chunk.uniquePayeeNames.length,
-                  status: smartState.currentStage
-                };
+                setChunkProgress(currentProgress => {
+                  const updatedProgress = { ...currentProgress[parentJobId] };
+                  updatedProgress[updatedJob.id] = {
+                    current: Math.round((smartState.progress / 100) * chunk.uniquePayeeNames.length),
+                    total: chunk.uniquePayeeNames.length,
+                    status: smartState.currentStage
+                  };
 
-                const overallProgress = calculateChunkedProgress(currentProgress);
-                
-                // Create a synthetic parent job for progress reporting
-                const parentJob: BatchJob = {
-                  ...updatedJob,
-                  id: parentJobId,
-                  status: overallProgress.completedChunks === chunks.length ? 'completed' : 'in_progress'
-                };
+                  const overallProgress = calculateChunkedProgress(updatedProgress);
+                  
+                  // Create a synthetic parent job for progress reporting
+                  const parentJob: BatchJob = {
+                    ...updatedJob,
+                    id: parentJobId,
+                    status: overallProgress.completedChunks === chunks.length ? 'completed' : 'in_progress'
+                  };
 
-                if (onJobUpdate) {
-                  onJobUpdate(parentJob);
-                }
+                  if (onJobUpdate) {
+                    onJobUpdate(parentJob);
+                  }
+
+                  return currentProgress;
+                });
               },
               (results, summary, jobId) => {
                 // Handle individual chunk completion
                 console.log(`[CHUNKED BATCH] Chunk ${chunk.chunkIndex + 1} completed with ${results.length} results`);
                 
-                setChunkResults(prev => ({
-                  ...prev,
-                  [parentJobId]: [...(prev[parentJobId] || []), ...results]
+                setChunkResults(prevResults => ({
+                  ...prevResults,
+                  [parentJobId]: [...(prevResults[parentJobId] || []), ...results]
                 }));
 
                 completedChunks++;
@@ -130,22 +134,26 @@ export const useChunkedBatchManager = () => {
                 if (completedChunks === chunks.length) {
                   console.log(`[CHUNKED BATCH] All ${chunks.length} chunks completed, consolidating results`);
                   
-                  // Consolidate all results
-                  const allResults = chunkResults[parentJobId] || [];
-                  const consolidatedSummary: BatchProcessingResult = {
-                    results: allResults,
-                    successCount: allResults.filter(r => r.result.processingTier !== 'Failed').length,
-                    failureCount: allResults.filter(r => r.result.processingTier === 'Failed').length,
-                    originalFileData: payeeRowData.originalFileData
-                  };
+                  // Get current results and consolidate
+                  setChunkResults(currentResults => {
+                    const allResults = currentResults[parentJobId] || [];
+                    const consolidatedSummary: BatchProcessingResult = {
+                      results: allResults,
+                      successCount: allResults.filter(r => r.result.processingTier !== 'Failed').length,
+                      failureCount: allResults.filter(r => r.result.processingTier === 'Failed').length,
+                      originalFileData: payeeRowData.originalFileData
+                    };
 
-                  if (onJobComplete) {
-                    onJobComplete(allResults, consolidatedSummary, parentJobId);
-                  }
+                    if (onJobComplete) {
+                      onJobComplete(allResults, consolidatedSummary, parentJobId);
+                    }
+
+                    return currentResults;
+                  });
 
                   toast({
                     title: "Chunked Processing Complete",
-                    description: `Successfully processed ${allResults.length} classifications from ${chunks.length} chunks.`,
+                    description: `Successfully processed classifications from ${chunks.length} chunks.`,
                   });
                 }
               }
@@ -181,7 +189,7 @@ export const useChunkedBatchManager = () => {
       console.error('[CHUNKED BATCH] Failed to create chunked batch job:', error);
       throw error;
     }
-  }, [createBatchWithFallback, initializeSmartState, startIntelligentMonitoring, getSmartState, toast, chunkResults]);
+  }, [createBatchWithFallback, initializeSmartState, startIntelligentMonitoring, getSmartState, toast]);
 
   const getChunkedProgress = useCallback((parentJobId: string) => {
     const progress = chunkProgress[parentJobId] || {};

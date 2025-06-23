@@ -83,9 +83,7 @@ export const createPayeeRowDataFromChunk = (chunk: FileChunk, originalPayeeRowDa
   return {
     uniquePayeeNames: chunk.uniquePayeeNames,
     originalFileData: chunk.originalFileData,
-    rowMappings: chunk.rowMappings,
-    selectedPayeeColumn: originalPayeeRowData.selectedPayeeColumn,
-    fileName: `${originalPayeeRowData.fileName} (Chunk ${chunk.chunkIndex + 1}/${chunk.totalChunks})`
+    rowMappings: chunk.rowMappings
   };
 };
 
