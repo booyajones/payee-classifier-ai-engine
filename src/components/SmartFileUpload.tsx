@@ -1,6 +1,7 @@
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileCheck } from 'lucide-react';
-import { useUnifiedBatchManager } from '@/hooks/useUnifiedBatchManager';
+import { useBatchManager } from '@/hooks/useBatchManager';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
 import { PayeeRowData } from '@/lib/rowMapping';
@@ -21,7 +22,7 @@ interface SmartFileUploadProps {
 }
 
 const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileUploadProps) => {
-  const { createBatch } = useUnifiedBatchManager();
+  const { createBatch } = useBatchManager();
   
   const {
     uploadState,
