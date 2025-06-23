@@ -7,7 +7,7 @@ import { useChunkedBatchManager } from './useChunkedBatchManager';
 import { useSmartBatchMonitoring } from './useSmartBatchMonitoring';
 
 export const useSmartBatchManager = () => {
-  const { createChunkedBatchJob, getChunkedProgress } = useChunkedBatchManager();
+  const { createChunkedBatchJob, getChunkedProgress, chunkJobs } = useChunkedBatchManager();
   const { getSmartState, cleanup } = useSmartBatchMonitoring();
 
   const createSmartBatchJob = useCallback(async (
@@ -23,8 +23,10 @@ export const useSmartBatchManager = () => {
   }, [createChunkedBatchJob]);
 
   const getEnhancedSmartState = useCallback((jobId: string) => {
-    // Check if this is a chunked job
-    if (jobId.startsWith('chunked-')) {
+    // Check if this is a chunked job by looking in our chunk jobs map
+    const isChunkedJob = Object.keys(chunkJobs).includes(jobId);
+    
+    if (isChunkedJob) {
       const chunkedProgress = getChunkedProgress(jobId);
       return {
         isProcessing: chunkedProgress.completedChunks < chunkedProgress.totalChunks,
@@ -37,7 +39,7 @@ export const useSmartBatchManager = () => {
 
     // Regular job state
     return getSmartState(jobId);
-  }, [getSmartState, getChunkedProgress]);
+  }, [getSmartState, getChunkedProgress, chunkJobs]);
 
   return {
     createSmartBatchJob,
