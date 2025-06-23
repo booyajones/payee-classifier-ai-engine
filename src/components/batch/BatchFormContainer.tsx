@@ -16,6 +16,12 @@ interface BatchFormContainerProps {
 const BatchFormContainer = ({ onBatchClassify, onComplete }: BatchFormContainerProps) => {
   const batchManager = useBatchManager();
   const formState = useSimplifiedBatchForm();
+  const [renderKey, setRenderKey] = useState(0);
+
+  // Force re-render when jobs change
+  useEffect(() => {
+    setRenderKey(prev => prev + 1);
+  }, [batchManager.jobs.length]);
 
   // Show loading until batch manager has loaded existing jobs
   if (!batchManager.isLoaded) {
@@ -32,6 +38,9 @@ const BatchFormContainer = ({ onBatchClassify, onComplete }: BatchFormContainerP
     // Just switch to jobs tab to show it
     console.log(`[BATCH CONTAINER] Job ${batchJob.id} created, switching to jobs tab`);
     formState.setActiveTab("jobs");
+    
+    // Force a re-render to ensure the new job shows up
+    setRenderKey(prev => prev + 1);
   };
 
   const handleJobComplete = (
@@ -52,10 +61,10 @@ const BatchFormContainer = ({ onBatchClassify, onComplete }: BatchFormContainerP
     }
   };
 
-  console.log(`[BATCH CONTAINER] Rendering with ${batchManager.jobs.length} jobs`);
+  console.log(`[BATCH CONTAINER] Rendering with ${batchManager.jobs.length} jobs (key: ${renderKey})`);
 
   return (
-    <Card>
+    <Card key={renderKey}>
       <BatchFormHeader />
       <CardContent>
         <BatchFormContent

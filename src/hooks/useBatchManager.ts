@@ -77,16 +77,22 @@ export const useBatchManager = () => {
         return null;
       }
 
-      // Save to database and update state
+      // Save to database first
       await saveBatchJob(job, payeeRowData);
       
-      setState(prev => ({
-        ...prev,
-        jobs: [...prev.jobs, job],
-        payeeDataMap: { ...prev.payeeDataMap, [job.id]: payeeRowData }
-      }));
-      
-      console.log(`[BATCH MANAGER] Job ${job.id} added to state. Total jobs: ${state.jobs.length + 1}`);
+      // Then update state immediately to ensure UI updates
+      setState(prev => {
+        const updatedJobs = [...prev.jobs, job];
+        const updatedPayeeDataMap = { ...prev.payeeDataMap, [job.id]: payeeRowData };
+        
+        console.log(`[BATCH MANAGER] Job ${job.id} added to state. Total jobs: ${updatedJobs.length}`);
+        
+        return {
+          ...prev,
+          jobs: updatedJobs,
+          payeeDataMap: updatedPayeeDataMap
+        };
+      });
       
       return job;
 
@@ -103,7 +109,7 @@ export const useBatchManager = () => {
       
       throw error;
     }
-  }, [toast, state.jobs.length]);
+  }, [toast]);
 
   const updateJob = useCallback(async (updatedJob: BatchJob, silent: boolean = true) => {
     try {
