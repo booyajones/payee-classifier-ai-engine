@@ -44,9 +44,18 @@ export const useBatchJobActions = ({
 
   const { handleCancelJob, handleCancelDownload } = useBatchJobCancellation(onJobUpdate);
 
+  // Manual refresh (user-initiated) - shows toast
   const handleRefreshJob = async (jobId: string) => {
     const refreshFunction = async () => {
-      await baseHandleRefreshJob(jobId);
+      await baseHandleRefreshJob(jobId, false); // false = not silent, show toast
+    };
+    await refreshSpecificJob(jobId, refreshFunction);
+  };
+
+  // Auto refresh (system-initiated) - silent
+  const handleAutoRefreshJob = async (jobId: string) => {
+    const refreshFunction = async () => {
+      await baseHandleRefreshJob(jobId, true); // true = silent, no toast
     };
     await refreshSpecificJob(jobId, refreshFunction);
   };
@@ -69,6 +78,7 @@ export const useBatchJobActions = ({
     downloadProgress,
     pollingStates,
     handleRefreshJob,
+    handleAutoRefreshJob, // Add silent version for auto-polling
     handleDownloadResults,
     handleCancelDownload: (jobId: string) => {
       cancelDownload(jobId);

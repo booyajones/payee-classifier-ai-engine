@@ -1,4 +1,3 @@
-
 import { useCallback } from 'react';
 import { BatchJob, createBatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
@@ -12,6 +11,7 @@ interface BatchCreationOptions {
   description?: string;
   onJobUpdate?: (job: BatchJob) => void;
   onJobComplete?: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void;
+  silent?: boolean;
 }
 
 export const useConsolidatedBatchManager = () => {
@@ -21,7 +21,7 @@ export const useConsolidatedBatchManager = () => {
     payeeRowData: PayeeRowData,
     options: BatchCreationOptions = {}
   ): Promise<BatchJob | null> => {
-    const { description, onJobUpdate, onJobComplete } = options;
+    const { description, onJobUpdate, onJobComplete, silent = false } = options;
     
     console.log(`[CONSOLIDATED BATCH] Creating batch job for ${payeeRowData.uniquePayeeNames.length} unique payees`);
     
@@ -33,10 +33,13 @@ export const useConsolidatedBatchManager = () => {
       if (payeeRowData.uniquePayeeNames.length > 45000) {
         console.log(`[CONSOLIDATED BATCH] Large file detected, using local processing`);
         
-        toast({
-          title: "Large File Processing",
-          description: "Using enhanced local processing for large file",
-        });
+        // Only show toast for large file processing (user needs to know this is different)
+        if (!silent) {
+          toast({
+            title: "Large File Processing",
+            description: "Using enhanced local processing for large file",
+          });
+        }
 
         const result = await batchProcessingService.processBatch(
           payeeRowData.uniquePayeeNames,
@@ -61,16 +64,14 @@ export const useConsolidatedBatchManager = () => {
       // Save to database - pass the job and payeeRowData
       await saveBatchJob(job, payeeRowData);
       
-      toast({
-        title: "Batch Job Created",
-        description: `Job ${job.id.substring(0, 8)}... created successfully`,
-      });
+      // Remove toast for normal batch job creation - user can see it in the UI
 
       return job;
 
     } catch (error) {
       console.error('[CONSOLIDATED BATCH] Batch job creation failed:', error);
       
+      // Keep error toasts - users need to know about failures
       toast({
         title: "Batch Creation Failed",
         description: error instanceof Error ? error.message : 'Unknown error occurred',

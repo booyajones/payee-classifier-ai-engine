@@ -1,4 +1,3 @@
-
 import { useCallback, useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { BatchJob, createBatchJob } from '@/lib/openai/trueBatchAPI';
@@ -20,6 +19,7 @@ interface BatchCreationOptions {
   description?: string;
   onJobUpdate?: (job: BatchJob) => void;
   onJobComplete?: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void;
+  silent?: boolean; // Add option to suppress toasts
 }
 
 export const useUnifiedBatchManager = () => {
@@ -60,7 +60,7 @@ export const useUnifiedBatchManager = () => {
     payeeRowData: PayeeRowData,
     options: BatchCreationOptions = {}
   ): Promise<BatchJob | null> => {
-    const { description, onJobUpdate, onJobComplete } = options;
+    const { description, onJobUpdate, onJobComplete, silent = false } = options;
     
     console.log(`[UNIFIED BATCH] Creating batch for ${payeeRowData.uniquePayeeNames.length} payees`);
     
@@ -72,10 +72,13 @@ export const useUnifiedBatchManager = () => {
       if (payeeRowData.uniquePayeeNames.length > 45000) {
         console.log(`[UNIFIED BATCH] Large file detected, using local processing`);
         
-        toast({
-          title: "Large File Processing",
-          description: "Processing large file locally with enhanced algorithms",
-        });
+        // Only show toast for large file processing (user needs to know this is different)
+        if (!silent) {
+          toast({
+            title: "Large File Processing",
+            description: "Processing large file locally with enhanced algorithms",
+          });
+        }
 
         const result = await batchProcessingService.processBatch(
           payeeRowData.uniquePayeeNames,
@@ -107,16 +110,15 @@ export const useUnifiedBatchManager = () => {
       
       console.log(`[UNIFIED BATCH] Job ${job.id} added to state. Total jobs: ${state.jobs.length + 1}`);
       
-      toast({
-        title: "Batch Job Created",
-        description: `Job ${job.id.substring(0, 8)}... created successfully`,
-      });
+      // Remove toast for batch job creation - user can see it in the UI
+      // Only show toast on errors or special cases
 
       return job;
 
     } catch (error) {
       console.error('[UNIFIED BATCH] Creation failed:', error);
       
+      // Keep error toasts - users need to know about failures
       toast({
         title: "Batch Creation Failed",
         description: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -127,7 +129,7 @@ export const useUnifiedBatchManager = () => {
     }
   }, [toast, state.jobs.length]);
 
-  const updateJob = useCallback(async (updatedJob: BatchJob) => {
+  const updateJob = useCallback(async (updatedJob: BatchJob, silent: boolean = true) => {
     try {
       await updateBatchJobStatus(updatedJob);
       setState(prev => ({
@@ -135,6 +137,8 @@ export const useUnifiedBatchManager = () => {
         jobs: prev.jobs.map(job => job.id === updatedJob.id ? updatedJob : job)
       }));
       console.log(`[UNIFIED BATCH] Job ${updatedJob.id} updated in state`);
+      
+      // Don't show toast for routine job updates - user can see status in UI
     } catch (error) {
       console.error('[UNIFIED BATCH] Update failed:', error);
       setState(prev => ({
@@ -160,6 +164,7 @@ export const useUnifiedBatchManager = () => {
       
       console.log(`[UNIFIED BATCH] Job ${jobId} removed from state`);
       
+      // Keep toast for destructive actions - user needs confirmation
       toast({
         title: "Job Deleted",
         description: `Job ${jobId.slice(-8)} removed successfully`,
@@ -187,6 +192,7 @@ export const useUnifiedBatchManager = () => {
         isLoaded: true
       });
       
+      // Keep toast for bulk destructive actions - user needs confirmation
       toast({
         title: "All Jobs Cleared",
         description: "All batch jobs have been removed",
@@ -201,7 +207,7 @@ export const useUnifiedBatchManager = () => {
     }
   }, [state.jobs, toast]);
 
-  const refreshJobs = useCallback(async () => {
+  const refreshJobs = useCallback(async (silent: boolean = true) => {
     try {
       console.log('[UNIFIED BATCH] Refreshing jobs from database...');
       const { jobs, payeeRowDataMap } = await loadAllBatchJobs();
@@ -213,6 +219,8 @@ export const useUnifiedBatchManager = () => {
       }));
       
       console.log(`[UNIFIED BATCH] Refreshed ${jobs.length} jobs`);
+      
+      // Don't show toast for routine refreshes
     } catch (error) {
       console.error('[UNIFIED BATCH] Failed to refresh jobs:', error);
     }

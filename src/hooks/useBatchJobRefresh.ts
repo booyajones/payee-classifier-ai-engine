@@ -23,7 +23,7 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
     }
   });
 
-  const handleRefreshJob = async (jobId: string) => {
+  const handleRefreshJob = async (jobId: string, silent: boolean = false) => {
     setRefreshingJobs(prev => new Set(prev).add(jobId));
     try {
       console.log(`[JOB REFRESH] Refreshing job ${jobId}`);
@@ -31,17 +31,20 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
       console.log(`[JOB REFRESH] Job ${jobId} updated status:`, updatedJob.status);
       onJobUpdate(updatedJob);
       
-      toast({
-        title: "Job Status Updated",
-        description: `Job status refreshed: ${updatedJob.status}`,
-      });
+      // Only show toast for user-initiated refreshes, not automatic polling
+      if (!silent) {
+        toast({
+          title: "Job Status Updated",
+          description: `Job status refreshed: ${updatedJob.status}`,
+        });
+      }
     } catch (error) {
       const appError = handleError(error, 'Job Status Refresh');
       console.error(`[JOB REFRESH] Error refreshing job ${jobId}:`, error);
       
       showRetryableErrorToast(
         appError, 
-        () => handleRefreshJob(jobId),
+        () => handleRefreshJob(jobId, silent),
         'Job Refresh'
       );
       throw error;
