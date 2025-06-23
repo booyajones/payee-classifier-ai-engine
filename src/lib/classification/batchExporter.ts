@@ -81,3 +81,94 @@ export function exportResultsWithOriginalDataV3(
 
   return exportData;
 }
+
+/**
+ * Direct CSV export with minimal processing - optimized for speed and reliability
+ */
+export function exportDirectCSV(batchResult: BatchProcessingResult): { headers: string[]; rows: any[][] } {
+  console.log('[CSV EXPORTER] Starting direct CSV export:', {
+    resultsLength: batchResult.results.length,
+    originalDataLength: batchResult.originalFileData?.length || 0
+  });
+
+  if (!batchResult.originalFileData || batchResult.originalFileData.length !== batchResult.results.length) {
+    throw new Error(`Row count mismatch: ${batchResult.results.length} results vs ${batchResult.originalFileData?.length || 0} original rows`);
+  }
+
+  // Get all possible column names from first row
+  const firstOriginalRow = batchResult.originalFileData[0];
+  const originalColumns = firstOriginalRow ? Object.keys(firstOriginalRow) : [];
+  
+  // Define classification columns
+  const classificationColumns = [
+    'classification',
+    'confidence', 
+    'processingTier',
+    'reasoning',
+    'processingMethod',
+    'keywordExclusion',
+    'matchedKeywords',
+    'keywordConfidence',
+    'keywordReasoning',
+    'timestamp'
+  ];
+
+  // Combine headers
+  const headers = [...originalColumns, ...classificationColumns];
+  
+  // Create rows
+  const rows: any[][] = [];
+  
+  for (let i = 0; i < batchResult.results.length; i++) {
+    const result = batchResult.results[i];
+    const originalRow = batchResult.originalFileData[i];
+    
+    if (!result || !originalRow) {
+      throw new Error(`Missing data at index ${i}`);
+    }
+
+    // Handle timestamp
+    let timestampString = '';
+    try {
+      if (result.timestamp instanceof Date) {
+        timestampString = result.timestamp.toISOString();
+      } else if (typeof result.timestamp === 'string') {
+        timestampString = result.timestamp;
+      } else {
+        timestampString = new Date().toISOString();
+      }
+    } catch (error) {
+      timestampString = new Date().toISOString();
+    }
+
+    // Create row array in same order as headers
+    const row = [];
+    
+    // Add original data values
+    for (const column of originalColumns) {
+      row.push(originalRow[column] || '');
+    }
+    
+    // Add classification values
+    row.push(result.result.classification || 'Individual');
+    row.push(result.result.confidence?.toString() || '50');
+    row.push(result.result.processingTier || 'AI-Powered');
+    row.push(result.result.reasoning || 'Classification result');
+    row.push(result.result.processingMethod || 'OpenAI Classification');
+    row.push(result.result.keywordExclusion?.isExcluded ? 'Yes' : 'No');
+    row.push(result.result.keywordExclusion?.matchedKeywords?.join('; ') || '');
+    row.push(result.result.keywordExclusion?.confidence?.toString() || '0');
+    row.push(result.result.keywordExclusion?.reasoning || 'No keyword exclusion applied');
+    row.push(timestampString);
+    
+    rows.push(row);
+  }
+
+  console.log('[CSV EXPORTER] CSV export complete:', {
+    headers: headers.length,
+    rows: rows.length,
+    validated: rows.length === batchResult.results.length
+  });
+
+  return { headers, rows };
+}

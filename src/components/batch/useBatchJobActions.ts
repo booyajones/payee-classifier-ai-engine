@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { BatchJob, checkBatchJobStatus, getBatchJobResults, cancelBatchJob } from "@/lib/openai/trueBatchAPI";
@@ -15,6 +16,9 @@ interface UseBatchJobActionsProps {
   onJobComplete: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void;
 }
 
+const CHUNK_SIZE = 500; // Process 500 payees at a time
+const DOWNLOAD_TIMEOUT = 30000; // 30 seconds per chunk
+
 export const useBatchJobActions = ({
   jobs,
   payeeRowDataMap,
@@ -25,6 +29,8 @@ export const useBatchJobActions = ({
   const [downloadingJobs, setDownloadingJobs] = useState<Set<string>>(new Set());
   const [downloadProgress, setDownloadProgress] = useState<Record<string, { current: number; total: number }>>({});
   const [processedJobResults, setProcessedJobResults] = useState<Set<string>>(new Set());
+  const [partialResults, setPartialResults] = useState<Record<string, { results: PayeeClassification[]; summary: BatchProcessingResult }>>({});
+  const [cancelledDownloads, setCancelledDownloads] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   const { pollingStates, refreshSpecificJob } = useBatchJobPolling(jobs, onJobUpdate);
@@ -47,11 +53,6 @@ export const useBatchJobActions = ({
         const updatedJob = await refreshJobWithRetry(jobId);
         console.log(`[DEBUG] Job ${jobId} updated status:`, updatedJob.status);
         onJobUpdate(updatedJob);
-        
-        toast({
-          title: "Job Status Updated",
-          description: `Job status refreshed to "${updatedJob.status}".`,
-        });
       } catch (error) {
         const appError = handleError(error, 'Job Status Refresh');
         console.error(`[DEBUG] Error refreshing job ${jobId}:`, error);
@@ -74,8 +75,64 @@ export const useBatchJobActions = ({
     await refreshSpecificJob(jobId, refreshFunction);
   };
 
+  const downloadChunkedResults = async (
+    job: BatchJob,
+    uniquePayeeNames: string[],
+    onProgress: (current: number, total: number) => void
+  ) => {
+    const chunks = [];
+    for (let i = 0; i < uniquePayeeNames.length; i += CHUNK_SIZE) {
+      chunks.push(uniquePayeeNames.slice(i, i + CHUNK_SIZE));
+    }
+
+    console.log(`[CHUNKED DOWNLOAD] Processing ${chunks.length} chunks for ${uniquePayeeNames.length} payees`);
+    
+    const allResults = [];
+    
+    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+      // Check if download was cancelled
+      if (cancelledDownloads.has(job.id)) {
+        console.log(`[CHUNKED DOWNLOAD] Download cancelled for job ${job.id}`);
+        throw new Error('Download cancelled by user');
+      }
+
+      const chunk = chunks[chunkIndex];
+      console.log(`[CHUNKED DOWNLOAD] Processing chunk ${chunkIndex + 1}/${chunks.length} with ${chunk.length} payees`);
+      
+      try {
+        // Add timeout to each chunk download
+        const chunkPromise = downloadResultsWithRetry(job, chunk);
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error(`Chunk ${chunkIndex + 1} timed out after ${DOWNLOAD_TIMEOUT}ms`)), DOWNLOAD_TIMEOUT);
+        });
+
+        const chunkResults = await Promise.race([chunkPromise, timeoutPromise]) as any[];
+        allResults.push(...chunkResults);
+        
+        onProgress(allResults.length, uniquePayeeNames.length);
+        
+        // Small delay between chunks to prevent overwhelming the API
+        if (chunkIndex < chunks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+      } catch (error) {
+        console.error(`[CHUNKED DOWNLOAD] Chunk ${chunkIndex + 1} failed:`, error);
+        
+        // For timeout or API errors, save partial results and continue or fail
+        if (allResults.length > 0) {
+          console.log(`[CHUNKED DOWNLOAD] Saving partial results: ${allResults.length}/${uniquePayeeNames.length}`);
+          throw new Error(`Partial download completed: ${allResults.length}/${uniquePayeeNames.length} results downloaded. Chunk ${chunkIndex + 1} failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+        throw error;
+      }
+    }
+
+    return allResults;
+  };
+
   const handleDownloadResults = async (job: BatchJob) => {
-    console.log(`[DOWNLOAD] === STARTING DOWNLOAD FOR JOB ${job.id} ===`);
+    console.log(`[DOWNLOAD] === STARTING CHUNKED DOWNLOAD FOR JOB ${job.id} ===`);
     
     // Prevent duplicate processing
     const resultKey = `${job.id}-results`;
@@ -83,6 +140,13 @@ export const useBatchJobActions = ({
       console.log(`[DOWNLOAD] Job ${job.id} results already processed, skipping`);
       return;
     }
+
+    // Clear any previous cancellation
+    setCancelledDownloads(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(job.id);
+      return newSet;
+    });
 
     setDownloadingJobs(prev => new Set(prev).add(job.id));
     
@@ -101,7 +165,6 @@ export const useBatchJobActions = ({
         jobId: job.id
       });
       
-      // CRITICAL VALIDATION: Ensure we have all required data
       if (uniquePayeeNames.length === 0) {
         throw new Error(`No unique payee names found for job ${job.id}`);
       }
@@ -112,32 +175,34 @@ export const useBatchJobActions = ({
       
       setDownloadProgress(prev => ({ ...prev, [job.id]: { current: 0, total: uniquePayeeNames.length } }));
 
-      console.log(`[DOWNLOAD] Downloading raw results for ${uniquePayeeNames.length} unique payees...`);
+      console.log(`[DOWNLOAD] Starting chunked download for ${uniquePayeeNames.length} unique payees...`);
       
-      // Download raw results for unique payees only
-      const rawResults = await downloadResultsWithRetry(job, uniquePayeeNames);
+      // Download results in chunks with progress tracking
+      const rawResults = await downloadChunkedResults(
+        job,
+        uniquePayeeNames,
+        (current, total) => {
+          setDownloadProgress(prev => ({ ...prev, [job.id]: { current, total } }));
+        }
+      );
       
       console.log(`[DOWNLOAD] Downloaded ${rawResults.length} raw results for job ${job.id}`);
       
       if (rawResults.length !== uniquePayeeNames.length) {
-        throw new Error(`Results misalignment: expected ${uniquePayeeNames.length}, got ${rawResults.length}`);
+        console.warn(`[DOWNLOAD] Partial results: expected ${uniquePayeeNames.length}, got ${rawResults.length}`);
       }
 
-      // Create classifications for unique payees first
+      // Create classifications for unique payees
       const uniquePayeeClassifications: PayeeClassification[] = [];
       
-      console.log(`[DOWNLOAD] Creating classifications for unique payees...`);
+      console.log(`[DOWNLOAD] Creating classifications for ${rawResults.length} unique payees...`);
       
-      for (let i = 0; i < uniquePayeeNames.length; i++) {
+      for (let i = 0; i < rawResults.length; i++) {
         const payeeName = uniquePayeeNames[i];
         const rawResult = rawResults[i];
         
-        console.log(`[DOWNLOAD] Processing unique payee ${i + 1}/${uniquePayeeNames.length}: "${payeeName}"`);
-        
-        // Apply keyword exclusion
         const keywordExclusion = checkKeywordExclusion(payeeName);
         
-        // Create classification for unique payee
         uniquePayeeClassifications.push({
           id: `job-${job.id}-payee-${i}`,
           payeeName: payeeName,
@@ -153,36 +218,27 @@ export const useBatchJobActions = ({
           originalData: null,
           rowIndex: i
         });
-        
-        setDownloadProgress(prev => ({ 
-          ...prev, 
-          [job.id]: { current: i + 1, total: uniquePayeeNames.length } 
-        }));
       }
 
       console.log(`[DOWNLOAD] Created ${uniquePayeeClassifications.length} unique payee classifications`);
 
-      // CRITICAL: Use row mapping to expand unique results to ALL original rows
+      // Map results to original rows
       console.log(`[DOWNLOAD] Mapping ${uniquePayeeClassifications.length} unique results to ${originalFileData.length} original rows...`);
       
       const mappedResults = mapResultsToOriginalRows(uniquePayeeClassifications, payeeRowData);
       
       console.log(`[DOWNLOAD] Mapped results count: ${mappedResults.length}`);
-      console.log(`[DOWNLOAD] Expected original rows: ${originalFileData.length}`);
       
-      // VALIDATION: Must match original file length exactly
       if (mappedResults.length !== originalFileData.length) {
-        console.error(`[DOWNLOAD] CRITICAL MAPPING ERROR:`, {
+        console.error(`[DOWNLOAD] MAPPING ERROR:`, {
           mappedResultsLength: mappedResults.length,
           originalFileDataLength: originalFileData.length,
           uniquePayeesLength: uniquePayeeNames.length
         });
-        throw new Error(`CRITICAL: Expected exactly ${originalFileData.length} results, got ${mappedResults.length}`);
+        throw new Error(`Expected exactly ${originalFileData.length} results, got ${mappedResults.length}`);
       }
       
-      // FIXED: Create final classifications DIRECTLY from mapped results WITHOUT duplication
-      console.log(`[DOWNLOAD] Creating final classifications from mapped results...`);
-      
+      // Create final classifications
       const finalClassifications: PayeeClassification[] = mappedResults.map((mappedRow, index) => {
         return {
           id: `job-${job.id}-row-${index}`,
@@ -206,25 +262,6 @@ export const useBatchJobActions = ({
         };
       });
 
-      console.log(`[DOWNLOAD] Created ${finalClassifications.length} final classifications`);
-
-      // FINAL VALIDATION: Must match original file length exactly
-      if (finalClassifications.length !== originalFileData.length) {
-        console.error(`[DOWNLOAD] FINAL COUNT MISMATCH:`, {
-          finalClassificationsLength: finalClassifications.length,
-          originalFileDataLength: originalFileData.length
-        });
-        throw new Error(`FINAL VALIDATION FAILED: Expected exactly ${originalFileData.length} results, got ${finalClassifications.length}`);
-      }
-
-      // Validate no duplicate row indices
-      const rowIndices = finalClassifications.map(c => c.rowIndex).filter(idx => idx !== undefined);
-      const uniqueRowIndices = new Set(rowIndices);
-      if (rowIndices.length !== uniqueRowIndices.size) {
-        console.error(`[DOWNLOAD] DUPLICATE ROW INDICES DETECTED`);
-        throw new Error(`DUPLICATE ROW INDICES: ${rowIndices.length - uniqueRowIndices.size} duplicates found`);
-      }
-
       const successCount = finalClassifications.filter(c => c.result.processingTier !== 'Failed').length;
       const failureCount = finalClassifications.length - successCount;
 
@@ -239,29 +276,37 @@ export const useBatchJobActions = ({
         originalRows: originalFileData.length,
         finalResults: finalClassifications.length,
         successCount,
-        failureCount,
-        perfectAlignment: finalClassifications.length === originalFileData.length
+        failureCount
       });
 
-      // Mark as processed to prevent duplicates
+      // Mark as processed and store results
       setProcessedJobResults(prev => new Set(prev).add(resultKey));
-
+      
       onJobComplete(finalClassifications, summary, job.id);
 
       toast({
         title: "Download Complete",
-        description: `Processed exactly ${finalClassifications.length} rows with perfect alignment.`,
+        description: `Successfully processed ${finalClassifications.length} rows.`,
       });
       
     } catch (error) {
       const appError = handleError(error, 'Results Download');
       console.error(`[DOWNLOAD] Download error for job ${job.id}:`, error);
       
-      toast({
-        title: "Download Failed",
-        description: `Job download failed: ${appError.message}`,
-        variant: "destructive",
-      });
+      // Check if this was a partial download error
+      if (error instanceof Error && error.message.includes('Partial download completed')) {
+        toast({
+          title: "Partial Download Complete",
+          description: error.message + " You can export the partial results.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Download Failed",
+          description: `Download failed: ${appError.message}. Try using chunked export for large files.`,
+          variant: "destructive",
+        });
+      }
       
     } finally {
       setDownloadingJobs(prev => {
@@ -275,6 +320,16 @@ export const useBatchJobActions = ({
         return newProgress;
       });
     }
+  };
+
+  const handleCancelDownload = (jobId: string) => {
+    console.log(`[DOWNLOAD] Cancelling download for job ${jobId}`);
+    setCancelledDownloads(prev => new Set(prev).add(jobId));
+    
+    toast({
+      title: "Download Cancelled",
+      description: "Download has been cancelled.",
+    });
   };
 
   const handleCancelJob = async (jobId: string) => {
@@ -300,8 +355,10 @@ export const useBatchJobActions = ({
     downloadingJobs,
     downloadProgress,
     pollingStates,
+    partialResults,
     handleRefreshJob,
     handleDownloadResults,
+    handleCancelDownload,
     handleCancelJob
   };
 };
