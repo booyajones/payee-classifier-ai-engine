@@ -22,8 +22,8 @@ export const useBatchJobActions = ({
   onJobComplete
 }: UseBatchJobActionsProps) => {
   const { pollingStates, refreshSpecificJob } = useBatchJobPolling(jobs, onJobUpdate);
-  
   const { refreshingJobs, handleRefreshJob: baseHandleRefreshJob } = useBatchJobRefresh(onJobUpdate);
+  const { handleCancelJob, handleCancelDownload } = useBatchJobCancellation(onJobUpdate);
   
   const {
     downloadingJobs,
@@ -42,27 +42,17 @@ export const useBatchJobActions = ({
     updateProgress
   });
 
-  const { handleCancelJob, handleCancelDownload } = useBatchJobCancellation(onJobUpdate);
-
   // Manual refresh (user-initiated) - shows toast
   const handleRefreshJob = async (jobId: string) => {
-    const refreshFunction = async () => {
-      await baseHandleRefreshJob(jobId, false); // false = not silent, show toast
-    };
-    await refreshSpecificJob(jobId, refreshFunction);
+    await refreshSpecificJob(jobId, () => baseHandleRefreshJob(jobId, false));
   };
 
   // Auto refresh (system-initiated) - silent
   const handleAutoRefreshJob = async (jobId: string) => {
-    const refreshFunction = async () => {
-      await baseHandleRefreshJob(jobId, true); // true = silent, no toast
-    };
-    await refreshSpecificJob(jobId, refreshFunction);
+    await refreshSpecificJob(jobId, () => baseHandleRefreshJob(jobId, true));
   };
 
   const handleDownloadResults = async (job: BatchJob) => {
-    const resultKey = `${job.id}-results`;
-    
     startDownload(job.id);
     
     try {
@@ -72,18 +62,23 @@ export const useBatchJobActions = ({
     }
   };
 
+  const handleCancelDownloadWithCleanup = (jobId: string) => {
+    cancelDownload(jobId);
+    handleCancelDownload(jobId);
+  };
+
   return {
+    // State
     refreshingJobs,
     downloadingJobs,
     downloadProgress,
     pollingStates,
+    
+    // Actions
     handleRefreshJob,
-    handleAutoRefreshJob, // Add silent version for auto-polling
+    handleAutoRefreshJob,
     handleDownloadResults,
-    handleCancelDownload: (jobId: string) => {
-      cancelDownload(jobId);
-      handleCancelDownload(jobId);
-    },
+    handleCancelDownload: handleCancelDownloadWithCleanup,
     handleCancelJob
   };
 };

@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
-import { useUnifiedBatchManager } from "@/hooks/useUnifiedBatchManager";
+import { useBatchManager } from "@/hooks/useBatchManager";
 import { useSimplifiedBatchForm } from "@/hooks/useSimplifiedBatchForm";
 import BatchJobLoader from "./BatchJobLoader";
 import BatchFormHeader from "./BatchFormHeader";
@@ -14,7 +14,7 @@ interface BatchFormContainerProps {
 }
 
 const BatchFormContainer = ({ onBatchClassify, onComplete }: BatchFormContainerProps) => {
-  const batchManager = useUnifiedBatchManager();
+  const batchManager = useBatchManager();
   const formState = useSimplifiedBatchForm();
 
   // Show loading until batch manager has loaded existing jobs

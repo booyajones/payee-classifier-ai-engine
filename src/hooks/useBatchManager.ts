@@ -1,11 +1,11 @@
+
 import { useCallback, useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
-import { BatchJob, createBatchJob } from '@/lib/openai/trueBatchAPI';
+import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
+import { batchCreationService } from '@/lib/services/batchCreationService';
 import { saveBatchJob, updateBatchJobStatus, deleteBatchJob, loadAllBatchJobs } from '@/lib/database/batchJobService';
-import { batchProcessingService } from '@/lib/services/batchProcessingService';
-import { DEFAULT_CLASSIFICATION_CONFIG } from '@/lib/classification/config';
 
 interface BatchManagerState {
   jobs: BatchJob[];
@@ -19,10 +19,10 @@ interface BatchCreationOptions {
   description?: string;
   onJobUpdate?: (job: BatchJob) => void;
   onJobComplete?: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void;
-  silent?: boolean; // Add option to suppress toasts
+  silent?: boolean;
 }
 
-export const useUnifiedBatchManager = () => {
+export const useBatchManager = () => {
   const { toast } = useToast();
   const [state, setState] = useState<BatchManagerState>({
     jobs: [],
@@ -36,7 +36,7 @@ export const useUnifiedBatchManager = () => {
   useEffect(() => {
     const loadExistingJobs = async () => {
       try {
-        console.log('[UNIFIED BATCH] Loading existing jobs from database...');
+        console.log('[BATCH MANAGER] Loading existing jobs from database...');
         const { jobs, payeeRowDataMap } = await loadAllBatchJobs();
         
         setState(prev => ({
@@ -46,9 +46,9 @@ export const useUnifiedBatchManager = () => {
           isLoaded: true
         }));
         
-        console.log(`[UNIFIED BATCH] Loaded ${jobs.length} existing jobs`);
+        console.log(`[BATCH MANAGER] Loaded ${jobs.length} existing jobs`);
       } catch (error) {
-        console.error('[UNIFIED BATCH] Failed to load existing jobs:', error);
+        console.error('[BATCH MANAGER] Failed to load existing jobs:', error);
         setState(prev => ({ ...prev, isLoaded: true }));
       }
     };
@@ -62,68 +62,44 @@ export const useUnifiedBatchManager = () => {
   ): Promise<BatchJob | null> => {
     const { description, onJobUpdate, onJobComplete, silent = false } = options;
     
-    console.log(`[UNIFIED BATCH] Creating batch for ${payeeRowData.uniquePayeeNames.length} payees`);
+    console.log(`[BATCH MANAGER] Creating batch for ${payeeRowData.uniquePayeeNames.length} payees`);
     
     try {
-      // Validate input - pass the complete PayeeRowData object
-      batchProcessingService.validateBatchInput(payeeRowData);
+      // Use the centralized batch creation service
+      const job = await batchCreationService.createBatch(payeeRowData, {
+        description,
+        onJobComplete,
+        silent
+      });
 
-      // For large files, use local processing
-      if (payeeRowData.uniquePayeeNames.length > 45000) {
-        console.log(`[UNIFIED BATCH] Large file detected, using local processing`);
-        
-        // Only show toast for large file processing (user needs to know this is different)
-        if (!silent) {
-          toast({
-            title: "Large File Processing",
-            description: "Processing large file locally with enhanced algorithms",
-          });
-        }
-
-        const result = await batchProcessingService.processBatch(
-          payeeRowData.uniquePayeeNames,
-          {
-            ...DEFAULT_CLASSIFICATION_CONFIG,
-            offlineMode: true,
-            aiThreshold: 75
-          },
-          payeeRowData.originalFileData
-        );
-
-        if (onJobComplete) {
-          onJobComplete(result.results, result, 'local-processing');
-        }
-
+      // If it's a local processing job (null), no state update needed
+      if (!job) {
         return null;
       }
 
-      // Create OpenAI batch job for smaller files
-      const job = await createBatchJob(payeeRowData.uniquePayeeNames, description);
+      // Save to database and update state
       await saveBatchJob(job, payeeRowData);
       
-      // CRITICAL FIX: Update state immediately after job creation
       setState(prev => ({
         ...prev,
         jobs: [...prev.jobs, job],
         payeeDataMap: { ...prev.payeeDataMap, [job.id]: payeeRowData }
       }));
       
-      console.log(`[UNIFIED BATCH] Job ${job.id} added to state. Total jobs: ${state.jobs.length + 1}`);
+      console.log(`[BATCH MANAGER] Job ${job.id} added to state. Total jobs: ${state.jobs.length + 1}`);
       
-      // Remove toast for batch job creation - user can see it in the UI
-      // Only show toast on errors or special cases
-
       return job;
 
     } catch (error) {
-      console.error('[UNIFIED BATCH] Creation failed:', error);
+      console.error('[BATCH MANAGER] Creation failed:', error);
       
-      // Keep error toasts - users need to know about failures
-      toast({
-        title: "Batch Creation Failed",
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
-        variant: "destructive"
-      });
+      if (!silent) {
+        toast({
+          title: "Batch Creation Failed",
+          description: error instanceof Error ? error.message : 'Unknown error occurred',
+          variant: "destructive"
+        });
+      }
       
       throw error;
     }
@@ -136,11 +112,9 @@ export const useUnifiedBatchManager = () => {
         ...prev,
         jobs: prev.jobs.map(job => job.id === updatedJob.id ? updatedJob : job)
       }));
-      console.log(`[UNIFIED BATCH] Job ${updatedJob.id} updated in state`);
-      
-      // Don't show toast for routine job updates - user can see status in UI
+      console.log(`[BATCH MANAGER] Job ${updatedJob.id} updated in state`);
     } catch (error) {
-      console.error('[UNIFIED BATCH] Update failed:', error);
+      console.error('[BATCH MANAGER] Update failed:', error);
       setState(prev => ({
         ...prev,
         errors: { ...prev.errors, [updatedJob.id]: 'Failed to update job status' }
@@ -162,15 +136,14 @@ export const useUnifiedBatchManager = () => {
         )
       }));
       
-      console.log(`[UNIFIED BATCH] Job ${jobId} removed from state`);
+      console.log(`[BATCH MANAGER] Job ${jobId} removed from state`);
       
-      // Keep toast for destructive actions - user needs confirmation
       toast({
         title: "Job Deleted",
         description: `Job ${jobId.slice(-8)} removed successfully`,
       });
     } catch (error) {
-      console.error('[UNIFIED BATCH] Delete failed:', error);
+      console.error('[BATCH MANAGER] Delete failed:', error);
       toast({
         title: "Delete Error",
         description: "Failed to delete job",
@@ -192,13 +165,12 @@ export const useUnifiedBatchManager = () => {
         isLoaded: true
       });
       
-      // Keep toast for bulk destructive actions - user needs confirmation
       toast({
         title: "All Jobs Cleared",
         description: "All batch jobs have been removed",
       });
     } catch (error) {
-      console.error('[UNIFIED BATCH] Clear all failed:', error);
+      console.error('[BATCH MANAGER] Clear all failed:', error);
       toast({
         title: "Clear Error",
         description: "Some jobs could not be cleared",
@@ -209,7 +181,7 @@ export const useUnifiedBatchManager = () => {
 
   const refreshJobs = useCallback(async (silent: boolean = true) => {
     try {
-      console.log('[UNIFIED BATCH] Refreshing jobs from database...');
+      console.log('[BATCH MANAGER] Refreshing jobs from database...');
       const { jobs, payeeRowDataMap } = await loadAllBatchJobs();
       
       setState(prev => ({
@@ -218,11 +190,9 @@ export const useUnifiedBatchManager = () => {
         payeeDataMap: payeeRowDataMap
       }));
       
-      console.log(`[UNIFIED BATCH] Refreshed ${jobs.length} jobs`);
-      
-      // Don't show toast for routine refreshes
+      console.log(`[BATCH MANAGER] Refreshed ${jobs.length} jobs`);
     } catch (error) {
-      console.error('[UNIFIED BATCH] Failed to refresh jobs:', error);
+      console.error('[BATCH MANAGER] Failed to refresh jobs:', error);
     }
   }, []);
 
