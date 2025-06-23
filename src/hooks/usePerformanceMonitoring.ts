@@ -158,11 +158,11 @@ export const usePerformanceMonitoring = (enabled: boolean = false) => {
 };
 
 // Higher-order component for automatic performance tracking
-export const withPerformanceTracking = <P extends object>(
-  Component: React.ComponentType<P>,
+export const withPerformanceTracking = (
+  Component: React.ComponentType<any>,
   operationName: string
 ) => {
-  return React.memo((props: P) => {
+  const WrappedComponent = (props: any) => {
     const { startOperation, finishOperation } = usePerformanceMonitoring(true);
     const operationIdRef = useRef<string>();
 
@@ -176,6 +176,10 @@ export const withPerformanceTracking = <P extends object>(
       };
     }, [startOperation, finishOperation]);
 
-    return <Component {...props} />;
-  });
+    return React.createElement(Component, props);
+  };
+
+  WrappedComponent.displayName = `withPerformanceTracking(${Component.displayName || Component.name})`;
+  
+  return React.memo(WrappedComponent);
 };
