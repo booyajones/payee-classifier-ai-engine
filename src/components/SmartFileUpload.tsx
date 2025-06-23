@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileCheck } from 'lucide-react';
-import { useSmartBatchManager } from '@/hooks/useSmartBatchManager';
+import { useConsolidatedBatchManager } from '@/hooks/useConsolidatedBatchManager';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
 import { PayeeRowData } from '@/lib/rowMapping';
@@ -18,7 +18,7 @@ interface SmartFileUploadProps {
 }
 
 const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileUploadProps) => {
-  const { createSmartBatchJob, getSmartState, isChunkedJob } = useSmartBatchManager();
+  const { createBatchJob: createConsolidatedBatchJob } = useConsolidatedBatchManager();
   
   const {
     uploadState,
@@ -54,55 +54,31 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
     updateProgress(UPLOAD_ID, 'Creating batch job...', 50);
 
     try {
-      // Check if file needs chunking
-      const needsChunking = payeeRowData.uniquePayeeNames.length > 45000;
-      const jobDescription = needsChunking 
-        ? `Large Upload: ${fileName} (${payeeRowData.uniquePayeeNames.length} unique payees - will be chunked)`
-        : `Upload: ${fileName} (${payeeRowData.uniquePayeeNames.length} unique payees)`;
+      const jobDescription = `Upload: ${fileName} (${payeeRowData.uniquePayeeNames.length} unique payees)`;
 
-      const job = await createSmartBatchJob(
-        payeeRowData,
-        jobDescription,
-        (updatedJob) => {
+      const job = await createConsolidatedBatchJob(payeeRowData, {
+        description: jobDescription,
+        onJobUpdate: (updatedJob) => {
           console.log(`[SMART UPLOAD] Job ${updatedJob.id} updated: ${updatedJob.status}`);
-          const smartState = getSmartState(updatedJob.id);
-          
-          // Enhanced progress for chunked jobs
-          const chunked = isChunkedJob(updatedJob.id);
-          const progressMessage = chunked 
-            ? `Chunked processing: ${smartState.currentStage} (${smartState.completedChunks}/${smartState.totalChunks} chunks)`
-            : smartState.currentStage;
-            
           updateProgress(
             UPLOAD_ID, 
-            progressMessage, 
-            smartState.progress, 
-            smartState.currentStage, 
+            `Job status: ${updatedJob.status}`, 
+            75, 
+            updatedJob.status, 
             updatedJob.id
           );
         },
-        (results, summary, jobId) => {
+        onJobComplete: (results, summary, jobId) => {
           console.log(`[SMART UPLOAD] Job ${jobId} completed with ${results.length} results`);
           setUploadState('complete');
-          
-          const chunked = isChunkedJob(jobId);
-          const successMessage = chunked 
-            ? `Successfully processed ${results.length} payees from chunked large file!`
-            : `Successfully processed ${results.length} payees!`;
-            
-          completeProgress(UPLOAD_ID, successMessage);
+          completeProgress(UPLOAD_ID, `Successfully processed ${results.length} payees!`);
           onProcessingComplete(results, summary, jobId);
         }
-      );
+      });
 
       if (job) {
         setUploadState('processing');
-        const chunked = isChunkedJob(job.id);
-        const progressMessage = chunked
-          ? 'Large file automatically chunked! Processing multiple batch jobs...'
-          : 'Batch job created! Processing payee classifications...';
-        
-        updateProgress(UPLOAD_ID, progressMessage, 70, 'OpenAI batch processing started', job.id);
+        updateProgress(UPLOAD_ID, 'Batch job created! Processing payee classifications...', 70, 'OpenAI batch processing started', job.id);
         onBatchJobCreated(job, payeeRowData);
       } else {
         setUploadState('complete');
@@ -127,7 +103,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
         </CardTitle>
         <CardDescription>
           Upload your payee file and select the column containing payee names. 
-          Supports files up to 100MB with 100,000 rows. Large files are automatically split into chunks.
+          Supports files up to 100MB with intelligent processing for large files.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
