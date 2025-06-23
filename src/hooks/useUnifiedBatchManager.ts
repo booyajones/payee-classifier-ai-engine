@@ -1,9 +1,10 @@
-import { useCallback, useState } from 'react';
+
+import { useCallback, useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { BatchJob, createBatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
-import { saveBatchJob, updateBatchJobStatus, deleteBatchJob } from '@/lib/database/batchJobService';
+import { saveBatchJob, updateBatchJobStatus, deleteBatchJob, loadAllBatchJobs } from '@/lib/database/batchJobService';
 import { batchProcessingService } from '@/lib/services/batchProcessingService';
 import { DEFAULT_CLASSIFICATION_CONFIG } from '@/lib/classification/config';
 
@@ -12,6 +13,7 @@ interface BatchManagerState {
   payeeDataMap: Record<string, PayeeRowData>;
   processing: Set<string>;
   errors: Record<string, string>;
+  isLoaded: boolean;
 }
 
 interface BatchCreationOptions {
@@ -26,8 +28,33 @@ export const useUnifiedBatchManager = () => {
     jobs: [],
     payeeDataMap: {},
     processing: new Set(),
-    errors: {}
+    errors: {},
+    isLoaded: false
   });
+
+  // Load existing jobs on mount
+  useEffect(() => {
+    const loadExistingJobs = async () => {
+      try {
+        console.log('[UNIFIED BATCH] Loading existing jobs from database...');
+        const { jobs, payeeRowDataMap } = await loadAllBatchJobs();
+        
+        setState(prev => ({
+          ...prev,
+          jobs,
+          payeeDataMap: payeeRowDataMap,
+          isLoaded: true
+        }));
+        
+        console.log(`[UNIFIED BATCH] Loaded ${jobs.length} existing jobs`);
+      } catch (error) {
+        console.error('[UNIFIED BATCH] Failed to load existing jobs:', error);
+        setState(prev => ({ ...prev, isLoaded: true }));
+      }
+    };
+
+    loadExistingJobs();
+  }, []);
 
   const createBatch = useCallback(async (
     payeeRowData: PayeeRowData,
@@ -71,12 +98,14 @@ export const useUnifiedBatchManager = () => {
       const job = await createBatchJob(payeeRowData.uniquePayeeNames, description);
       await saveBatchJob(job, payeeRowData);
       
-      // Update state
+      // CRITICAL FIX: Update state immediately after job creation
       setState(prev => ({
         ...prev,
         jobs: [...prev.jobs, job],
         payeeDataMap: { ...prev.payeeDataMap, [job.id]: payeeRowData }
       }));
+      
+      console.log(`[UNIFIED BATCH] Job ${job.id} added to state. Total jobs: ${state.jobs.length + 1}`);
       
       toast({
         title: "Batch Job Created",
@@ -96,7 +125,7 @@ export const useUnifiedBatchManager = () => {
       
       throw error;
     }
-  }, [toast]);
+  }, [toast, state.jobs.length]);
 
   const updateJob = useCallback(async (updatedJob: BatchJob) => {
     try {
@@ -105,6 +134,7 @@ export const useUnifiedBatchManager = () => {
         ...prev,
         jobs: prev.jobs.map(job => job.id === updatedJob.id ? updatedJob : job)
       }));
+      console.log(`[UNIFIED BATCH] Job ${updatedJob.id} updated in state`);
     } catch (error) {
       console.error('[UNIFIED BATCH] Update failed:', error);
       setState(prev => ({
@@ -127,6 +157,8 @@ export const useUnifiedBatchManager = () => {
           Object.entries(prev.errors).filter(([id]) => id !== jobId)
         )
       }));
+      
+      console.log(`[UNIFIED BATCH] Job ${jobId} removed from state`);
       
       toast({
         title: "Job Deleted",
@@ -151,7 +183,8 @@ export const useUnifiedBatchManager = () => {
         jobs: [],
         payeeDataMap: {},
         processing: new Set(),
-        errors: {}
+        errors: {},
+        isLoaded: true
       });
       
       toast({
@@ -168,18 +201,37 @@ export const useUnifiedBatchManager = () => {
     }
   }, [state.jobs, toast]);
 
+  const refreshJobs = useCallback(async () => {
+    try {
+      console.log('[UNIFIED BATCH] Refreshing jobs from database...');
+      const { jobs, payeeRowDataMap } = await loadAllBatchJobs();
+      
+      setState(prev => ({
+        ...prev,
+        jobs,
+        payeeDataMap: payeeRowDataMap
+      }));
+      
+      console.log(`[UNIFIED BATCH] Refreshed ${jobs.length} jobs`);
+    } catch (error) {
+      console.error('[UNIFIED BATCH] Failed to refresh jobs:', error);
+    }
+  }, []);
+
   return {
     // State
     jobs: state.jobs,
     payeeDataMap: state.payeeDataMap,
     processing: state.processing,
     errors: state.errors,
+    isLoaded: state.isLoaded,
     
     // Actions
     createBatch,
     updateJob,
     deleteJob,
     clearAll,
+    refreshJobs,
     
     // Utilities
     getJobData: useCallback((jobId: string) => state.payeeDataMap[jobId], [state.payeeDataMap]),

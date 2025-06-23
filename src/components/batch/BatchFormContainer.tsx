@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { useUnifiedBatchManager } from "@/hooks/useUnifiedBatchManager";
@@ -14,24 +14,23 @@ interface BatchFormContainerProps {
 }
 
 const BatchFormContainer = ({ onBatchClassify, onComplete }: BatchFormContainerProps) => {
-  const [isLoadingJobs, setIsLoadingJobs] = useState(true);
-  
   const batchManager = useUnifiedBatchManager();
   const formState = useSimplifiedBatchForm();
 
-  const handleJobsLoaded = (jobs: any[], payeeDataMap: any) => {
-    // Jobs are now managed by the unified batch manager
-    if (jobs.length > 0) {
-      formState.setActiveTab("jobs");
-    }
-  };
-
-  const handleLoadingComplete = () => {
-    setIsLoadingJobs(false);
-  };
+  // Show loading until batch manager has loaded existing jobs
+  if (!batchManager.isLoaded) {
+    return (
+      <BatchJobLoader 
+        onJobsLoaded={() => {}}
+        onLoadingComplete={() => {}}
+      />
+    );
+  }
 
   const handleFileUploadBatchJob = async (batchJob: any, payeeRowData: any) => {
-    // The unified manager already handles saving, so we just need to switch tabs
+    // Job is already added to batchManager state in createBatch
+    // Just switch to jobs tab to show it
+    console.log(`[BATCH CONTAINER] Job ${batchJob.id} created, switching to jobs tab`);
     formState.setActiveTab("jobs");
   };
 
@@ -40,6 +39,8 @@ const BatchFormContainer = ({ onBatchClassify, onComplete }: BatchFormContainerP
     summary: BatchProcessingResult, 
     jobId: string
   ) => {
+    console.log(`[BATCH CONTAINER] Job ${jobId} completed with ${results.length} results`);
+    
     formState.handleJobComplete(results, summary);
     
     if (onBatchClassify) {
@@ -51,14 +52,7 @@ const BatchFormContainer = ({ onBatchClassify, onComplete }: BatchFormContainerP
     }
   };
 
-  if (isLoadingJobs) {
-    return (
-      <BatchJobLoader 
-        onJobsLoaded={handleJobsLoaded}
-        onLoadingComplete={handleLoadingComplete}
-      />
-    );
-  }
+  console.log(`[BATCH CONTAINER] Rendering with ${batchManager.jobs.length} jobs`);
 
   return (
     <Card>
