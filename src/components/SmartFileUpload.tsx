@@ -13,7 +13,7 @@ import UploadErrorDisplay from './upload/UploadErrorDisplay';
 import UploadSuccessDisplay from './upload/UploadSuccessDisplay';
 import FileCorruptionDetector from './upload/FileCorruptionDetector';
 import { Badge } from '@/components/ui/badge';
-import PerformanceMonitoringDashboard from './upload/PerformanceMonitoringDashboard';
+import PerformanceMonitoringDashboard from './performance/PerformanceMonitoringDashboard';
 
 interface SmartFileUploadProps {
   onBatchJobCreated: (batchJob: BatchJob, payeeRowData: PayeeRowData) => void;

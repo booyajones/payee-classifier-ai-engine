@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 /**
  * Memory optimization utilities for large file processing
@@ -141,20 +141,21 @@ export class MemoryOptimizer {
  * React hook for monitoring memory usage
  */
 export const useMemoryMonitor = (enabled: boolean = false) => {
-  const [memoryStats, setMemoryStats] = React.useState<MemoryStats | null>(null);
-  
-  React.useEffect(() => {
+  const [memoryStats, setMemoryStats] = useState<MemoryStats | null>(null);
+
+  useEffect(() => {
     if (!enabled) return;
-    
+
     const updateStats = () => {
-      setMemoryStats(MemoryOptimizer.getMemoryStats());
+      const stats = MemoryOptimizer.getMemoryStats();
+      setMemoryStats(stats);
     };
-    
+
     updateStats();
-    const interval = setInterval(updateStats, 5000); // Update every 5 seconds
-    
+    const interval = setInterval(updateStats, 2000);
+
     return () => clearInterval(interval);
   }, [enabled]);
-  
+
   return memoryStats;
 };

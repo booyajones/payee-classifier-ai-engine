@@ -72,11 +72,13 @@ export const usePerformanceEnhancedFileUpload = () => {
         
         result = await StreamingFileProcessor.processFileStream(
           file,
-          async (chunk) => {
+          async (chunk: any[]): Promise<any[]> => {
             if (shouldUseWorker) {
-              return await createMappingsWithWorker(chunk, 'payee');
+              const mappings = await createMappingsWithWorker(chunk, 'payee');
+              // Ensure we return an array
+              return Array.isArray(mappings) ? mappings : [mappings];
             } else {
-              // Fallback to main thread
+              // Fallback to main thread - return processed chunk as array
               return chunk.map(item => ({ ...item, processed: true }));
             }
           },
@@ -104,7 +106,9 @@ export const usePerformanceEnhancedFileUpload = () => {
         setStage('Creating mappings...');
         setProgress(70);
         
-        result = await createMappingsWithWorker(fileData, 'payee', (workerProgress) => {
+        // Ensure fileData is an array before passing to createMappingsWithWorker
+        const dataArray = Array.isArray(fileData) ? fileData : [fileData];
+        result = await createMappingsWithWorker(dataArray, 'payee', (workerProgress) => {
           setProgress(70 + (workerProgress * 0.2));
         });
         
