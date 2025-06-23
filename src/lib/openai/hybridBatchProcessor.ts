@@ -1,9 +1,9 @@
 
-
 import { ClassificationConfig } from '@/lib/types';
 import { createBatchJob, BatchJob, getBatchJobResults, TrueBatchClassificationResult } from './trueBatchAPI';
 import { optimizedBatchClassification } from './optimizedBatchClassification';
-import { checkKeywordExclusion } from '@/lib/classification/keywordExclusion';
+import { checkKeywordExclusion } from '@/lib/classification/enhancedKeywordExclusion';
+import { KEYWORD_EXCLUSION_CONFIG } from '@/lib/classification/config';
 
 export interface HybridBatchResult {
   results: Array<{
@@ -34,6 +34,28 @@ export type ProgressCallback = (
 ) => void;
 
 /**
+ * Apply keyword exclusions - ALWAYS ENABLED
+ */
+function applyKeywordExclusions(payeeNames: string[]) {
+  console.log(`[KEYWORD EXCLUSION] Processing ${payeeNames.length} names - ALWAYS ENABLED`);
+  
+  const exclusionResults = payeeNames.map(name => {
+    const result = checkKeywordExclusion(name);
+    
+    if (KEYWORD_EXCLUSION_CONFIG.logMatches && result.isExcluded) {
+      console.log(`[KEYWORD EXCLUSION] Excluded "${name}" - matched: ${result.matchedKeywords.join(', ')}`);
+    }
+    
+    return result;
+  });
+  
+  const excludedCount = exclusionResults.filter(r => r.isExcluded).length;
+  console.log(`[KEYWORD EXCLUSION] Excluded ${excludedCount}/${payeeNames.length} names`);
+  
+  return exclusionResults;
+}
+
+/**
  * Process payees using either real-time or batch mode
  */
 export async function processWithHybridBatch(
@@ -50,11 +72,11 @@ export async function processWithHybridBatch(
     phase: 'Initializing'
   };
 
-  // Step 1: Apply keyword exclusions first
-  stats.phase = 'Applying keyword exclusions';
+  // Step 1: Apply keyword exclusions - ALWAYS ENABLED
+  stats.phase = 'Applying keyword exclusions (ALWAYS ENABLED)';
   onProgress?.(0, payeeNames.length, 0, stats);
 
-  const exclusionResults = payeeNames.map(name => checkKeywordExclusion(name));
+  const exclusionResults = applyKeywordExclusions(payeeNames);
   
   // Separate excluded vs. needs AI processing
   const needsAI: { name: string; index: number }[] = [];
@@ -69,9 +91,9 @@ export async function processWithHybridBatch(
       stats.keywordExcluded++;
       return {
         classification: 'Business' as const,
-        confidence: 95,
-        reasoning: `Excluded by keyword match: ${exclusionResult.matchedKeywords.join(', ')}`,
-        processingTier: 'Rule-Based' as const
+        confidence: exclusionResult.confidence,
+        reasoning: exclusionResult.reasoning,
+        processingTier: 'Excluded' as const
       };
     } else {
       needsAI.push({ name, index });
@@ -94,11 +116,11 @@ export async function processWithHybridBatch(
 
   if (mode === 'batch') {
     // Submit to OpenAI Batch API
-    stats.phase = 'Submitting batch job';
+    stats.phase = 'Submitting batch job (after keyword exclusion)';
     onProgress?.(stats.keywordExcluded, payeeNames.length, (stats.keywordExcluded / payeeNames.length) * 100, stats);
 
     try {
-      console.log(`[HYBRID BATCH] Creating batch job for ${aiNames.length} names`);
+      console.log(`[HYBRID BATCH] Creating batch job for ${aiNames.length} names (${stats.keywordExcluded} excluded)`);
       const batchJob = await createBatchJob(aiNames, `Hybrid classification batch - ${aiNames.length} payees`);
       console.log(`[HYBRID BATCH] Created batch job:`, batchJob);
       
@@ -117,7 +139,7 @@ export async function processWithHybridBatch(
     }
   } else {
     // Real-time processing
-    stats.phase = 'Processing with AI (real-time)';
+    stats.phase = 'Processing with AI (real-time, after keyword exclusion)';
     
     try {
       const aiResults = await optimizedBatchClassification(
@@ -137,15 +159,6 @@ export async function processWithHybridBatch(
           processingTier: 'AI-Powered' as const
         };
       });
-
-      // Update progress callback
-      const processingCallback = (current: number, total: number) => {
-        const totalProgress = stats.keywordExcluded + current;
-        const percentage = (totalProgress / payeeNames.length) * 100;
-        stats.phase = `AI processing: ${current}/${total}`;
-        stats.aiProcessed = current;
-        onProgress?.(totalProgress, payeeNames.length, percentage, stats);
-      };
 
       stats.phase = 'Complete';
       stats.aiProcessed = aiNames.length;
@@ -171,8 +184,8 @@ export async function completeBatchJob(
 ): Promise<HybridBatchResult> {
   console.log(`[HYBRID BATCH] Completing batch job ${batchJob.id} for ${originalPayeeNames.length} payees`);
   
-  // Re-apply keyword exclusions to get the same filtering
-  const exclusionResults = originalPayeeNames.map(name => checkKeywordExclusion(name));
+  // Re-apply keyword exclusions to get the same filtering - ALWAYS ENABLED
+  const exclusionResults = applyKeywordExclusions(originalPayeeNames);
   const needsAI: { name: string; index: number }[] = [];
   const finalResults: Array<{
     classification: 'Business' | 'Individual';
@@ -184,9 +197,9 @@ export async function completeBatchJob(
     if (exclusionResult.isExcluded) {
       return {
         classification: 'Business' as const,
-        confidence: 95,
-        reasoning: `Excluded by keyword match: ${exclusionResult.matchedKeywords.join(', ')}`,
-        processingTier: 'Rule-Based' as const
+        confidence: exclusionResult.confidence,
+        reasoning: exclusionResult.reasoning,
+        processingTier: 'Excluded' as const
       };
     } else {
       needsAI.push({ name, index });
@@ -232,4 +245,3 @@ export async function completeBatchJob(
     throw new Error(`Failed to complete batch job: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
-

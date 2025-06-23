@@ -6,13 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useToast } from "@/components/ui/use-toast";
-import { Plus, Edit, Trash } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Plus, Edit, Trash, Shield } from "lucide-react";
 import {
   getComprehensiveExclusionKeywords,
   validateExclusionKeywords,
   checkKeywordExclusion
 } from "@/lib/classification/keywordExclusion";
+import { KEYWORD_EXCLUSION_CONFIG } from "@/lib/classification/config";
 import {
   Table,
   TableBody,
@@ -138,13 +139,29 @@ const KeywordExclusionManager = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Keyword Exclusion Management</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-green-600" />
+            Keyword Exclusion Management
+            <Badge variant="secondary" className="bg-green-100 text-green-800">
+              ALWAYS ENABLED
+            </Badge>
+          </CardTitle>
           <CardDescription>
-            Manage keywords that will automatically exclude payees from being classified as individuals.
-            Payees containing these keywords will be classified as businesses.
+            Keyword exclusions are automatically applied to ALL payee classifications. 
+            Payees containing these keywords will be classified as businesses and excluded from AI processing.
+            This feature is always enabled and cannot be disabled for accuracy and performance.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <Alert className="border-green-200 bg-green-50">
+            <Shield className="h-4 w-4" />
+            <AlertDescription>
+              <strong>System Status:</strong> Keyword exclusions are {KEYWORD_EXCLUSION_CONFIG.enabled ? 'ENABLED' : 'DISABLED'} and 
+              auto-apply is {KEYWORD_EXCLUSION_CONFIG.autoApply ? 'ON' : 'OFF'}. 
+              This ensures consistent classification across all processing methods.
+            </AlertDescription>
+          </Alert>
+
           <div className="flex gap-2">
             <div className="flex-1">
               <Label htmlFor="new-keyword">Add New Keyword</Label>

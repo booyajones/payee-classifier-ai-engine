@@ -20,6 +20,14 @@ export const MAX_BATCH_SIZE = 15; // Increased from 5
 // Extended name similarity threshold (Levenshtein distance %)
 export const NAME_SIMILARITY_THRESHOLD = 85; // 85% similar names treated as same
 
+// KEYWORD EXCLUSION CONFIGURATION - ALWAYS ENABLED
+export const KEYWORD_EXCLUSION_CONFIG = {
+  enabled: true, // ALWAYS enabled - never disable
+  autoApply: true, // Automatically apply to all processing
+  skipValidation: false, // Always validate exclusions
+  logMatches: true // Log keyword matches for debugging
+};
+
 // Legal entity suffixes for business detection
 export const LEGAL_SUFFIXES = [
   "LLC", "INC", "CORP", "LTD", "LP", "LLP", "PC", "PLLC", "CO", "COMPANY",
