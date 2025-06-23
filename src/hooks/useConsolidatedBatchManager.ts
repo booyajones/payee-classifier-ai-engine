@@ -58,7 +58,7 @@ export const useConsolidatedBatchManager = () => {
         return null; // No OpenAI batch job created
       }
 
-      // Create OpenAI batch job for smaller files
+      // Create OpenAI batch job for smaller files - pass only the string array
       const job = await createBatchJob(payeeRowData.uniquePayeeNames, description);
       
       // Save to database
