@@ -4,14 +4,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { AlertCircle, Calendar, RefreshCw, Download, X, Trash2, Users, Clock } from 'lucide-react';
+import { AlertCircle, Calendar, RefreshCw, Download, X, Trash2, Users, Clock, BarChart3 } from 'lucide-react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { useUnifiedProgress } from '@/contexts/UnifiedProgressContext';
+import { PayeeRowData } from '@/lib/rowMapping';
+import { checkKeywordExclusion } from '@/lib/classification/enhancedKeywordExclusion';
 import BatchJobTimeoutIndicator from './BatchJobTimeoutIndicator';
 
 interface BatchJobCardProps {
   job: BatchJob;
   payeeCount: number;
+  payeeData?: PayeeRowData;
   isRefreshing: boolean;
   isDownloading: boolean;
   isPolling: boolean;
@@ -37,6 +40,7 @@ interface BatchJobCardProps {
 const BatchJobCard = React.memo(({
   job,
   payeeCount,
+  payeeData,
   isRefreshing,
   isDownloading,
   isPolling,
@@ -79,6 +83,49 @@ const BatchJobCard = React.memo(({
     if (isStuck && job.status === 'in_progress') return 'Slow Progress';
     return job.status.charAt(0).toUpperCase() + job.status.slice(1).replace('_', ' ');
   }, [job.status, shouldTimeout, isStuck]);
+
+  // Memoize payee statistics
+  const payeeStats = useMemo(() => {
+    if (!payeeData) return null;
+
+    // Check which payees would be excluded by keywords
+    const exclusionResults = payeeData.uniquePayeeNames.map(name => ({
+      name,
+      exclusion: checkKeywordExclusion(name)
+    }));
+
+    const excludedPayees = exclusionResults.filter(r => r.exclusion.isExcluded);
+    const nonExcludedPayees = exclusionResults.filter(r => !r.exclusion.isExcluded);
+
+    // Simple heuristic for business vs individual classification
+    // This is a preview - actual classification happens during processing
+    const businessIndicators = ['LLC', 'INC', 'CORP', 'LTD', 'CO', 'COMPANY', 'CORPORATION', 'LIMITED'];
+    const individualIndicators = ['MR', 'MRS', 'MS', 'DR', 'MISS'];
+
+    const businessCount = nonExcludedPayees.filter(p => {
+      const upperName = p.name.toUpperCase();
+      return businessIndicators.some(indicator => upperName.includes(indicator));
+    }).length;
+
+    const individualCount = nonExcludedPayees.filter(p => {
+      const upperName = p.name.toUpperCase();
+      return individualIndicators.some(indicator => upperName.includes(indicator)) ||
+             (!businessIndicators.some(indicator => upperName.includes(indicator)) && 
+              upperName.split(' ').length >= 2);
+    }).length;
+
+    const unknownCount = nonExcludedPayees.length - businessCount - individualCount;
+
+    return {
+      total: payeeData.uniquePayeeNames.length,
+      excluded: excludedPayees.length,
+      business: businessCount,
+      individual: individualCount,
+      unknown: unknownCount,
+      excludedPayees: excludedPayees.slice(0, 5), // Show first 5 excluded payees
+      hasMoreExcluded: excludedPayees.length > 5
+    };
+  }, [payeeData]);
 
   // Memoize progress info calculation
   const progressInfo = useMemo(() => {
@@ -204,17 +251,74 @@ const BatchJobCard = React.memo(({
         )}
 
         {showDetails && (
-          <div className="text-xs text-muted-foreground space-y-1 bg-gray-50 p-2 rounded">
-            <div>Created: {new Date(job.created_at * 1000).toLocaleString()}</div>
-            {job.in_progress_at && (
-              <div>Started: {new Date(job.in_progress_at * 1000).toLocaleString()}</div>
-            )}
-            {job.completed_at && (
-              <div>Completed: {new Date(job.completed_at * 1000).toLocaleString()}</div>
-            )}
-            <div>Requests: {job.request_counts.completed}/{job.request_counts.total} 
-              {job.request_counts.failed > 0 && ` (${job.request_counts.failed} failed)`}
+          <div className="space-y-3">
+            <div className="text-xs text-muted-foreground space-y-1 bg-gray-50 p-2 rounded">
+              <div>Created: {new Date(job.created_at * 1000).toLocaleString()}</div>
+              {job.in_progress_at && (
+                <div>Started: {new Date(job.in_progress_at * 1000).toLocaleString()}</div>
+              )}
+              {job.completed_at && (
+                <div>Completed: {new Date(job.completed_at * 1000).toLocaleString()}</div>
+              )}
+              <div>Requests: {job.request_counts.completed}/{job.request_counts.total} 
+                {job.request_counts.failed > 0 && ` (${job.request_counts.failed} failed)`}
+              </div>
             </div>
+
+            {payeeStats && (
+              <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <BarChart3 className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-800">Payee Summary</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Total:</span>
+                      <span className="font-medium">{payeeStats.total}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Businesses:</span>
+                      <span className="font-medium text-blue-600">{payeeStats.business}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Individuals:</span>
+                      <span className="font-medium text-green-600">{payeeStats.individual}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Excluded:</span>
+                      <span className="font-medium text-red-600">{payeeStats.excluded}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Unknown:</span>
+                      <span className="font-medium text-gray-600">{payeeStats.unknown}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {payeeStats.excluded > 0 && (
+                  <div className="mt-2 pt-2 border-t border-blue-200">
+                    <div className="text-xs text-muted-foreground mb-1">
+                      Excluded payees {payeeStats.hasMoreExcluded ? `(showing first 5 of ${payeeStats.excluded})` : ''}:
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {payeeStats.excludedPayees.map((excluded, index) => (
+                        <Badge 
+                          key={index} 
+                          variant="destructive" 
+                          className="text-xs px-1 py-0"
+                          title={`Excluded: ${excluded.exclusion.matchedKeywords.join(', ')}`}
+                        >
+                          {excluded.name.length > 15 ? `${excluded.name.substring(0, 15)}...` : excluded.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
