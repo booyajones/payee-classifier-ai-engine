@@ -1,4 +1,3 @@
-
 import { FileValidationError, ERROR_CODES } from './errorHandler';
 
 export interface FileValidationResult {
@@ -10,12 +9,49 @@ export interface FileValidationResult {
     type: string;
     rowCount?: number;
     columnCount?: number;
+    estimatedProcessingTime?: string;
+    sizeWarning?: string;
   };
 }
 
-export const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-export const MAX_ROWS = 50000; // Maximum payee names to process
+// Phase 1: Increased limits for better file handling
+export const MAX_FILE_SIZE = 100 * 1024 * 1024; // Increased to 100MB
+export const MAX_ROWS = 100000; // Increased to 100K rows
+export const LARGE_FILE_WARNING_SIZE = 25 * 1024 * 1024; // 25MB warning threshold
+export const LARGE_ROW_WARNING_COUNT = 25000; // 25K rows warning threshold
 export const SUPPORTED_EXTENSIONS = ['xlsx', 'xls', 'csv'];
+
+/**
+ * Estimate processing time based on file characteristics
+ */
+export const estimateProcessingTime = (fileSize: number, rowCount?: number): string => {
+  // Base estimation: ~1 second per MB + ~0.1 second per 100 rows
+  const sizeSeconds = Math.ceil(fileSize / (1024 * 1024)) * 60; // 1 minute per MB for batch processing
+  const rowSeconds = rowCount ? Math.ceil(rowCount / 100) * 6 : 0; // 6 seconds per 100 rows
+  
+  const totalSeconds = Math.max(sizeSeconds, rowSeconds, 30); // Minimum 30 seconds
+  
+  if (totalSeconds < 120) {
+    return `${Math.ceil(totalSeconds / 60)} minute${totalSeconds >= 120 ? 's' : ''}`;
+  } else if (totalSeconds < 3600) {
+    return `${Math.ceil(totalSeconds / 60)} minutes`;
+  } else {
+    const hours = Math.ceil(totalSeconds / 3600);
+    return `${hours} hour${hours > 1 ? 's' : ''}`;
+  }
+};
+
+/**
+ * Generate size warning messages for large files
+ */
+export const generateSizeWarning = (fileSize: number, rowCount?: number): string | undefined => {
+  if (fileSize > LARGE_FILE_WARNING_SIZE || (rowCount && rowCount > LARGE_ROW_WARNING_COUNT)) {
+    const sizeMB = (fileSize / (1024 * 1024)).toFixed(1);
+    const rowText = rowCount ? ` with ${rowCount.toLocaleString()} rows` : '';
+    return `Large file detected (${sizeMB}MB${rowText}). Processing may take significant time and consume more resources.`;
+  }
+  return undefined;
+};
 
 export const validateFile = (file: File): FileValidationResult => {
   console.log(`[FILE VALIDATION] Validating file: ${file.name}, size: ${file.size} bytes`);
@@ -68,12 +104,18 @@ export const validateFile = (file: File): FileValidationResult => {
     console.warn(`[FILE VALIDATION] Unexpected MIME type: ${file.type}, but extension is valid`);
   }
 
+  // Generate initial file info with estimates
+  const estimatedTime = estimateProcessingTime(file.size);
+  const sizeWarning = generateSizeWarning(file.size);
+
   return {
     isValid: true,
     fileInfo: {
       name: file.name,
       size: file.size,
-      type: file.type || 'unknown'
+      type: file.type || 'unknown',
+      estimatedProcessingTime: estimatedTime,
+      sizeWarning
     }
   };
 };
@@ -97,7 +139,7 @@ export const validatePayeeData = (data: any[], selectedColumn: string): FileVali
       isValid: false,
       error: new FileValidationError(
         ERROR_CODES.FILE_TOO_LARGE,
-        `Too many rows (${data.length}). Maximum allowed is ${MAX_ROWS} payee names.`,
+        `Too many rows (${data.length.toLocaleString()}). Maximum allowed is ${MAX_ROWS.toLocaleString()} payee names.`,
         `Rows: ${data.length}, limit: ${MAX_ROWS}`
       )
     };
@@ -140,6 +182,11 @@ export const validatePayeeData = (data: any[], selectedColumn: string): FileVali
 
   console.log(`[PAYEE VALIDATION] Found ${payeeNames.length} total payees, ${uniquePayees.length} unique, ${duplicateCount} duplicates`);
 
+  // Generate enhanced file info with processing estimates
+  const dataSize = JSON.stringify(data).length;
+  const estimatedTime = estimateProcessingTime(dataSize, data.length);
+  const sizeWarning = generateSizeWarning(dataSize, data.length);
+
   return {
     isValid: true,
     fileInfo: {
@@ -147,11 +194,14 @@ export const validatePayeeData = (data: any[], selectedColumn: string): FileVali
       size: data.length,
       type: 'payee-list',
       rowCount: data.length,
-      columnCount: Object.keys(data[0] || {}).length
+      columnCount: Object.keys(data[0] || {}).length,
+      estimatedProcessingTime: estimatedTime,
+      sizeWarning
     }
   };
 };
 
+// ... keep existing code (cleanPayeeNames function)
 export const cleanPayeeNames = (payeeNames: string[]): string[] => {
   return [...new Set(
     payeeNames

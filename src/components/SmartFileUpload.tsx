@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileCheck } from 'lucide-react';
 import { useSmartBatchManager } from '@/hooks/useSmartBatchManager';
@@ -30,6 +29,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
     selectedPayeeColumn,
     setSelectedPayeeColumn,
     fileName,
+    processingInfo,
     fileInputRef,
     handleFileSelect,
     validatePayeeColumn,
@@ -55,7 +55,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
     try {
       const job = await createSmartBatchJob(
         payeeRowData,
-        `Upload: ${fileName}`,
+        `Upload: ${fileName} (${payeeRowData.uniquePayeeNames.length} unique payees)`,
         (updatedJob) => {
           console.log(`[SMART UPLOAD] Job ${updatedJob.id} updated: ${updatedJob.status}`);
           const smartState = getSmartState(updatedJob.id);
@@ -95,7 +95,8 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
           File Upload & Classification
         </CardTitle>
         <CardDescription>
-          Upload your payee file and select the column containing payee names
+          Upload your payee file and select the column containing payee names. 
+          Supports files up to 100MB with 100,000 rows.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -123,6 +124,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
             onProcess={handleColumnSelect}
             onCancel={resetUpload}
             recordCount={fileData?.length || 0}
+            processingInfo={processingInfo}
             disabled={isProcessing}
           />
         )}

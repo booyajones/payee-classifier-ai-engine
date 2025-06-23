@@ -1,12 +1,20 @@
 
 import { useState, useRef } from 'react';
 import { parseUploadedFile } from '@/lib/utils';
-import { validateFile, validatePayeeData } from '@/lib/fileValidation';
+import { validateFile, validatePayeeData, estimateProcessingTime } from '@/lib/fileValidation';
 import { createPayeeRowMapping, PayeeRowData } from '@/lib/rowMapping';
 import { useUnifiedProgress } from '@/contexts/UnifiedProgressContext';
 import { useToast } from '@/hooks/use-toast';
 
 export type UploadState = 'idle' | 'uploaded' | 'processing' | 'complete' | 'error';
+
+export interface FileProcessingInfo {
+  estimatedTime?: string;
+  sizeWarning?: string;
+  totalRows?: number;
+  uniquePayees?: number;
+  duplicates?: number;
+}
 
 export const useSmartFileUpload = () => {
   const [uploadState, setUploadState] = useState<UploadState>('idle');
@@ -16,6 +24,7 @@ export const useSmartFileUpload = () => {
   const [fileHeaders, setFileHeaders] = useState<string[]>([]);
   const [selectedPayeeColumn, setSelectedPayeeColumn] = useState<string>('');
   const [fileName, setFileName] = useState('');
+  const [processingInfo, setProcessingInfo] = useState<FileProcessingInfo>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { updateProgress, completeProgress, clearProgress } = useUnifiedProgress();
@@ -26,7 +35,12 @@ export const useSmartFileUpload = () => {
   const getSuggestions = (errorCode: string): string[] => {
     switch (errorCode) {
       case 'FILE_TOO_LARGE':
-        return ['Try splitting the file into smaller chunks', 'Remove unnecessary columns', 'Use CSV format instead of Excel'];
+        return [
+          'Try splitting the file into smaller chunks (under 100MB)',
+          'Remove unnecessary columns to reduce file size',
+          'Use CSV format instead of Excel for better efficiency',
+          'Consider processing in smaller batches'
+        ];
       case 'INVALID_FILE_FORMAT':
         return ['Use .xlsx, .xls, or .csv format', 'Check if the file is corrupted', 'Export from your accounting software again'];
       case 'NO_VALID_PAYEES':
@@ -42,6 +56,7 @@ export const useSmartFileUpload = () => {
     setErrorMessage('');
     setSuggestions([]);
     setFileName(file.name);
+    setProcessingInfo({});
 
     try {
       const fileValidation = validateFile(file);
@@ -51,6 +66,15 @@ export const useSmartFileUpload = () => {
         setSuggestions(getSuggestions(fileValidation.error!.code));
         clearProgress(UPLOAD_ID);
         return;
+      }
+
+      // Show size warning if applicable
+      if (fileValidation.fileInfo?.sizeWarning) {
+        toast({
+          title: "Large File Warning",
+          description: fileValidation.fileInfo.sizeWarning,
+          variant: "destructive",
+        });
       }
 
       updateProgress(UPLOAD_ID, 'Reading file contents...', 30);
@@ -73,12 +97,28 @@ export const useSmartFileUpload = () => {
         return;
       }
 
+      // Set initial processing info
+      const dataSize = JSON.stringify(data).length;
+      const estimatedTime = estimateProcessingTime(dataSize, data.length);
+      
+      setProcessingInfo({
+        estimatedTime,
+        totalRows: data.length,
+        sizeWarning: fileValidation.fileInfo?.sizeWarning
+      });
+
       updateProgress(UPLOAD_ID, 'File uploaded successfully! Please select the payee column.', 60);
       
       setFileData(data);
       setFileHeaders(headers);
       setUploadState('uploaded');
       completeProgress(UPLOAD_ID, 'File uploaded successfully!');
+
+      // Show detailed file info
+      toast({
+        title: "File Analysis Complete",
+        description: `Found ${data.length.toLocaleString()} rows with ${headers.length} columns. Estimated processing time: ${estimatedTime}`,
+      });
 
     } catch (error) {
       console.error('[SMART UPLOAD] Upload failed:', error);
@@ -105,12 +145,21 @@ export const useSmartFileUpload = () => {
         return null;
       }
 
-      updateProgress(UPLOAD_ID, 'Creating payee mappings...', 30);
+      updateProgress(UPLOAD_ID, 'Creating payee mappings and analyzing duplicates...', 30);
       const payeeRowData = createPayeeRowMapping(fileData, selectedPayeeColumn);
       
+      // Update processing info with final details
+      const duplicates = fileData.length - payeeRowData.uniquePayeeNames.length;
+      setProcessingInfo(prev => ({
+        ...prev,
+        uniquePayees: payeeRowData.uniquePayeeNames.length,
+        duplicates
+      }));
+
+      // Enhanced toast with detailed information
       toast({
         title: "Processing Started",
-        description: `Processing ${payeeRowData.uniquePayeeNames.length} unique payees from ${fileName}.`,
+        description: `Processing ${payeeRowData.uniquePayeeNames.length} unique payees from ${fileData.length} total rows (${duplicates} duplicates found). Estimated time: ${processingInfo.estimatedTime || 'calculating...'}`,
       });
 
       return payeeRowData;
@@ -133,6 +182,7 @@ export const useSmartFileUpload = () => {
     setFileHeaders([]);
     setSelectedPayeeColumn('');
     setFileName('');
+    setProcessingInfo({});
     clearProgress(UPLOAD_ID);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -153,6 +203,7 @@ export const useSmartFileUpload = () => {
     selectedPayeeColumn,
     setSelectedPayeeColumn,
     fileName,
+    processingInfo,
     fileInputRef,
     handleFileSelect,
     validatePayeeColumn,
