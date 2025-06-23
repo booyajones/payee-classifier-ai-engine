@@ -10,6 +10,8 @@ interface ProgressState {
   jobId?: string;
   status?: string;
   metadata?: Record<string, any>;
+  memoryUsage?: number;
+  estimatedTimeRemaining?: number;
 }
 
 interface ProgressHistory {
@@ -43,11 +45,23 @@ export const useProgressPersistence = () => {
         setProgressHistory(data.history || {});
         
         console.log('[PROGRESS PERSISTENCE] Loaded persisted progress:', Object.keys(data.current || {}));
+        
+        // Check for any incomplete operations that need recovery
+        const incompleteOperations = Object.values(data.current || {}).filter(
+          (state: any) => state.percentage < 100 && state.percentage > 0
+        );
+        
+        if (incompleteOperations.length > 0) {
+          toast({
+            title: "Previous Operations Recovered",
+            description: `Found ${incompleteOperations.length} incomplete operation(s) from previous session.`,
+          });
+        }
       }
     } catch (error) {
       console.warn('[PROGRESS PERSISTENCE] Failed to load persisted progress:', error);
     }
-  }, []);
+  }, [toast]);
 
   const persistProgress = useCallback((current: Record<string, ProgressState>, history: ProgressHistory) => {
     try {
@@ -79,6 +93,20 @@ export const useProgressPersistence = () => {
     jobId?: string,
     metadata?: Record<string, any>
   ) => {
+    const memoryInfo = (performance as any).memory;
+    const memoryUsage = memoryInfo ? memoryInfo.usedJSHeapSize : undefined;
+    
+    // Enhanced time estimation based on progress rate
+    const existingProgress = progressStates[id];
+    let estimatedTimeRemaining: number | undefined;
+    
+    if (existingProgress && percentage > existingProgress.percentage && percentage < 100) {
+      const progressDiff = percentage - existingProgress.percentage;
+      const timeDiff = Date.now() - existingProgress.timestamp;
+      const remainingProgress = 100 - percentage;
+      estimatedTimeRemaining = Math.round((remainingProgress / progressDiff) * timeDiff);
+    }
+
     const newState: ProgressState = {
       id,
       percentage: Math.max(0, Math.min(100, percentage)),
@@ -86,7 +114,9 @@ export const useProgressPersistence = () => {
       message,
       timestamp: Date.now(),
       jobId,
-      metadata
+      metadata,
+      memoryUsage,
+      estimatedTimeRemaining
     };
 
     setProgressStates(prev => {
@@ -114,8 +144,8 @@ export const useProgressPersistence = () => {
       return updated;
     });
 
-    console.log(`[PROGRESS PERSISTENCE] Updated progress for ${id}: ${percentage}% - ${message}`);
-  }, [persistProgress]);
+    console.log(`[PROGRESS PERSISTENCE] Updated progress for ${id}: ${percentage}% - ${message}${estimatedTimeRemaining ? ` (ETA: ${Math.round(estimatedTimeRemaining / 1000)}s)` : ''}`);
+  }, [persistProgress, progressStates]);
 
   const completeProgress = useCallback((id: string, finalMessage: string = 'Completed') => {
     updateProgress(id, finalMessage, 100, 'Complete');

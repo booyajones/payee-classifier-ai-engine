@@ -1,4 +1,3 @@
-
 import { Loader2, CheckCircle, AlertCircle, Clock, MemoryStick, Activity } from 'lucide-react';
 import { useProgressPersistence } from '@/hooks/useProgressPersistence';
 import { useMemoryMonitor } from '@/lib/performance/memoryOptimization';

@@ -1,9 +1,9 @@
-
 import { useState, useRef } from 'react';
 import { parseUploadedFile } from '@/lib/utils';
-import { validateFile, validatePayeeData, estimateProcessingTime } from '@/lib/fileValidation';
 import { createPayeeRowMapping, PayeeRowData } from '@/lib/rowMapping';
 import { useUnifiedProgress } from '@/contexts/UnifiedProgressContext';
+import { useEnhancedFileValidation } from './useEnhancedFileValidation';
+import { useMemoryAwareFileProcessor } from './useMemoryAwareFileProcessor';
 import { useToast } from '@/hooks/use-toast';
 
 export type UploadState = 'idle' | 'uploaded' | 'processing' | 'complete' | 'error';
@@ -14,6 +14,15 @@ export interface FileProcessingInfo {
   totalRows?: number;
   uniquePayees?: number;
   duplicates?: number;
+  fileInfo?: {
+    size: number;
+    type: string;
+    lastModified: Date;
+    encoding?: string;
+    hasHeaders?: boolean;
+    estimatedRows?: number;
+    columns?: string[];
+  };
 }
 
 export const useSmartFileUpload = () => {
@@ -28,6 +37,12 @@ export const useSmartFileUpload = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { updateProgress, completeProgress, clearProgress } = useUnifiedProgress();
+  const { validateFile } = useEnhancedFileValidation();
+  const { processWithMemoryManagement, getMemoryStatus } = useMemoryAwareFileProcessor({
+    enableMonitoring: true,
+    maxChunkSize: 2000,
+    memoryThreshold: 0.8
+  });
   const { toast } = useToast();
 
   const UPLOAD_ID = 'file-upload';
@@ -59,27 +74,50 @@ export const useSmartFileUpload = () => {
     setProcessingInfo({});
 
     try {
-      const fileValidation = validateFile(file);
-      if (!fileValidation.isValid) {
+      // Use enhanced file validation
+      const validationResult = await validateFile(file, {
+        maxFileSize: 100 * 1024 * 1024, // 100MB
+        allowedTypes: ['.xlsx', '.xls', '.csv'],
+        requireHeaders: true,
+        minRows: 1,
+        maxRows: 100000
+      });
+
+      if (!validationResult.isValid) {
         setUploadState('error');
-        setErrorMessage(fileValidation.error!.message);
-        setSuggestions(getSuggestions(fileValidation.error!.code));
+        setErrorMessage(validationResult.error!.message);
+        setSuggestions(getSuggestions(validationResult.error!.code));
         clearProgress(UPLOAD_ID);
         return;
       }
 
-      // Show size warning if applicable
-      if (fileValidation.fileInfo?.sizeWarning) {
-        toast({
-          title: "Large File Warning",
-          description: fileValidation.fileInfo.sizeWarning,
-          variant: "destructive",
+      // Show warnings if any
+      if (validationResult.warnings) {
+        validationResult.warnings.forEach(warning => {
+          toast({
+            title: "File Warning",
+            description: warning,
+            variant: "destructive",
+          });
         });
       }
 
       updateProgress(UPLOAD_ID, 'Reading file contents...', 30);
 
-      const data = await parseUploadedFile(file);
+      // Memory-aware file processing for large files
+      const data = await processWithMemoryManagement(
+        [file],
+        async (files) => {
+          const results = [];
+          for (const f of files) {
+            const parsed = await parseUploadedFile(f);
+            results.push(...(parsed || []));
+          }
+          return results;
+        },
+        'file-parsing'
+      );
+
       if (!data || data.length === 0) {
         setUploadState('error');
         setErrorMessage('No data found in the file. Please check if the file has content.');
@@ -97,15 +135,21 @@ export const useSmartFileUpload = () => {
         return;
       }
 
-      // Set initial processing info
-      const dataSize = JSON.stringify(data).length;
-      const estimatedTime = estimateProcessingTime(dataSize, data.length);
-      
-      setProcessingInfo({
-        estimatedTime,
+      // Enhanced processing info with file validation details
+      const enhancedProcessingInfo: FileProcessingInfo = {
+        estimatedTime: validationResult.fileInfo?.estimatedRows ? 
+          `${Math.ceil(validationResult.fileInfo.estimatedRows / 1000)} minutes` : '1-2 minutes',
         totalRows: data.length,
-        sizeWarning: fileValidation.fileInfo?.sizeWarning
-      });
+        fileInfo: validationResult.fileInfo
+      };
+
+      // Check memory status
+      const memoryStatus = getMemoryStatus();
+      if (memoryStatus.memoryPressure === 'high') {
+        enhancedProcessingInfo.sizeWarning = 'High memory usage detected. Processing may be slower.';
+      }
+
+      setProcessingInfo(enhancedProcessingInfo);
 
       updateProgress(UPLOAD_ID, 'File uploaded successfully! Please select the payee column.', 60);
       
@@ -114,10 +158,10 @@ export const useSmartFileUpload = () => {
       setUploadState('uploaded');
       completeProgress(UPLOAD_ID, 'File uploaded successfully!');
 
-      // Show detailed file info
+      // Enhanced file info toast
       toast({
         title: "File Analysis Complete",
-        description: `Found ${data.length.toLocaleString()} rows with ${headers.length} columns. Estimated processing time: ${estimatedTime}`,
+        description: `Found ${data.length.toLocaleString()} rows with ${headers.length} columns. ${validationResult.fileInfo?.hasHeaders ? 'Headers detected.' : ''} Estimated processing time: ${enhancedProcessingInfo.estimatedTime}`,
       });
 
     } catch (error) {
@@ -136,14 +180,30 @@ export const useSmartFileUpload = () => {
     updateProgress(UPLOAD_ID, 'Validating payee data...', 10);
 
     try {
-      const dataValidation = validatePayeeData(fileData, selectedPayeeColumn);
-      if (!dataValidation.isValid) {
-        setUploadState('error');
-        setErrorMessage(dataValidation.error!.message);
-        setSuggestions(getSuggestions(dataValidation.error!.code));
-        clearProgress(UPLOAD_ID);
-        return null;
-      }
+      // Memory-aware payee validation processing
+      const validationResult = await processWithMemoryManagement(
+        [{ data: fileData, column: selectedPayeeColumn }],
+        async (chunks) => {
+          const results = [];
+          for (const chunk of chunks) {
+            // Extract and validate payee names
+            const payeeNames = chunk.data
+              .map((row: any) => {
+                const value = row[chunk.column];
+                return typeof value === 'string' ? value.trim() : String(value || '').trim();
+              })
+              .filter((name: string) => name.length > 0);
+
+            if (payeeNames.length === 0) {
+              throw new Error(`No valid payee names found in the "${chunk.column}" column. Please check your data and column selection.`);
+            }
+
+            results.push(...payeeNames);
+          }
+          return results;
+        },
+        'payee-validation'
+      );
 
       updateProgress(UPLOAD_ID, 'Creating payee mappings and analyzing duplicates...', 30);
       const payeeRowData = createPayeeRowMapping(fileData, selectedPayeeColumn);

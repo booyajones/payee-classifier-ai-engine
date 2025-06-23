@@ -9,8 +9,10 @@ import { useSmartFileUpload } from '@/hooks/useSmartFileUpload';
 import FileSelectionArea from './upload/FileSelectionArea';
 import ColumnSelectionArea from './upload/ColumnSelectionArea';
 import UploadProgressDisplay from './upload/UploadProgressDisplay';
+import EnhancedUploadProgressDisplay from './upload/EnhancedUploadProgressDisplay';
 import UploadErrorDisplay from './upload/UploadErrorDisplay';
 import UploadSuccessDisplay from './upload/UploadSuccessDisplay';
+import FileCorruptionDetector from './upload/FileCorruptionDetector';
 
 interface SmartFileUploadProps {
   onBatchJobCreated: (batchJob: BatchJob, payeeRowData: PayeeRowData) => void;
@@ -137,9 +139,11 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
         )}
 
         {isProcessing && (
-          <UploadProgressDisplay
+          <EnhancedUploadProgressDisplay
             uploadState={uploadState}
             uploadId={UPLOAD_ID}
+            showMemoryStats={true}
+            showProgressHistory={false}
           />
         )}
 
@@ -147,6 +151,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
           <UploadSuccessDisplay
             uploadId={UPLOAD_ID}
             onReset={resetUpload}
+            resultCount={processingInfo.uniquePayees}
           />
         )}
 
