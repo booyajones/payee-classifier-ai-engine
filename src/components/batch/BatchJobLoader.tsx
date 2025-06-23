@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BatchJob, checkBatchJobStatus } from "@/lib/openai/trueBatchAPI";
@@ -13,6 +12,7 @@ interface BatchJobLoaderProps {
 
 const BatchJobLoader = ({ onJobsLoaded, onLoadingComplete }: BatchJobLoaderProps) => {
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState("Loading batch jobs from database...");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -22,48 +22,70 @@ const BatchJobLoader = ({ onJobsLoaded, onLoadingComplete }: BatchJobLoaderProps
   const loadJobsFromDatabase = async () => {
     try {
       setIsLoading(true);
+      setLoadingMessage("Connecting to database...");
       
+      console.log('[BATCH LOADER] Starting to load all batch jobs from database');
       const { jobs, payeeRowDataMap } = await loadAllBatchJobs();
       
       if (jobs.length === 0) {
         console.log('[BATCH LOADER] No saved jobs found in database');
-        onLoadingComplete();
+        setLoadingMessage("No previous jobs found");
+        setTimeout(() => onLoadingComplete(), 1000);
         return;
       }
 
-      console.log(`[BATCH LOADER] Found ${jobs.length} saved jobs in database, checking status...`);
+      console.log(`[BATCH LOADER] Found ${jobs.length} saved jobs in database, verifying status...`);
+      setLoadingMessage(`Found ${jobs.length} batch jobs, checking status...`);
 
       const updatedJobs: BatchJob[] = [];
       const validPayeeRowDataMap: Record<string, PayeeRowData> = {};
+      let updatedCount = 0;
 
-      for (const job of jobs) {
+      for (let i = 0; i < jobs.length; i++) {
+        const job = jobs[i];
+        setLoadingMessage(`Checking job ${i + 1}/${jobs.length}: ${job.id.substring(0, 8)}...`);
+        
         try {
-          console.log(`[BATCH LOADER] Checking status of job ${job.id}`);
-          const updatedJob = await checkBatchJobStatus(job.id);
-          updatedJobs.push(updatedJob);
-          validPayeeRowDataMap[job.id] = payeeRowDataMap[job.id];
+          console.log(`[BATCH LOADER] Checking status of job ${job.id} (${job.status})`);
           
-          // Update database if status changed
-          if (updatedJob.status !== job.status) {
-            console.log(`[BATCH LOADER] Job ${job.id} status changed: ${job.status} -> ${updatedJob.status}`);
-            await updateBatchJobStatus(updatedJob);
+          // Only check OpenAI status for jobs that might have changed
+          if (['validating', 'in_progress', 'finalizing'].includes(job.status)) {
+            const updatedJob = await checkBatchJobStatus(job.id);
+            
+            if (updatedJob.status !== job.status) {
+              console.log(`[BATCH LOADER] Job ${job.id} status changed: ${job.status} -> ${updatedJob.status}`);
+              await updateBatchJobStatus(updatedJob);
+              updatedCount++;
+            }
+            
+            updatedJobs.push(updatedJob);
+          } else {
+            // Job is in final state, no need to check OpenAI
+            updatedJobs.push(job);
           }
           
-          console.log(`[BATCH LOADER] Job ${job.id} preserved with complete payee row data`);
+          validPayeeRowDataMap[job.id] = payeeRowDataMap[job.id];
+          console.log(`[BATCH LOADER] Job ${job.id} preserved with complete payee row data (${payeeRowDataMap[job.id]?.uniquePayeeNames?.length || 0} payees)`);
           
         } catch (error) {
-          console.error(`[BATCH LOADER] Job ${job.id} no longer valid, but keeping data for recovery:`, error);
+          console.error(`[BATCH LOADER] Job ${job.id} status check failed, but keeping data for recovery:`, error);
+          // Keep the job data even if status check fails
           updatedJobs.push(job);
           validPayeeRowDataMap[job.id] = payeeRowDataMap[job.id];
         }
       }
 
+      console.log(`[BATCH LOADER] Loaded ${updatedJobs.length} jobs, ${updatedCount} status updates made`);
       onJobsLoaded(updatedJobs, validPayeeRowDataMap);
 
       if (updatedJobs.length > 0) {
+        const statusMessage = updatedCount > 0 
+          ? `Restored ${updatedJobs.length} batch job(s) with ${updatedCount} status update(s)`
+          : `Restored ${updatedJobs.length} batch job(s) with complete original data`;
+          
         toast({
-          title: "All Jobs Recovered",
-          description: `Restored ${updatedJobs.length} batch job(s) with complete original data from database.`,
+          title: "Jobs Loaded Successfully",
+          description: statusMessage,
         });
       }
 
@@ -75,6 +97,7 @@ const BatchJobLoader = ({ onJobsLoaded, onLoadingComplete }: BatchJobLoaderProps
         variant: "destructive"
       });
     } finally {
+      setIsLoading(false);
       onLoadingComplete();
     }
   };
@@ -88,13 +111,13 @@ const BatchJobLoader = ({ onJobsLoaded, onLoadingComplete }: BatchJobLoaderProps
       <CardHeader>
         <CardTitle>Batch Payee Classification</CardTitle>
         <CardDescription>
-          Loading and verifying all saved batch jobs from database...
+          {loadingMessage}
         </CardDescription>
       </CardHeader>
       <CardContent className="py-8">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground mt-2">Checking for previous batch jobs and data...</p>
+          <p className="text-muted-foreground mt-2">{loadingMessage}</p>
         </div>
       </CardContent>
     </Card>
