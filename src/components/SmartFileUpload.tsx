@@ -152,9 +152,9 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
 
         {uploadState === 'error' && (
           <UploadErrorDisplay
-            errorMessage={errorMessage}
-            suggestions={suggestions}
+            error={errorMessage}
             onRetry={resetUpload}
+            context="File Upload"
           />
         )}
       </CardContent>
