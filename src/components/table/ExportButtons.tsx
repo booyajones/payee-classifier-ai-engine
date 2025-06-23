@@ -87,7 +87,7 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
 
       toast({
         title: "Export Complete",
-        description: `Exported ${exportData.length} rows exactly.`,
+        description: `Exported ${exportData.length} rows with consistent column naming.`,
       });
 
     } catch (error) {

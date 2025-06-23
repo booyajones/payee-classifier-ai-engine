@@ -43,26 +43,26 @@ export function exportResultsWithOriginalDataV3(
       timestampString = new Date().toISOString();
     }
     
-    // Create export row: original data + classification columns
+    // Create export row: original data + classification columns (using consistent camelCase naming)
     const exportRow = {
       // Preserve ALL original columns exactly as they were
       ...originalRow,
       
-      // Add classification results
-      'Classification': result.result.classification,
-      'Confidence_%': result.result.confidence,
-      'Processing_Tier': result.result.processingTier,
-      'Reasoning': result.result.reasoning,
-      'Processing_Method': result.result.processingMethod || 'OpenAI Classification',
+      // Add classification results with consistent camelCase naming
+      'classification': result.result.classification,
+      'confidence': result.result.confidence,
+      'processingTier': result.result.processingTier,
+      'reasoning': result.result.reasoning,
+      'processingMethod': result.result.processingMethod || 'OpenAI Classification',
       
-      // Add keyword exclusion results
-      'Keyword_Exclusion': result.result.keywordExclusion?.isExcluded ? 'Yes' : 'No',
-      'Matched_Keywords': result.result.keywordExclusion?.matchedKeywords?.join('; ') || '',
-      'Keyword_Confidence': result.result.keywordExclusion?.confidence?.toString() || '0',
-      'Keyword_Reasoning': result.result.keywordExclusion?.reasoning || 'No keyword exclusion applied',
+      // Add keyword exclusion results with consistent camelCase naming
+      'keywordExclusion': result.result.keywordExclusion?.isExcluded ? 'Yes' : 'No',
+      'matchedKeywords': result.result.keywordExclusion?.matchedKeywords?.join('; ') || '',
+      'keywordConfidence': result.result.keywordExclusion?.confidence?.toString() || '0',
+      'keywordReasoning': result.result.keywordExclusion?.reasoning || 'No keyword exclusion applied',
       
       // Add timestamp
-      'Timestamp': timestampString
+      'timestamp': timestampString
     };
 
     exportData.push(exportRow);

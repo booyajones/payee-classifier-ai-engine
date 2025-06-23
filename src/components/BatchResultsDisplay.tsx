@@ -59,7 +59,7 @@ const BatchResultsDisplay = ({
       
       toast({
         title: "Export Complete",
-        description: `Exported exactly ${exportData.length} rows.`,
+        description: `Exported exactly ${exportData.length} rows with consistent column naming.`,
       });
     } catch (error) {
       console.error("Export error:", error);
