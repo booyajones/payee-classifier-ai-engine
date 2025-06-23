@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,12 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash, Shield } from "lucide-react";
+import { Plus, Edit, Trash, Shield, TestTube } from "lucide-react";
 import {
   getComprehensiveExclusionKeywords,
-  validateExclusionKeywords,
-  checkKeywordExclusion
+  validateExclusionKeywords
 } from "@/lib/classification/keywordExclusion";
+import { checkKeywordExclusion } from "@/lib/classification/enhancedKeywordExclusion";
+import { testKeywordExclusion, quickTest } from "@/lib/classification/keywordExclusionTest";
 import { KEYWORD_EXCLUSION_CONFIG } from "@/lib/classification/config";
 import {
   Table,
@@ -36,6 +36,7 @@ const KeywordExclusionManager = () => {
     // Load initial keywords
     const initialKeywords = getComprehensiveExclusionKeywords();
     setKeywords(initialKeywords);
+    console.log(`[KEYWORD EXCLUSION MANAGER] Loaded ${initialKeywords.length} keywords`);
   }, []);
 
   const handleAddKeyword = () => {
@@ -121,8 +122,22 @@ const KeywordExclusionManager = () => {
       return;
     }
 
+    console.log(`[KEYWORD EXCLUSION MANAGER] Testing: "${testPayeeName}"`);
     const result = checkKeywordExclusion(testPayeeName, keywords);
     setTestResult(result);
+    
+    // Also run quick test for detailed logging
+    quickTest(testPayeeName);
+  };
+
+  const runFullTest = () => {
+    console.log('[KEYWORD EXCLUSION MANAGER] Running full test suite...');
+    testKeywordExclusion();
+    
+    toast({
+      title: "Test Suite Complete",
+      description: "Check console for detailed test results",
+    });
   };
 
   const resetToDefaults = () => {
@@ -185,6 +200,10 @@ const KeywordExclusionManager = () => {
             <Button variant="outline" onClick={resetToDefaults}>
               Reset to Defaults
             </Button>
+            <Button variant="outline" onClick={runFullTest}>
+              <TestTube className="h-4 w-4 mr-2" />
+              Run Test Suite
+            </Button>
             <Badge variant="secondary">
               {keywords.length} keywords
             </Badge>
@@ -205,13 +224,19 @@ const KeywordExclusionManager = () => {
               <Label htmlFor="test-payee">Test Payee Name</Label>
               <Input
                 id="test-payee"
-                placeholder="Enter payee name to test"
+                placeholder="Enter payee name to test (e.g., 'Bank of America')"
                 value={testPayeeName}
                 onChange={(e) => {
                   setTestPayeeName(e.target.value);
                   handleTestPayee();
                 }}
               />
+            </div>
+            <div className="flex items-end">
+              <Button onClick={handleTestPayee} variant="outline">
+                <TestTube className="h-4 w-4 mr-2" />
+                Test
+              </Button>
             </div>
           </div>
           
@@ -221,10 +246,16 @@ const KeywordExclusionManager = () => {
                 <div className="space-y-2">
                   <p>
                     <strong>Result:</strong> {testResult.isExcluded ? "EXCLUDED" : "NOT EXCLUDED"}
+                    {testResult.confidence > 0 && ` (${testResult.confidence.toFixed(1)}% confidence)`}
                   </p>
                   {testResult.isExcluded && testResult.matchedKeywords.length > 0 && (
                     <p>
                       <strong>Matched Keywords:</strong> {testResult.matchedKeywords.join(", ")}
+                    </p>
+                  )}
+                  {testResult.reasoning && (
+                    <p>
+                      <strong>Reasoning:</strong> {testResult.reasoning}
                     </p>
                   )}
                 </div>

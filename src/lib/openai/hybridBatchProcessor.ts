@@ -1,4 +1,3 @@
-
 import { ClassificationConfig } from '@/lib/types';
 import { createBatchJob, BatchJob, getBatchJobResults, TrueBatchClassificationResult } from './trueBatchAPI';
 import { optimizedBatchClassification } from './optimizedBatchClassification';
@@ -34,23 +33,35 @@ export type ProgressCallback = (
 ) => void;
 
 /**
- * Apply keyword exclusions - ALWAYS ENABLED
+ * Apply keyword exclusions - ALWAYS ENABLED with enhanced logging
  */
 function applyKeywordExclusions(payeeNames: string[]) {
-  console.log(`[KEYWORD EXCLUSION] Processing ${payeeNames.length} names - ALWAYS ENABLED`);
+  console.log(`[HYBRID BATCH] [KEYWORD EXCLUSION] Processing ${payeeNames.length} names - ALWAYS ENABLED`);
+  console.log(`[HYBRID BATCH] [KEYWORD EXCLUSION] Config:`, KEYWORD_EXCLUSION_CONFIG);
   
-  const exclusionResults = payeeNames.map(name => {
+  const exclusionResults = payeeNames.map((name, index) => {
+    console.log(`[HYBRID BATCH] [KEYWORD EXCLUSION] Processing ${index + 1}/${payeeNames.length}: "${name}"`);
     const result = checkKeywordExclusion(name);
     
     if (KEYWORD_EXCLUSION_CONFIG.logMatches && result.isExcluded) {
-      console.log(`[KEYWORD EXCLUSION] Excluded "${name}" - matched: ${result.matchedKeywords.join(', ')}`);
+      console.log(`[HYBRID BATCH] [KEYWORD EXCLUSION] ✓ EXCLUDED "${name}" - matched: ${result.matchedKeywords.join(', ')}`);
+      console.log(`[HYBRID BATCH] [KEYWORD EXCLUSION] Reasoning: ${result.reasoning}`);
+    } else if (!result.isExcluded) {
+      console.log(`[HYBRID BATCH] [KEYWORD EXCLUSION] ✗ NOT EXCLUDED "${name}"`);
     }
     
     return result;
   });
   
   const excludedCount = exclusionResults.filter(r => r.isExcluded).length;
-  console.log(`[KEYWORD EXCLUSION] Excluded ${excludedCount}/${payeeNames.length} names`);
+  console.log(`[HYBRID BATCH] [KEYWORD EXCLUSION] SUMMARY: Excluded ${excludedCount}/${payeeNames.length} names`);
+  
+  // Log details of excluded items
+  exclusionResults.forEach((result, index) => {
+    if (result.isExcluded) {
+      console.log(`[HYBRID BATCH] [KEYWORD EXCLUSION] EXCLUDED[${index}]: "${payeeNames[index]}" -> ${result.matchedKeywords.join(', ')}`);
+    }
+  });
   
   return exclusionResults;
 }
@@ -65,6 +76,7 @@ export async function processWithHybridBatch(
   config?: ClassificationConfig
 ): Promise<HybridBatchResult> {
   console.log(`[HYBRID BATCH] Starting ${mode} processing for ${payeeNames.length} payees`);
+  console.log(`[HYBRID BATCH] Sample payees:`, payeeNames.slice(0, 5));
   
   const stats: BatchStats = {
     keywordExcluded: 0,

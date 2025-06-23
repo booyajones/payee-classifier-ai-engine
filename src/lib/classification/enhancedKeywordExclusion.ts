@@ -1,25 +1,20 @@
 
 import { KeywordExclusionResult, SimilarityScores } from '../types';
 import { calculateCombinedSimilarity, advancedNormalization } from './stringMatching';
-
-// Load exclusion keywords from localStorage
-function getExclusionKeywords(): string[] {
-  try {
-    const stored = localStorage.getItem('excludedKeywords');
-    return stored ? JSON.parse(stored) : [];
-  } catch (error) {
-    console.warn('Failed to load exclusion keywords:', error);
-    return [];
-  }
-}
+import { getComprehensiveExclusionKeywords } from './keywordExclusion';
 
 /**
  * Enhanced keyword exclusion with similarity matching and detailed results
+ * Always uses the comprehensive keyword list
  */
-export function checkKeywordExclusion(payeeName: string): KeywordExclusionResult {
-  const exclusionKeywords = getExclusionKeywords();
+export function checkKeywordExclusion(payeeName: string, customKeywords?: string[]): KeywordExclusionResult {
+  // Use comprehensive keywords as default, allow custom override for testing
+  const exclusionKeywords = customKeywords || getComprehensiveExclusionKeywords();
+  
+  console.log(`[ENHANCED KEYWORD EXCLUSION] Checking "${payeeName}" against ${exclusionKeywords.length} keywords`);
   
   if (exclusionKeywords.length === 0) {
+    console.warn('[ENHANCED KEYWORD EXCLUSION] No exclusion keywords available');
     return {
       isExcluded: false,
       matchedKeywords: [],
@@ -32,6 +27,8 @@ export function checkKeywordExclusion(payeeName: string): KeywordExclusionResult
   const matchedKeywords: string[] = [];
   const similarities: Array<{ keyword: string; similarity: number; scores: SimilarityScores }> = [];
   
+  console.log(`[ENHANCED KEYWORD EXCLUSION] Normalized: "${normalized}", Tokens: [${tokens.join(', ')}]`);
+  
   // Check for exact matches first
   for (const keyword of exclusionKeywords) {
     const normalizedKeyword = keyword.toUpperCase().trim();
@@ -39,12 +36,14 @@ export function checkKeywordExclusion(payeeName: string): KeywordExclusionResult
     // Exact match in normalized name
     if (normalized.includes(normalizedKeyword)) {
       matchedKeywords.push(keyword);
+      console.log(`[ENHANCED KEYWORD EXCLUSION] Exact match found: "${keyword}" in "${payeeName}"`);
       continue;
     }
     
     // Token-level exact match
     if (tokens.some(token => token === normalizedKeyword)) {
       matchedKeywords.push(keyword);
+      console.log(`[ENHANCED KEYWORD EXCLUSION] Token match found: "${keyword}" matches token in "${payeeName}"`);
       continue;
     }
     
@@ -52,6 +51,7 @@ export function checkKeywordExclusion(payeeName: string): KeywordExclusionResult
     const similarity = calculateCombinedSimilarity(normalized, normalizedKeyword);
     if (similarity.combined >= 85) { // High similarity threshold for exclusions
       similarities.push({ keyword, similarity: similarity.combined, scores: similarity });
+      console.log(`[ENHANCED KEYWORD EXCLUSION] Fuzzy match found: "${keyword}" (${similarity.combined.toFixed(1)}% similar)`);
     }
     
     // Check individual tokens for fuzzy matches
@@ -59,6 +59,7 @@ export function checkKeywordExclusion(payeeName: string): KeywordExclusionResult
       const tokenSimilarity = calculateCombinedSimilarity(token, normalizedKeyword);
       if (tokenSimilarity.combined >= 90) { // Very high threshold for token matches
         similarities.push({ keyword, similarity: tokenSimilarity.combined, scores: tokenSimilarity });
+        console.log(`[ENHANCED KEYWORD EXCLUSION] Token fuzzy match: "${keyword}" vs token "${token}" (${tokenSimilarity.combined.toFixed(1)}%)`);
       }
     }
   }
@@ -98,6 +99,8 @@ export function checkKeywordExclusion(payeeName: string): KeywordExclusionResult
     reasoning = 'No exclusion keywords matched';
   }
   
+  console.log(`[ENHANCED KEYWORD EXCLUSION] Result for "${payeeName}": ${isExcluded ? 'EXCLUDED' : 'NOT EXCLUDED'} (${matchedKeywords.join(', ')})`);
+  
   return {
     isExcluded,
     matchedKeywords,
@@ -110,11 +113,15 @@ export function checkKeywordExclusion(payeeName: string): KeywordExclusionResult
  * Bulk keyword exclusion check for batch processing
  */
 export function bulkKeywordExclusion(payeeNames: string[]): Map<string, KeywordExclusionResult> {
+  console.log(`[ENHANCED KEYWORD EXCLUSION] Bulk processing ${payeeNames.length} payees`);
   const results = new Map<string, KeywordExclusionResult>();
   
   for (const name of payeeNames) {
     results.set(name, checkKeywordExclusion(name));
   }
+  
+  const excludedCount = Array.from(results.values()).filter(r => r.isExcluded).length;
+  console.log(`[ENHANCED KEYWORD EXCLUSION] Bulk result: ${excludedCount}/${payeeNames.length} excluded`);
   
   return results;
 }
