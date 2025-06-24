@@ -1,30 +1,23 @@
 
-import { BatchJob } from "@/lib/openai/trueBatchAPI";
+import { BatchJob, getBatchJobResults } from "@/lib/openai/trueBatchAPI";
 import { PayeeRowData } from "@/lib/rowMapping";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
-import { useBatchJobChunkedDownload } from "./useBatchJobChunkedDownload";
 import { processBatchResults } from "@/services/batchResultProcessor";
 import { useToast } from "@/components/ui/use-toast";
 
 interface UseBatchJobDownloadProps {
   payeeRowDataMap: Record<string, PayeeRowData>;
   onJobComplete: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void;
-  isDownloadCancelled: (jobId: string) => boolean;
-  updateProgress: (jobId: string, current: number, total: number) => void;
 }
 
 export const useBatchJobDownload = ({
   payeeRowDataMap,
-  onJobComplete,
-  isDownloadCancelled,
-  updateProgress
+  onJobComplete
 }: UseBatchJobDownloadProps) => {
   const { toast } = useToast();
-  const { downloadChunkedResults, isDownloadRetrying } = useBatchJobChunkedDownload();
 
   const handleDownloadResults = async (job: BatchJob) => {
     console.log(`[BATCH DOWNLOAD] Starting download for job ${job.id}`);
-    console.log(`[BATCH DOWNLOAD] onJobComplete type:`, typeof onJobComplete);
     
     // Validate callback before proceeding
     if (typeof onJobComplete !== 'function') {
@@ -59,14 +52,10 @@ export const useBatchJobDownload = ({
     }
 
     try {
-      console.log(`[BATCH DOWNLOAD] Starting download for job ${job.id} with ${uniquePayeeNames.length} payees`);
+      console.log(`[BATCH DOWNLOAD] Downloading results for job ${job.id} with ${uniquePayeeNames.length} payees`);
       
-      const rawResults = await downloadChunkedResults(
-        job,
-        uniquePayeeNames,
-        (current: number, total: number) => updateProgress(job.id, current, total),
-        isDownloadCancelled
-      );
+      // Simple direct download - no chunking needed
+      const rawResults = await getBatchJobResults(job, uniquePayeeNames);
 
       console.log(`[BATCH DOWNLOAD] Download completed, processing ${rawResults.length} results`);
 
@@ -82,38 +71,23 @@ export const useBatchJobDownload = ({
       console.log(`[BATCH DOWNLOAD] onJobComplete called successfully`);
 
       toast({
-        title: "Download Complete",
-        description: `Successfully downloaded ${finalClassifications.length} results.`,
+        title: "Results Ready",
+        description: `Successfully processed ${finalClassifications.length} results.`,
       });
 
     } catch (error) {
       console.error('[BATCH DOWNLOAD] Download failed:', error);
       
-      if (error instanceof Error && error.message.includes('cancelled')) {
-        toast({
-          title: "Download Cancelled",
-          description: "The download was cancelled by user.",
-          variant: "destructive"
-        });
-      } else if (error instanceof Error && error.message.includes('Partial download')) {
-        toast({
-          title: "Partial Download",
-          description: error.message,
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Download Failed",
-          description: error instanceof Error ? error.message : "Unknown error occurred",
-          variant: "destructive"
-        });
-      }
+      toast({
+        title: "Download Failed",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive"
+      });
       throw error;
     }
   };
 
   return {
-    handleDownloadResults,
-    isDownloadRetrying
+    handleDownloadResults
   };
 };

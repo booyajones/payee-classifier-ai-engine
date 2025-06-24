@@ -11,8 +11,6 @@ interface BatchJobContainerProps {
   jobs: BatchJob[];
   payeeRowDataMap: Record<string, PayeeRowData>;
   refreshingJobs: Set<string>;
-  downloadingJobs: Set<string>;
-  downloadProgress: Record<string, { current: number; total: number }>;
   pollingStates: Record<string, { isPolling: boolean }>;
   onRefresh: (jobId: string) => Promise<void>;
   onDownload: (job: BatchJob) => Promise<void>;
@@ -24,8 +22,6 @@ const BatchJobContainer = React.memo(({
   jobs, 
   payeeRowDataMap,
   refreshingJobs,
-  downloadingJobs,
-  downloadProgress,
   pollingStates,
   onRefresh,
   onDownload,
@@ -60,8 +56,6 @@ const BatchJobContainer = React.memo(({
       jobs={jobs}
       payeeRowDataMap={payeeRowDataMap}
       refreshingJobs={refreshingJobs}
-      downloadingJobs={downloadingJobs}
-      downloadProgress={downloadProgress}
       pollingStates={pollingStates}
       onRefresh={onRefresh}
       onDownload={onDownload}

@@ -2,68 +2,24 @@
 import React from 'react';
 import { Progress } from '@/components/ui/progress';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
-import { useUnifiedProgress } from '@/contexts/UnifiedProgressContext';
 
 interface BatchJobProgressProps {
   job: BatchJob;
-  isCompleted: boolean;
-  isDownloading: boolean;
-  progress?: { current: number; total: number };
-  customProgress?: {
-    stage: string;
-    percentage: number;
-    isActive: boolean;
-  };
+  isCompleted?: boolean;
 }
 
 const BatchJobProgress = ({
   job,
-  isCompleted,
-  isDownloading,
-  progress,
-  customProgress
+  isCompleted = false
 }: BatchJobProgressProps) => {
-  const { getProgress } = useUnifiedProgress();
-
   // Calculate progress info
   const progressInfo = React.useMemo(() => {
     // For completed jobs, show 100% progress
-    if (job.status === 'completed' && isCompleted) {
+    if (job.status === 'completed' || isCompleted) {
       return {
         percentage: 100,
         label: 'Processing complete',
-        showBar: true,
-        source: 'completed'
-      };
-    }
-
-    const unifiedProgress = getProgress(`job-${job.id}`);
-    
-    if (unifiedProgress && unifiedProgress.percentage > 0) {
-      return {
-        percentage: unifiedProgress.percentage,
-        label: unifiedProgress.stage || unifiedProgress.message || 'Processing...',
-        showBar: true,
-        source: 'unified'
-      };
-    }
-
-    if (customProgress && customProgress.isActive) {
-      return {
-        percentage: customProgress.percentage,
-        label: customProgress.stage,
-        showBar: true,
-        source: 'custom'
-      };
-    }
-
-    if (progress && progress.total > 0) {
-      const percentage = Math.round((progress.current / progress.total) * 100);
-      return {
-        percentage,
-        label: `Downloading: ${progress.current}/${progress.total}`,
-        showBar: true,
-        source: 'download'
+        showBar: true
       };
     }
 
@@ -72,22 +28,19 @@ const BatchJobProgress = ({
       return {
         percentage,
         label: `${job.request_counts.completed}/${job.request_counts.total} completed`,
-        showBar: true,
-        source: 'batch'
+        showBar: true
       };
     }
 
+    // For other statuses, don't show progress bar
     return {
       percentage: 0,
       label: 'Ready',
-      showBar: false,
-      source: 'none'
+      showBar: false
     };
-  }, [job.status, job.id, job.request_counts, isCompleted, getProgress, customProgress, progress]);
+  }, [job.status, job.request_counts, isCompleted]);
 
-  const showBar = progressInfo.showBar || isDownloading;
-
-  if (!showBar) return null;
+  if (!progressInfo.showBar) return null;
 
   return (
     <div className="space-y-2">

@@ -9,8 +9,6 @@ interface BatchJobListProps {
   jobs: BatchJob[];
   payeeRowDataMap: Record<string, PayeeRowData>;
   refreshingJobs: Set<string>;
-  downloadingJobs: Set<string>;
-  downloadProgress: Record<string, { current: number; total: number }>;
   pollingStates: Record<string, { isPolling: boolean }>;
   onRefresh: (jobId: string) => Promise<void>;
   onDownload: (job: BatchJob) => Promise<void>;
@@ -22,8 +20,6 @@ const BatchJobList = ({
   jobs, 
   payeeRowDataMap,
   refreshingJobs,
-  downloadingJobs,
-  downloadProgress,
   pollingStates,
   onRefresh,
   onDownload,
@@ -46,9 +42,7 @@ const BatchJobList = ({
         const payeeData = payeeRowDataMap[job.id];
         const payeeCount = payeeData?.uniquePayeeNames?.length || 0;
         const isRefreshing = refreshingJobs.has(job.id);
-        const isDownloading = downloadingJobs.has(job.id);
         const isPolling = pollingStates[job.id]?.isPolling || false;
-        const progress = downloadProgress[job.id];
 
         return (
           <div key={`${job.id}-${job.status}-${job.request_counts.completed}`} className="space-y-2">
@@ -57,15 +51,13 @@ const BatchJobList = ({
               payeeCount={payeeCount}
               payeeData={payeeData}
               isRefreshing={isRefreshing}
-              isDownloading={isDownloading}
               isPolling={isPolling}
-              progress={progress}
               onRefresh={() => onRefresh(job.id)}
               onCancel={() => onCancel(job.id)}
               onDelete={() => onJobDelete(job.id)}
             />
             
-            {/* Single download interface for completed jobs */}
+            {/* Simple download interface for completed jobs */}
             {job.status === 'completed' && payeeData && (
               <DirectCSVExport 
                 job={job}

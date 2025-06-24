@@ -1,3 +1,4 @@
+
 import React, { useMemo } from "react";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
@@ -124,8 +125,6 @@ const BatchJobManager = React.memo(({
 
   const {
     refreshingJobs,
-    downloadingJobs,
-    downloadProgress,
     pollingStates,
     handleRefreshJob,
     handleDownloadResults,
@@ -166,8 +165,6 @@ const BatchJobManager = React.memo(({
         jobs={jobs}
         payeeRowDataMap={payeeRowDataMap}
         refreshingJobs={refreshingJobs}
-        downloadingJobs={downloadingJobs}
-        downloadProgress={downloadProgress}
         pollingStates={pollingStates}
         onRefresh={handleRefreshJob}
         onDownload={handleDownloadResults}
