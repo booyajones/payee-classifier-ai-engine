@@ -1,3 +1,4 @@
+
 import { useCallback, useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
@@ -20,6 +21,13 @@ interface BatchCreationOptions {
   onJobComplete?: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void;
   silent?: boolean;
 }
+
+// Create a simple event emitter for job updates
+const jobUpdateListeners = new Set<() => void>();
+
+const emitJobUpdate = () => {
+  jobUpdateListeners.forEach(listener => listener());
+};
 
 export const useBatchManager = () => {
   const { toast } = useToast();
@@ -59,6 +67,20 @@ export const useBatchManager = () => {
     loadExistingJobs();
   }, []);
 
+  // Listen for job updates from other components
+  useEffect(() => {
+    const handleJobUpdate = () => {
+      console.log('[BATCH MANAGER] Received job update event, refreshing jobs...');
+      refreshJobs(true);
+    };
+
+    jobUpdateListeners.add(handleJobUpdate);
+    
+    return () => {
+      jobUpdateListeners.delete(handleJobUpdate);
+    };
+  }, []);
+
   const createBatch = useCallback(async (
     payeeRowData: PayeeRowData,
     options: BatchCreationOptions = {}
@@ -77,6 +99,8 @@ export const useBatchManager = () => {
 
       // If it's a local processing job (null), no state update needed
       if (!job) {
+        // Still emit update event for local processing completion
+        emitJobUpdate();
         return null;
       }
 
@@ -97,7 +121,10 @@ export const useBatchManager = () => {
         };
       });
       
-      console.log(`[BATCH MANAGER] Job ${job.id} successfully added to state`);
+      // Emit update event to notify other components
+      console.log(`[BATCH MANAGER] Job ${job.id} successfully added, emitting update event`);
+      emitJobUpdate();
+      
       return job;
 
     } catch (error) {
@@ -126,6 +153,9 @@ export const useBatchManager = () => {
           jobs: updatedJobs
         };
       });
+      
+      // Emit update event for job status changes
+      emitJobUpdate();
     } catch (error) {
       console.error('[BATCH MANAGER] Update failed:', error);
       setState(prev => ({
@@ -157,6 +187,9 @@ export const useBatchManager = () => {
         };
       });
       
+      // Emit update event for job deletions
+      emitJobUpdate();
+      
       toast({
         title: "Job Deleted",
         description: `Job ${jobId.slice(-8)} removed successfully`,
@@ -183,6 +216,9 @@ export const useBatchManager = () => {
         errors: {},
         isLoaded: true
       });
+      
+      // Emit update event for clearing all jobs
+      emitJobUpdate();
       
       toast({
         title: "All Jobs Cleared",
@@ -236,3 +272,6 @@ export const useBatchManager = () => {
     getError: useCallback((jobId: string) => state.errors[jobId], [state.errors])
   };
 };
+
+// Export the event emitter function for external use
+export const emitBatchJobUpdate = emitJobUpdate;

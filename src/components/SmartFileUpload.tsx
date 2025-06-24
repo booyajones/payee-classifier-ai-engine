@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileCheck } from 'lucide-react';
-import { useBatchManager } from '@/hooks/useBatchManager';
+import { useBatchManager, emitBatchJobUpdate } from '@/hooks/useBatchManager';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
 import { PayeeRowData } from '@/lib/rowMapping';
@@ -83,6 +83,10 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
       // Always call onBatchJobCreated, whether we have a real batch job or null (local processing)
       console.log(`[SMART UPLOAD] Calling onBatchJobCreated with job: ${job ? job.id : 'local-processing'}`);
       onBatchJobCreated(job, payeeRowData);
+
+      // Emit batch job update to refresh UI across components
+      console.log(`[SMART UPLOAD] Emitting batch job update event`);
+      emitBatchJobUpdate();
 
       if (job) {
         setUploadState('processing');
