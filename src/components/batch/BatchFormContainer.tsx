@@ -17,18 +17,9 @@ const BatchFormContainer = ({ onBatchClassify, onComplete }: BatchFormContainerP
   const batchManager = useBatchManager();
   const formState = useSimplifiedBatchForm();
 
-  console.log(`[BATCH CONTAINER] Rendering with ${batchManager.jobs.length} jobs`);
+  console.log(`[BATCH CONTAINER] Rendering with ${batchManager.jobs.length} jobs, isLoaded: ${batchManager.isLoaded}`);
 
-  // Show loading until batch manager has loaded existing jobs
-  if (!batchManager.isLoaded) {
-    return (
-      <BatchJobLoader 
-        onJobsLoaded={() => {}}
-        onLoadingComplete={() => {}}
-      />
-    );
-  }
-
+  // Move all hooks before any conditional logic
   const handleFileUploadBatchJob = useCallback(async (batchJob: any, payeeRowData: any) => {
     console.log(`[BATCH CONTAINER] Job ${batchJob.id} created, switching to jobs tab`);
     
@@ -57,6 +48,16 @@ const BatchFormContainer = ({ onBatchClassify, onComplete }: BatchFormContainerP
       onComplete(results, summary);
     }
   }, [formState, onBatchClassify, onComplete]);
+
+  // Show loading until batch manager has loaded existing jobs
+  if (!batchManager.isLoaded) {
+    return (
+      <BatchJobLoader 
+        onJobsLoaded={() => {}}
+        onLoadingComplete={() => {}}
+      />
+    );
+  }
 
   return (
     <Card>
