@@ -39,59 +39,6 @@ const BatchJobList = ({
     onJobComplete
   });
 
-  // Robust delete handler with comprehensive error handling
-  const handleSafeDelete = (jobId: string) => {
-    try {
-      console.log(`[BATCH JOB LIST] Attempting to delete job ${jobId}`);
-      console.log(`[BATCH JOB LIST] onJobDelete type:`, typeof onJobDelete);
-      
-      if (typeof onJobDelete === 'function') {
-        onJobDelete(jobId);
-        console.log(`[BATCH JOB LIST] Successfully called onJobDelete for ${jobId}`);
-      } else {
-        console.error('[BATCH JOB LIST] onJobDelete is not a function:', onJobDelete);
-        throw new Error('Delete function not available');
-      }
-    } catch (error) {
-      console.error('[BATCH JOB LIST] Error deleting job:', error);
-    }
-  };
-
-  // Robust refresh handler
-  const handleSafeRefresh = (jobId: string) => {
-    try {
-      console.log(`[BATCH JOB LIST] Attempting to refresh job ${jobId}`);
-      console.log(`[BATCH JOB LIST] handleRefreshJob type:`, typeof handleRefreshJob);
-      
-      if (typeof handleRefreshJob === 'function') {
-        handleRefreshJob(jobId);
-        console.log(`[BATCH JOB LIST] Successfully called handleRefreshJob for ${jobId}`);
-      } else {
-        console.error('[BATCH JOB LIST] handleRefreshJob is not a function:', handleRefreshJob);
-        throw new Error('Refresh function not available');
-      }
-    } catch (error) {
-      console.error('[BATCH JOB LIST] Error refreshing job:', error);
-    }
-  };
-
-  // Robust cancel handler
-  const handleSafeCancel = (jobId: string) => {
-    try {
-      console.log(`[BATCH JOB LIST] Attempting to cancel job ${jobId}`);
-      
-      if (typeof handleCancelJob === 'function') {
-        handleCancelJob(jobId);
-        console.log(`[BATCH JOB LIST] Successfully called handleCancelJob for ${jobId}`);
-      } else {
-        console.error('[BATCH JOB LIST] handleCancelJob is not a function:', handleCancelJob);
-        throw new Error('Cancel function not available');
-      }
-    } catch (error) {
-      console.error('[BATCH JOB LIST] Error cancelling job:', error);
-    }
-  };
-
   if (jobs.length === 0) {
     return (
       <div className="text-center py-8 border rounded-md">
@@ -120,10 +67,10 @@ const BatchJobList = ({
               isDownloading={isDownloading}
               isPolling={isPolling}
               progress={progress}
-              onRefresh={() => handleSafeRefresh(job.id)}
+              onRefresh={() => handleRefreshJob(job.id)}
               onDownload={() => handleDownloadResults(job)}
-              onCancel={() => handleSafeCancel(job.id)}
-              onDelete={() => handleSafeDelete(job.id)}
+              onCancel={() => handleCancelJob(job.id)}
+              onDelete={() => onJobDelete(job.id)}
             />
             
             {/* Single download interface for completed jobs */}
