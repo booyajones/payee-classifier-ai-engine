@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -85,14 +84,18 @@ const BatchJobCard = React.memo(({
     return job.status.charAt(0).toUpperCase() + job.status.slice(1).replace('_', ' ');
   }, [job.status, shouldTimeout, isStuck]);
 
-  // Create safe callback wrappers
+  // Create safe callback wrappers with comprehensive error handling
   const safeOnRefresh = () => {
     try {
       console.log(`[BATCH CARD] Calling onRefresh for job ${job.id}`);
+      console.log(`[BATCH CARD] onRefresh type:`, typeof onRefresh);
+      
       if (typeof onRefresh === 'function') {
         onRefresh();
+        console.log(`[BATCH CARD] Successfully called onRefresh for ${job.id}`);
       } else {
-        console.error('[BATCH CARD] onRefresh is not a function:', typeof onRefresh);
+        console.error('[BATCH CARD] onRefresh is not a function:', onRefresh);
+        throw new Error('Refresh function not available');
       }
     } catch (error) {
       console.error('[BATCH CARD] Error calling onRefresh:', error);
@@ -102,10 +105,14 @@ const BatchJobCard = React.memo(({
   const safeOnCancel = () => {
     try {
       console.log(`[BATCH CARD] Calling onCancel for job ${job.id}`);
+      console.log(`[BATCH CARD] onCancel type:`, typeof onCancel);
+      
       if (typeof onCancel === 'function') {
         onCancel();
+        console.log(`[BATCH CARD] Successfully called onCancel for ${job.id}`);
       } else {
-        console.error('[BATCH CARD] onCancel is not a function:', typeof onCancel);
+        console.error('[BATCH CARD] onCancel is not a function:', onCancel);
+        throw new Error('Cancel function not available');
       }
     } catch (error) {
       console.error('[BATCH CARD] Error calling onCancel:', error);
@@ -115,10 +122,14 @@ const BatchJobCard = React.memo(({
   const safeOnDelete = () => {
     try {
       console.log(`[BATCH CARD] Calling onDelete for job ${job.id}`);
+      console.log(`[BATCH CARD] onDelete type:`, typeof onDelete);
+      
       if (typeof onDelete === 'function') {
         onDelete();
+        console.log(`[BATCH CARD] Successfully called onDelete for ${job.id}`);
       } else {
-        console.error('[BATCH CARD] onDelete is not a function:', typeof onDelete);
+        console.error('[BATCH CARD] onDelete is not a function:', onDelete);
+        throw new Error('Delete function not available');
       }
     } catch (error) {
       console.error('[BATCH CARD] Error calling onDelete:', error);
@@ -181,7 +192,6 @@ const BatchJobCard = React.memo(({
             isDownloading={isDownloading}
             isPolling={isPolling}
             onRefresh={safeOnRefresh}
-            onDownload={onDownload}
             onCancel={safeOnCancel}
             onDelete={safeOnDelete}
           />
