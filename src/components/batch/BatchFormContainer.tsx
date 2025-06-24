@@ -11,9 +11,10 @@ import BatchFormContent from "./BatchFormContent";
 interface BatchFormContainerProps {
   onBatchClassify?: (results: PayeeClassification[]) => void;
   onComplete?: (results: PayeeClassification[], summary: BatchProcessingResult) => void;
+  onJobDelete?: () => void;
 }
 
-const BatchFormContainer = ({ onBatchClassify, onComplete }: BatchFormContainerProps) => {
+const BatchFormContainer = ({ onBatchClassify, onComplete, onJobDelete }: BatchFormContainerProps) => {
   const batchManager = useBatchManager();
   const formState = useSimplifiedBatchForm();
 
@@ -49,6 +50,18 @@ const BatchFormContainer = ({ onBatchClassify, onComplete }: BatchFormContainerP
     }
   }, [formState, onBatchClassify, onComplete]);
 
+  const handleJobDelete = useCallback((jobId: string) => {
+    console.log(`[BATCH CONTAINER] Job ${jobId} deleted, calling parent onJobDelete`);
+    
+    // Call the batch manager's delete function
+    batchManager.deleteJob(jobId);
+    
+    // Call the parent's onJobDelete to clear summary
+    if (onJobDelete) {
+      onJobDelete();
+    }
+  }, [batchManager, onJobDelete]);
+
   // Show loading until batch manager has loaded existing jobs
   if (!batchManager.isLoaded) {
     return (
@@ -73,7 +86,7 @@ const BatchFormContainer = ({ onBatchClassify, onComplete }: BatchFormContainerP
           onFileUploadBatchJob={handleFileUploadBatchJob}
           onJobUpdate={batchManager.updateJob}
           onJobComplete={handleJobComplete}
-          onJobDelete={batchManager.deleteJob}
+          onJobDelete={handleJobDelete}
           onReset={formState.reset}
         />
       </CardContent>
