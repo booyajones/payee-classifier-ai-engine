@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Download, X, Trash2 } from 'lucide-react';
+import { RefreshCw, X, Trash2 } from 'lucide-react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 
 interface BatchJobActionsProps {
@@ -23,7 +23,6 @@ const BatchJobActions = ({
   isDownloading,
   isPolling,
   onRefresh,
-  onDownload,
   onCancel,
   onDelete
 }: BatchJobActionsProps) => {
@@ -38,18 +37,6 @@ const BatchJobActions = ({
       }
     } catch (error) {
       console.error('[BATCH ACTIONS] Error in refresh:', error);
-    }
-  };
-
-  const safeDownload = () => {
-    try {
-      if (typeof onDownload === 'function') {
-        onDownload();
-      } else {
-        console.error('[BATCH ACTIONS] onDownload is not a function');
-      }
-    } catch (error) {
-      console.error('[BATCH ACTIONS] Error in download:', error);
     }
   };
 
@@ -89,18 +76,6 @@ const BatchJobActions = ({
         <RefreshCw className={`h-3 w-3 mr-1 ${(isRefreshing || isPolling) ? 'animate-spin' : ''}`} />
         Refresh
       </Button>
-
-      {job.status === 'completed' && !isCompleted && (
-        <Button
-          variant="default"
-          size="sm"
-          onClick={safeDownload}
-          disabled={isDownloading}
-        >
-          <Download className={`h-3 w-3 mr-1 ${isDownloading ? 'animate-pulse' : ''}`} />
-          Download
-        </Button>
-      )}
 
       {['validating', 'in_progress', 'finalizing'].includes(job.status) && (
         <Button

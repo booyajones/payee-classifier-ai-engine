@@ -9,110 +9,24 @@ import { PayeeRowData } from '@/lib/rowMapping';
 interface DirectCSVExportProps {
   job: BatchJob;
   payeeData: PayeeRowData;
-  onDownloadResults?: () => void;
+  onDownloadResults: () => Promise<void>;
 }
 
 const DirectCSVExport = ({ job, payeeData, onDownloadResults }: DirectCSVExportProps) => {
   const { toast } = useToast();
   const [isExporting, setIsExporting] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
-  const handleDirectCSVExport = async () => {
-    setIsExporting(true);
+  const handleMainDownload = async () => {
+    setIsDownloading(true);
     try {
-      console.log(`[DIRECT CSV] Exporting job ${job.id} with ${payeeData.originalFileData.length} rows`);
+      console.log(`[DIRECT CSV] Starting main download for job ${job.id}`);
       
-      if (!payeeData.originalFileData || payeeData.originalFileData.length === 0) {
-        throw new Error('No original file data available for export');
-      }
-
-      // Get all column names from the first row
-      const firstRow = payeeData.originalFileData[0];
-      const originalColumns = Object.keys(firstRow);
-      
-      // Add classification columns
-      const classificationColumns = [
-        'classification',
-        'confidence',
-        'processingTier',
-        'reasoning',
-        'processingMethod',
-        'keywordExclusion',
-        'matchedKeywords',
-        'keywordConfidence',
-        'keywordReasoning',
-        'timestamp'
-      ];
-      
-      const allColumns = [...originalColumns, ...classificationColumns];
-      
-      // Create CSV content
-      const csvRows = [
-        // Header row
-        allColumns.map(col => `"${col}"`).join(','),
-        // Data rows
-        ...payeeData.originalFileData.map(row => {
-          const csvRow = [];
-          
-          // Add original data
-          originalColumns.forEach(col => {
-            const value = row[col] || '';
-            csvRow.push(`"${String(value).replace(/"/g, '""')}"`);
-          });
-          
-          // Add placeholder classification data
-          csvRow.push('"Pending"'); // classification
-          csvRow.push('"0"'); // confidence
-          csvRow.push('"AI-Powered"'); // processingTier
-          csvRow.push('"Export original data - download results for classifications"'); // reasoning
-          csvRow.push('"OpenAI Batch API"'); // processingMethod
-          csvRow.push('"No"'); // keywordExclusion
-          csvRow.push('""'); // matchedKeywords
-          csvRow.push('"0"'); // keywordConfidence
-          csvRow.push('"No keyword exclusion applied"'); // keywordReasoning
-          csvRow.push(`"${new Date().toISOString()}"`); // timestamp
-          
-          return csvRow.join(',');
-        })
-      ];
-      
-      const csvContent = csvRows.join('\n');
-      
-      // Create and trigger download
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.setAttribute('href', url);
-      link.setAttribute('download', `payee_data_original_${job.id.slice(-8)}_${new Date().toISOString().slice(0, 10)}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-      toast({
-        title: "CSV Export Complete",
-        description: `Exported ${payeeData.originalFileData.length} rows with original data.`,
-      });
-      
-    } catch (error) {
-      console.error('[DIRECT CSV] Export error:', error);
-      toast({
-        title: "Export Error",
-        description: `Failed to export CSV: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        variant: "destructive",
-      });
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const handleDownloadWithResults = async () => {
-    try {
       if (typeof onDownloadResults === 'function') {
         await onDownloadResults();
         toast({
           title: "Download Started",
-          description: "Downloading classification results from OpenAI...",
+          description: "Downloading processed classification results...",
         });
       } else {
         console.error('[DIRECT CSV] onDownloadResults is not a function');
@@ -123,12 +37,71 @@ const DirectCSVExport = ({ job, payeeData, onDownloadResults }: DirectCSVExportP
         });
       }
     } catch (error) {
-      console.error('[DIRECT CSV] Download error:', error);
+      console.error('[DIRECT CSV] Main download error:', error);
       toast({
         title: "Download Error",
-        description: `Failed to start download: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        description: `Failed to download results: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive",
       });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleExportOriginal = async () => {
+    setIsExporting(true);
+    try {
+      console.log(`[DIRECT CSV] Exporting original data for job ${job.id}`);
+      
+      if (!payeeData.originalFileData || payeeData.originalFileData.length === 0) {
+        throw new Error('No original file data available for export');
+      }
+
+      // Get all column names from the first row
+      const firstRow = payeeData.originalFileData[0];
+      const originalColumns = Object.keys(firstRow);
+      
+      // Create CSV content with just original data
+      const csvRows = [
+        // Header row
+        originalColumns.map(col => `"${col}"`).join(','),
+        // Data rows
+        ...payeeData.originalFileData.map(row => {
+          return originalColumns.map(col => {
+            const value = row[col] || '';
+            return `"${String(value).replace(/"/g, '""')}"`;
+          }).join(',');
+        })
+      ];
+      
+      const csvContent = csvRows.join('\n');
+      
+      // Create and trigger download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `original_data_${job.id.slice(-8)}_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Export Complete",
+        description: `Exported ${payeeData.originalFileData.length} rows of original data.`,
+      });
+      
+    } catch (error) {
+      console.error('[DIRECT CSV] Export original error:', error);
+      toast({
+        title: "Export Error",
+        description: `Failed to export original data: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -136,32 +109,31 @@ const DirectCSVExport = ({ job, payeeData, onDownloadResults }: DirectCSVExportP
     <div className="pl-4 border-l-2 border-muted">
       <div className="flex items-center justify-between p-3 bg-muted/30 rounded-md">
         <div className="text-sm">
-          <p className="font-medium">Export Options</p>
+          <p className="font-medium">Download Options</p>
           <p className="text-muted-foreground text-xs">
-            Export original data now or download processed results
+            Get processed results or export original data
           </p>
         </div>
         <div className="flex gap-2">
           <Button
+            variant="default"
+            size="sm"
+            onClick={handleMainDownload}
+            disabled={isDownloading}
+          >
+            <Download className={`h-3 w-3 mr-1 ${isDownloading ? 'animate-pulse' : ''}`} />
+            {isDownloading ? 'Downloading...' : 'Download CSV'}
+          </Button>
+          
+          <Button
             variant="outline"
             size="sm"
-            onClick={handleDirectCSVExport}
+            onClick={handleExportOriginal}
             disabled={isExporting}
           >
             <FileSpreadsheet className="h-3 w-3 mr-1" />
             {isExporting ? 'Exporting...' : 'Export Original'}
           </Button>
-          
-          {job.status === 'completed' && onDownloadResults && (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleDownloadWithResults}
-            >
-              <Download className="h-3 w-3 mr-1" />
-              Download Results
-            </Button>
-          )}
         </div>
       </div>
     </div>

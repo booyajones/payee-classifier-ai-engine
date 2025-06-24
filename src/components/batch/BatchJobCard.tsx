@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -58,6 +57,9 @@ const BatchJobCard = React.memo(({
   isRecovering = false
 }: BatchJobCardProps) => {
   const [showDetails, setShowDetails] = useState(false);
+
+  // Determine if job is actually completed
+  const actuallyCompleted = job.status === 'completed';
 
   // Memoize status color calculation
   const statusColor = useMemo(() => {
@@ -133,7 +135,7 @@ const BatchJobCard = React.memo(({
 
           <BatchJobActions
             job={job}
-            isCompleted={isCompleted}
+            isCompleted={actuallyCompleted}
             isRefreshing={isRefreshing}
             isDownloading={isDownloading}
             isPolling={isPolling}

@@ -87,7 +87,7 @@ const BatchJobList = ({
               onDelete={() => handleSafeDelete(job.id)}
             />
             
-            {/* Enhanced direct CSV export for completed jobs */}
+            {/* Single download interface for completed jobs */}
             {job.status === 'completed' && payeeData && (
               <DirectCSVExport 
                 job={job}
