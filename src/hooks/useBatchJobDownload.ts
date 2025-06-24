@@ -23,6 +23,21 @@ export const useBatchJobDownload = ({
   const { downloadChunkedResults, isDownloadRetrying } = useBatchJobChunkedDownload();
 
   const handleDownloadResults = async (job: BatchJob) => {
+    console.log(`[BATCH DOWNLOAD] Starting download for job ${job.id}`);
+    console.log(`[BATCH DOWNLOAD] onJobComplete type:`, typeof onJobComplete);
+    
+    // Validate callback before proceeding
+    if (typeof onJobComplete !== 'function') {
+      const errorMsg = `onJobComplete callback is not a function (type: ${typeof onJobComplete})`;
+      console.error(`[BATCH DOWNLOAD] ${errorMsg}`);
+      toast({
+        title: "Download Error",
+        description: "Download callback function is missing. Please refresh the page and try again.",
+        variant: "destructive"
+      });
+      throw new Error(errorMsg);
+    }
+
     const payeeData = payeeRowDataMap[job.id];
     if (!payeeData) {
       toast({
@@ -62,7 +77,9 @@ export const useBatchJobDownload = ({
         job
       );
 
+      console.log(`[BATCH DOWNLOAD] About to call onJobComplete with ${finalClassifications.length} results`);
       onJobComplete(finalClassifications, summary, job.id);
+      console.log(`[BATCH DOWNLOAD] onJobComplete called successfully`);
 
       toast({
         title: "Download Complete",

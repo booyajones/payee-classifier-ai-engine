@@ -21,7 +21,7 @@ export const useBatchJobActions = ({
   onJobUpdate,
   onJobComplete
 }: UseBatchJobActionsProps) => {
-  // Ensure onJobUpdate is properly validated before passing to hooks
+  // Validate and wrap onJobUpdate with error handling
   const safeOnJobUpdate = (job: BatchJob) => {
     try {
       if (typeof onJobUpdate === 'function') {
@@ -32,6 +32,28 @@ export const useBatchJobActions = ({
       }
     } catch (error) {
       console.error('[BATCH ACTIONS] Error in onJobUpdate:', error);
+    }
+  };
+
+  // Validate and wrap onJobComplete with error handling
+  const safeOnJobComplete = (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => {
+    try {
+      console.log(`[BATCH ACTIONS] onJobComplete called for job ${jobId} with ${results.length} results`);
+      console.log(`[BATCH ACTIONS] onJobComplete type:`, typeof onJobComplete);
+      console.log(`[BATCH ACTIONS] onJobComplete is function:`, typeof onJobComplete === 'function');
+      
+      if (typeof onJobComplete === 'function') {
+        console.log(`[BATCH ACTIONS] Executing onJobComplete for job ${jobId}`);
+        onJobComplete(results, summary, jobId);
+        console.log(`[BATCH ACTIONS] onJobComplete executed successfully for job ${jobId}`);
+      } else {
+        console.error('[BATCH ACTIONS] onJobComplete is not a function:', typeof onJobComplete);
+        console.error('[BATCH ACTIONS] onJobComplete value:', onJobComplete);
+        throw new Error(`onJobComplete callback is not a function (type: ${typeof onJobComplete})`);
+      }
+    } catch (error) {
+      console.error('[BATCH ACTIONS] Error in onJobComplete:', error);
+      throw error;
     }
   };
 
@@ -63,7 +85,7 @@ export const useBatchJobActions = ({
 
   const { handleDownloadResults: baseHandleDownloadResults } = useBatchJobDownload({
     payeeRowDataMap,
-    onJobComplete,
+    onJobComplete: safeOnJobComplete,
     isDownloadCancelled,
     updateProgress: safeUpdateProgress
   });
@@ -80,6 +102,9 @@ export const useBatchJobActions = ({
 
   const handleDownloadResults = async (job: BatchJob) => {
     try {
+      console.log(`[BATCH ACTIONS] Starting download for job ${job.id}`);
+      console.log(`[BATCH ACTIONS] Callbacks validation - onJobComplete:`, typeof safeOnJobComplete);
+      
       if (startDownload && typeof startDownload === 'function') {
         startDownload(job.id);
       }

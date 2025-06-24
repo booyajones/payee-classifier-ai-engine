@@ -21,21 +21,24 @@ const DirectCSVExport = ({ job, payeeData, onDownloadResults }: DirectCSVExportP
     setIsDownloading(true);
     try {
       console.log(`[DIRECT CSV] Starting main download for job ${job.id}`);
+      console.log(`[DIRECT CSV] onDownloadResults type:`, typeof onDownloadResults);
       
-      if (typeof onDownloadResults === 'function') {
-        await onDownloadResults();
-        toast({
-          title: "Download Started",
-          description: "Downloading processed classification results...",
-        });
-      } else {
-        console.error('[DIRECT CSV] onDownloadResults is not a function');
+      if (typeof onDownloadResults !== 'function') {
+        const errorMsg = `onDownloadResults is not a function (type: ${typeof onDownloadResults})`;
+        console.error(`[DIRECT CSV] ${errorMsg}`);
         toast({
           title: "Download Error",
-          description: "Download function not available",
+          description: "Download function is not available. Please refresh the page and try again.",
           variant: "destructive",
         });
+        return;
       }
+
+      await onDownloadResults();
+      toast({
+        title: "Download Started",
+        description: "Downloading processed classification results...",
+      });
     } catch (error) {
       console.error('[DIRECT CSV] Main download error:', error);
       toast({
