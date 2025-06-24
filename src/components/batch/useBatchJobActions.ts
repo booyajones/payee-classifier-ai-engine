@@ -21,11 +21,24 @@ export const useBatchJobActions = ({
   onJobUpdate,
   onJobComplete
 }: UseBatchJobActionsProps) => {
-  // Ensure onJobUpdate is passed to the refresh hook
-  const { refreshingJobs, handleRefreshJob: baseHandleRefreshJob } = useBatchJobRefresh(onJobUpdate);
+  // Ensure onJobUpdate is properly validated before passing to hooks
+  const safeOnJobUpdate = (job: BatchJob) => {
+    try {
+      if (typeof onJobUpdate === 'function') {
+        console.log(`[BATCH ACTIONS] Calling onJobUpdate for job ${job.id}`);
+        onJobUpdate(job);
+      } else {
+        console.error('[BATCH ACTIONS] onJobUpdate is not a function:', typeof onJobUpdate);
+      }
+    } catch (error) {
+      console.error('[BATCH ACTIONS] Error in onJobUpdate:', error);
+    }
+  };
+
+  const { refreshingJobs, handleRefreshJob: baseHandleRefreshJob } = useBatchJobRefresh(safeOnJobUpdate);
   
-  const { pollingStates, refreshSpecificJob } = useBatchJobPolling(jobs, onJobUpdate);
-  const { handleCancelJob, handleCancelDownload } = useBatchJobCancellation(onJobUpdate);
+  const { pollingStates, refreshSpecificJob } = useBatchJobPolling(jobs, safeOnJobUpdate);
+  const { handleCancelJob, handleCancelDownload } = useBatchJobCancellation(safeOnJobUpdate);
   
   const {
     downloadingJobs,
@@ -44,7 +57,6 @@ export const useBatchJobActions = ({
         updateProgress(jobId, current, total);
       }
     } catch (error) {
-      // Silent fail - progress updates are not critical
       console.warn('[BATCH ACTIONS] Progress update failed silently:', error);
     }
   };
@@ -59,10 +71,10 @@ export const useBatchJobActions = ({
   // Manual refresh (user-initiated) - shows toast
   const handleRefreshJob = async (jobId: string) => {
     try {
+      console.log(`[BATCH ACTIONS] Starting refresh for job ${jobId}`);
       await refreshSpecificJob(jobId, () => baseHandleRefreshJob(jobId, false));
     } catch (error) {
       console.error('[BATCH ACTIONS] Refresh error:', error);
-      // Error is already handled in the base refresh hook
     }
   };
 

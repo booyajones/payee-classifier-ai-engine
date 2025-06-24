@@ -11,7 +11,6 @@ interface BatchJobActionsProps {
   isDownloading: boolean;
   isPolling: boolean;
   onRefresh: () => void;
-  onDownload: () => void;
   onCancel: () => void;
   onDelete: () => void;
 }
@@ -20,20 +19,21 @@ const BatchJobActions = ({
   job,
   isCompleted,
   isRefreshing,
-  isDownloading,
   isPolling,
   onRefresh,
   onCancel,
   onDelete
 }: BatchJobActionsProps) => {
   
-  // Safe handler wrappers with error handling
+  // Safe handler wrappers with better error handling
   const safeRefresh = () => {
     try {
+      console.log(`[BATCH ACTIONS] Refreshing job ${job.id}`);
       if (typeof onRefresh === 'function') {
         onRefresh();
       } else {
-        console.error('[BATCH ACTIONS] onRefresh is not a function');
+        console.error('[BATCH ACTIONS] onRefresh is not a function:', typeof onRefresh);
+        throw new Error('Refresh function not available');
       }
     } catch (error) {
       console.error('[BATCH ACTIONS] Error in refresh:', error);
@@ -42,10 +42,12 @@ const BatchJobActions = ({
 
   const safeCancel = () => {
     try {
+      console.log(`[BATCH ACTIONS] Cancelling job ${job.id}`);
       if (typeof onCancel === 'function') {
         onCancel();
       } else {
-        console.error('[BATCH ACTIONS] onCancel is not a function');
+        console.error('[BATCH ACTIONS] onCancel is not a function:', typeof onCancel);
+        throw new Error('Cancel function not available');
       }
     } catch (error) {
       console.error('[BATCH ACTIONS] Error in cancel:', error);
@@ -54,11 +56,12 @@ const BatchJobActions = ({
 
   const safeDelete = () => {
     try {
-      console.log(`[BATCH ACTIONS] Attempting to delete job ${job.id}`);
+      console.log(`[BATCH ACTIONS] Deleting job ${job.id}`);
       if (typeof onDelete === 'function') {
         onDelete();
       } else {
-        console.error('[BATCH ACTIONS] onDelete is not a function');
+        console.error('[BATCH ACTIONS] onDelete is not a function:', typeof onDelete);
+        throw new Error('Delete function not available');
       }
     } catch (error) {
       console.error('[BATCH ACTIONS] Error in delete:', error);
@@ -93,6 +96,7 @@ const BatchJobActions = ({
         size="sm"
         onClick={safeDelete}
         className="text-destructive hover:text-destructive"
+        title="Remove job from list"
       >
         <Trash2 className="h-3 w-3" />
       </Button>
