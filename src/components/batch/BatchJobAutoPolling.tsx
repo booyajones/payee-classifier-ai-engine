@@ -6,7 +6,7 @@ interface UseBatchJobAutoPollingProps {
   jobs: BatchJob[];
   autoPollingJobs: Set<string>;
   setAutoPollingJobs: React.Dispatch<React.SetStateAction<Set<string>>>;
-  handleRefreshJob: (jobId: string) => Promise<void>;
+  handleRefreshJob: (jobId: string, silent?: boolean) => Promise<void>;
 }
 
 export const useBatchJobAutoPolling = ({
@@ -64,7 +64,8 @@ export const useBatchJobAutoPolling = ({
         
         if (shouldPoll) {
           console.log(`[AUTO POLLING] Checking job ${jobId.slice(-8)} for changes`);
-          await handleRefreshJob(jobId);
+          // Pass silent: true to prevent toast notifications during auto-polling
+          await handleRefreshJob(jobId, true);
         }
         
         // Check if job is still active after refresh

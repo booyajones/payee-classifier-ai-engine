@@ -62,11 +62,11 @@ export const useBatchJobActions = ({
     onJobComplete: safeOnJobComplete
   });
 
-  // Manual refresh (user-initiated)
-  const handleRefreshJob = async (jobId: string) => {
+  // Manual refresh (user-initiated) - now properly handles silent parameter
+  const handleRefreshJob = async (jobId: string, silent: boolean = false) => {
     try {
-      console.log(`[BATCH ACTIONS] Starting refresh for job ${jobId}`);
-      await refreshSpecificJob(jobId, () => baseHandleRefreshJob(jobId, false));
+      console.log(`[BATCH ACTIONS] Starting refresh for job ${jobId}${silent ? ' (silent)' : ''}`);
+      await refreshSpecificJob(jobId, () => baseHandleRefreshJob(jobId, silent));
     } catch (error) {
       console.error('[BATCH ACTIONS] Refresh error:', error);
     }
