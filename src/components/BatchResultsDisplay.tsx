@@ -1,11 +1,10 @@
 
 import { Button } from "@/components/ui/button";
-import { RotateCcw, Download, X } from "lucide-react";
+import { RotateCcw, Download } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import BatchProcessingSummary from "./BatchProcessingSummary";
-import ClassificationResultTable from "./ClassificationResultTable";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
-import { exportResultsWithOriginalDataV3, exportDirectCSV } from "@/lib/classification/batchExporter";
+import { exportDirectCSV } from "@/lib/classification/batchExporter";
 import * as XLSX from 'xlsx';
 
 interface BatchResultsDisplayProps {
@@ -40,11 +39,6 @@ const BatchResultsDisplay = ({
     }
 
     try {
-      console.log('[CSV EXPORT] Starting direct CSV export:', {
-        resultsCount: batchResults.length,
-        summaryOriginalCount: processingSummary.originalFileData?.length || 0
-      });
-
       const csvData = exportDirectCSV(processingSummary);
       
       const timestamp = new Date().toISOString().slice(0, 10);
@@ -95,17 +89,16 @@ const BatchResultsDisplay = ({
     }
 
     try {
-      const invalidResults = batchResults.filter(r => !r.originalData);
-      if (invalidResults.length > 0) {
-        throw new Error(`${invalidResults.length} results missing original data`);
-      }
-
-      console.log('[EXCEL EXPORT] Pre-export validation:', {
-        resultsCount: batchResults.length,
-        summaryOriginalCount: processingSummary.originalFileData?.length || 0
+      const csvData = exportDirectCSV(processingSummary);
+      
+      // Convert to object format for Excel
+      const exportData = csvData.rows.map(row => {
+        const obj: any = {};
+        csvData.headers.forEach((header, index) => {
+          obj[header] = row[index] || '';
+        });
+        return obj;
       });
-
-      const exportData = exportResultsWithOriginalDataV3(processingSummary, true);
       
       const workbook = XLSX.utils.book_new();
       const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -119,7 +112,7 @@ const BatchResultsDisplay = ({
       
       toast({
         title: "Excel Export Complete",
-        description: `Exported exactly ${exportData.length} rows.`,
+        description: `Exported ${exportData.length} rows.`,
       });
     } catch (error) {
       console.error("Excel export error:", error);
@@ -139,49 +132,19 @@ const BatchResultsDisplay = ({
         </div>
       )}
 
-      {/* Download Progress Display */}
-      {isDownloading && downloadProgress && (
-        <div className="mb-4 p-4 border rounded-lg bg-blue-50">
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-medium">Downloading Results...</span>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">
-                {downloadProgress.current} / {downloadProgress.total}
-              </span>
-              {onCancelDownload && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onCancelDownload}
-                  className="text-red-600 hover:text-red-700"
-                >
-                  <X className="h-4 w-4 mr-1" />
-                  Cancel
-                </Button>
-              )}
-            </div>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-              style={{ 
-                width: `${downloadProgress.total > 0 ? (downloadProgress.current / downloadProgress.total) * 100 : 0}%` 
-              }}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Large files are processed in chunks to prevent timeouts. You can cancel if needed.
-          </p>
-        </div>
-      )}
-
       {batchResults.length > 0 ? (
         <div>
-          <h3 className="text-lg font-medium mb-4">Classification Results</h3>
+          <div className="text-center py-8 border rounded-md mb-4">
+            <h3 className="text-lg font-medium mb-2">Results Ready</h3>
+            <p className="text-muted-foreground mb-4">
+              Your classification results are ready. The CSV file should have downloaded automatically.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {batchResults.length} results processed successfully
+            </p>
+          </div>
           
-          <ClassificationResultTable results={batchResults} />
-          
-          <div className="mt-4 flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap">
             <Button
               variant="default"
               onClick={handleExportCSV}
@@ -189,7 +152,7 @@ const BatchResultsDisplay = ({
               className="flex-1 min-w-[120px]"
             >
               <Download className="h-4 w-4 mr-2" />
-              Export CSV
+              Download CSV
             </Button>
             
             <Button
@@ -199,7 +162,7 @@ const BatchResultsDisplay = ({
               className="flex-1 min-w-[120px]"
             >
               <Download className="h-4 w-4 mr-2" />
-              Export Excel
+              Download Excel
             </Button>
             
             <Button
@@ -213,13 +176,13 @@ const BatchResultsDisplay = ({
           </div>
           
           <p className="text-xs text-muted-foreground mt-2">
-            CSV export is faster and more reliable for large files. Excel export includes formatting but may be slower.
+            CSV files are automatically downloaded when batch jobs complete. You can also manually download them here.
           </p>
         </div>
       ) : (
         <div className="text-center py-8 border rounded-md">
           <p className="text-muted-foreground">
-            No batch results yet. Complete a batch job to see results here.
+            No batch results yet. Complete a batch job to get your CSV file.
           </p>
         </div>
       )}

@@ -1,4 +1,3 @@
-
 import React, { useMemo } from "react";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
@@ -14,6 +13,8 @@ import { useBatchJobConfirmationDialogs } from "./batch/BatchJobConfirmationDial
 import { useBatchJobManagerState } from "@/hooks/useBatchJobManagerState";
 import BatchJobContainer from "./batch/BatchJobContainer";
 import BatchJobConfirmation from "./batch/BatchJobConfirmation";
+import { exportDirectCSV } from "@/lib/classification/batchExporter";
+import { useToast } from "@/components/ui/use-toast";
 
 interface BatchJobManagerProps {
   jobs: BatchJob[];
@@ -30,6 +31,7 @@ const BatchJobManager = React.memo(({
   onJobComplete, 
   onJobDelete 
 }: BatchJobManagerProps) => {
+  const { toast } = useToast();
   const { getSmartState } = useSmartBatchManager();
   const { updateProgress } = useUnifiedProgress();
   
@@ -56,9 +58,54 @@ const BatchJobManager = React.memo(({
     handleJobComplete: baseHandleJobComplete
   } = useBatchJobManagerState();
 
-  // Memoize the completion handler with all dependencies
-  const handleJobComplete = useMemo(() => 
-    (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) =>
+  // Auto-download CSV when job completes
+  const handleJobCompleteWithAutoDownload = useMemo(() => 
+    (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => {
+      console.log(`[BATCH MANAGER] Job ${jobId} completed, auto-downloading CSV`);
+      
+      try {
+        // Auto-download CSV immediately
+        const csvData = exportDirectCSV(summary);
+        
+        const timestamp = new Date().toISOString().slice(0, 10);
+        const csvContent = [
+          csvData.headers.join(','),
+          ...csvData.rows.map(row => 
+            row.map(cell => {
+              const value = cell || '';
+              return typeof value === 'string' && (value.includes(',') || value.includes('"')) 
+                ? `"${value.replace(/"/g, '""')}"` 
+                : value;
+            }).join(',')
+          )
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `payee_results_${jobId.slice(-8)}_${timestamp}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        toast({
+          title: "CSV Downloaded",
+          description: `Successfully downloaded ${csvData.rows.length} results as CSV.`,
+        });
+
+      } catch (error) {
+        console.error('[BATCH MANAGER] Auto-download failed:', error);
+        toast({
+          title: "Download Error",
+          description: `Failed to auto-download CSV: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          variant: "destructive",
+        });
+      }
+
+      // Call the original completion handler
       baseHandleJobComplete(
         results, 
         summary, 
@@ -70,8 +117,9 @@ const BatchJobManager = React.memo(({
         removeJobFromProcessing,
         updateProgress,
         onJobComplete
-      ), 
-    [baseHandleJobComplete, isJobProcessed, isJobProcessing, markJobAsProcessing, markJobAsProcessed, removeJobFromProcessing, updateProgress, onJobComplete]
+      );
+    }, 
+    [baseHandleJobComplete, isJobProcessed, isJobProcessing, markJobAsProcessing, markJobAsProcessed, removeJobFromProcessing, updateProgress, onJobComplete, toast]
   );
 
   const {
@@ -86,7 +134,7 @@ const BatchJobManager = React.memo(({
     jobs,
     payeeRowDataMap,
     onJobUpdate,
-    onJobComplete: handleJobComplete
+    onJobComplete: handleJobCompleteWithAutoDownload
   });
 
   useBatchJobAutoPolling({
@@ -98,7 +146,7 @@ const BatchJobManager = React.memo(({
 
   const { recoveringJobs, handleJobRecovery } = useBatchJobRecovery({
     payeeRowDataMap,
-    onJobComplete: handleJobComplete
+    onJobComplete: handleJobCompleteWithAutoDownload
   });
 
   const {
