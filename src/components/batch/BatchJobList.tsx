@@ -3,7 +3,7 @@ import React from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import { useBatchJobActions } from './useBatchJobActions';
-import BatchJobCard from './BatchJobCard';
+import BatchJobCardMain from './BatchJobCardMain';
 import DirectCSVExport from './DirectCSVExport';
 
 interface BatchJobListProps {
@@ -59,7 +59,7 @@ const BatchJobList = ({
 
         return (
           <div key={`${job.id}-${job.status}-${job.request_counts.completed}`} className="space-y-2">
-            <BatchJobCard
+            <BatchJobCardMain
               job={job}
               payeeCount={payeeCount}
               payeeData={payeeData}
@@ -68,7 +68,6 @@ const BatchJobList = ({
               isPolling={isPolling}
               progress={progress}
               onRefresh={() => handleRefreshJob(job.id)}
-              onDownload={() => handleDownloadResults(job)}
               onCancel={() => handleCancelJob(job.id)}
               onDelete={() => onJobDelete(job.id)}
             />
