@@ -4,6 +4,7 @@ import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import { useBatchJobActions } from './useBatchJobActions';
 import BatchJobCard from './BatchJobCard';
+import DirectCSVExport from './DirectCSVExport';
 
 interface BatchJobListProps {
   jobs: BatchJob[];
@@ -57,20 +58,29 @@ const BatchJobList = ({
         const progress = downloadProgress[job.id];
 
         return (
-          <BatchJobCard
-            key={`${job.id}-${job.status}-${job.request_counts.completed}`}
-            job={job}
-            payeeCount={payeeCount}
-            payeeData={payeeData}
-            isRefreshing={isRefreshing}
-            isDownloading={isDownloading}
-            isPolling={isPolling}
-            progress={progress}
-            onRefresh={() => handleRefreshJob(job.id)}
-            onDownload={() => handleDownloadResults(job)}
-            onCancel={() => handleCancelDownload(job.id)}
-            onDelete={() => onJobDelete(job.id)}
-          />
+          <div key={`${job.id}-${job.status}-${job.request_counts.completed}`} className="space-y-2">
+            <BatchJobCard
+              job={job}
+              payeeCount={payeeCount}
+              payeeData={payeeData}
+              isRefreshing={isRefreshing}
+              isDownloading={isDownloading}
+              isPolling={isPolling}
+              progress={progress}
+              onRefresh={() => handleRefreshJob(job.id)}
+              onDownload={() => handleDownloadResults(job)}
+              onCancel={() => handleCancelDownload(job.id)}
+              onDelete={() => onJobDelete(job.id)}
+            />
+            
+            {/* Add direct CSV export for completed jobs */}
+            {job.status === 'completed' && payeeData && (
+              <DirectCSVExport 
+                job={job}
+                payeeData={payeeData}
+              />
+            )}
+          </div>
         );
       })}
     </div>

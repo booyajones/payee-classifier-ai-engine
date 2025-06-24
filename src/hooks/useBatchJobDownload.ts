@@ -1,4 +1,3 @@
-
 import { useToast } from "@/components/ui/use-toast";
 import { BatchJob, getBatchJobResults } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
@@ -29,6 +28,19 @@ export const useBatchJobDownload = ({
     execute: downloadResultsWithRetry,
     isRetrying: isDownloadRetrying
   } = useRetry(getBatchJobResults, { maxRetries: 3, baseDelay: 2000 });
+
+  // Create a safe progress update function
+  const safeUpdateProgress = (jobId: string, current: number, total: number) => {
+    try {
+      if (typeof updateProgress === 'function') {
+        updateProgress(jobId, current, total);
+      } else {
+        console.warn(`[DOWNLOAD] updateProgress is not a function for job ${jobId}`);
+      }
+    } catch (error) {
+      console.error(`[DOWNLOAD] Error updating progress for job ${jobId}:`, error);
+    }
+  };
 
   const downloadChunkedResults = async (
     job: BatchJob,
@@ -62,7 +74,12 @@ export const useBatchJobDownload = ({
         const chunkResults = await Promise.race([chunkPromise, timeoutPromise]) as any[];
         allResults.push(...chunkResults);
         
-        onProgress(allResults.length, uniquePayeeNames.length);
+        // Safe progress update
+        try {
+          onProgress(allResults.length, uniquePayeeNames.length);
+        } catch (error) {
+          console.warn(`[CHUNKED DOWNLOAD] Progress callback error:`, error);
+        }
         
         if (chunkIndex < chunks.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 1000));
@@ -113,7 +130,7 @@ export const useBatchJobDownload = ({
       job,
       uniquePayeeNames,
       (current, total) => {
-        updateProgress(job.id, current, total);
+        safeUpdateProgress(job.id, current, total);
       }
     );
     
@@ -234,7 +251,7 @@ export const useBatchJobDownload = ({
       } else {
         toast({
           title: "Download Failed",
-          description: `Download failed: ${appError.message}. Try using chunked export for large files.`,
+          description: `Download failed: ${appError.message}. Try using the direct CSV export for the original data.`,
           variant: "destructive",
         });
       }

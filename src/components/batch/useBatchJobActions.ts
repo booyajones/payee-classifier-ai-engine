@@ -37,11 +37,24 @@ export const useBatchJobActions = ({
     isDownloadCancelled
   } = useDownloadProgress();
 
+  // Create a safe updateProgress function that ensures it's always defined
+  const safeUpdateProgress = (jobId: string, current: number, total: number) => {
+    try {
+      if (typeof updateProgress === 'function') {
+        updateProgress(jobId, current, total);
+      } else {
+        console.warn('[BATCH ACTIONS] updateProgress is not a function, skipping progress update');
+      }
+    } catch (error) {
+      console.error('[BATCH ACTIONS] Error in updateProgress:', error);
+    }
+  };
+
   const { handleDownloadResults: baseHandleDownloadResults } = useBatchJobDownload({
     payeeRowDataMap,
     onJobComplete,
     isDownloadCancelled,
-    updateProgress
+    updateProgress: safeUpdateProgress
   });
 
   // Manual refresh (user-initiated) - shows toast
@@ -55,18 +68,24 @@ export const useBatchJobActions = ({
   };
 
   const handleDownloadResults = async (job: BatchJob) => {
-    startDownload(job.id);
-    
     try {
+      startDownload(job.id);
       await baseHandleDownloadResults(job);
+    } catch (error) {
+      console.error('[BATCH ACTIONS] Download error:', error);
+      throw error;
     } finally {
       finishDownload(job.id);
     }
   };
 
   const handleCancelDownloadWithCleanup = (jobId: string) => {
-    cancelDownload(jobId);
-    handleCancelDownload(jobId);
+    try {
+      cancelDownload(jobId);
+      handleCancelDownload(jobId);
+    } catch (error) {
+      console.error('[BATCH ACTIONS] Cancel download error:', error);
+    }
   };
 
   return {
