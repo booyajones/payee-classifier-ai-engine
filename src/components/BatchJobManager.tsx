@@ -125,7 +125,7 @@ const BatchJobManager = React.memo(({
     onRefresh: handleRefreshJob,
     onDownload: handleDownloadResults,
     onCancel: showCancelConfirmation,
-    onDelete: showDeleteConfirmation,
+    onJobDelete: showDeleteConfirmation,
     getSmartState,
     updateProgress,
     getTimeoutState,
