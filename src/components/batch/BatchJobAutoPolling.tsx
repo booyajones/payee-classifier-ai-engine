@@ -63,7 +63,7 @@ export const useBatchJobAutoPolling = ({
         const shouldPoll = hasJobChanged(job) || Math.random() < 0.3; // Reduce frequency
         
         if (shouldPoll) {
-          console.log(`[AUTO POLLING] Checking job ${jobId.slice(-8)} for changes`);
+          console.log(`[AUTO POLLING] Silently checking job ${jobId.slice(-8)} for changes`);
           // Pass silent: true to prevent toast notifications during auto-polling
           await handleRefreshJob(jobId, true);
         }
