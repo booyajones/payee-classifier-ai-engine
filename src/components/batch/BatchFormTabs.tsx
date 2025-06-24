@@ -14,7 +14,7 @@ interface BatchFormTabsProps {
   payeeRowDataMap: Record<string, PayeeRowData>;
   batchResults: PayeeClassification[];
   processingSummary: BatchProcessingResult | null;
-  onFileUploadBatchJob: (batchJob: BatchJob, payeeRowData: PayeeRowData) => void;
+  onFileUploadBatchJob: (batchJob: BatchJob | null, payeeRowData: PayeeRowData) => void;
   onJobUpdate: (job: BatchJob) => void;
   onJobComplete: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void;
   onJobDelete: (jobId: string) => void;

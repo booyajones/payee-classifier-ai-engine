@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import PerformanceMonitoringDashboard from './performance/PerformanceMonitoringDashboard';
 
 interface SmartFileUploadProps {
-  onBatchJobCreated: (batchJob: BatchJob, payeeRowData: PayeeRowData) => void;
+  onBatchJobCreated: (batchJob: BatchJob | null, payeeRowData: PayeeRowData) => void;
   onProcessingComplete: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void;
 }
 
@@ -80,10 +80,13 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
         }
       });
 
+      // Always call onBatchJobCreated, whether we have a real batch job or null (local processing)
+      console.log(`[SMART UPLOAD] Calling onBatchJobCreated with job: ${job ? job.id : 'local-processing'}`);
+      onBatchJobCreated(job, payeeRowData);
+
       if (job) {
         setUploadState('processing');
         updateProgress(UPLOAD_ID, 'Batch job created! Processing payee classifications...', 70, 'OpenAI batch processing started', job.id);
-        onBatchJobCreated(job, payeeRowData);
       } else {
         setUploadState('complete');
         completeProgress(UPLOAD_ID, 'Processing completed using enhanced local classification!');

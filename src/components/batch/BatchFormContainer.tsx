@@ -22,7 +22,11 @@ const BatchFormContainer = ({ onBatchClassify, onComplete, onJobDelete }: BatchF
 
   // Move all hooks before any conditional logic
   const handleFileUploadBatchJob = useCallback(async (batchJob: any, payeeRowData: any) => {
-    console.log(`[BATCH CONTAINER] Job ${batchJob.id} created, switching to jobs tab`);
+    if (batchJob) {
+      console.log(`[BATCH CONTAINER] Real batch job ${batchJob.id} created, switching to jobs tab`);
+    } else {
+      console.log(`[BATCH CONTAINER] Local processing completed, switching to jobs tab for visibility`);
+    }
     
     // Small delay to ensure state propagation before switching tabs
     await new Promise(resolve => setTimeout(resolve, 100));
