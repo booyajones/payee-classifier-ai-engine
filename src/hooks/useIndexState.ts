@@ -68,6 +68,22 @@ export const useIndexState = () => {
     }
   };
 
+  // Handle job deletion - clear summary and results
+  const handleJobDelete = () => {
+    try {
+      console.log('[INDEX] Clearing batch summary and results due to job deletion');
+      setBatchResults([]);
+      setBatchSummary(null);
+      
+      toast({
+        title: "Summary Cleared",
+        description: "Batch summary removed with deleted job.",
+      });
+    } catch (error) {
+      console.error('[INDEX ERROR] Failed to clear batch data:', error);
+    }
+  };
+
   const handleKeySet = () => {
     try {
       setHasApiKey(true);
@@ -83,6 +99,7 @@ export const useIndexState = () => {
     batchSummary,
     hasApiKey,
     handleBatchComplete,
+    handleJobDelete,
     handleKeySet
   };
 };

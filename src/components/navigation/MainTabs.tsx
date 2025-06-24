@@ -12,6 +12,7 @@ interface MainTabsProps {
   batchResults: PayeeClassification[];
   batchSummary: BatchProcessingResult | null;
   onBatchComplete: (results: PayeeClassification[], summary: BatchProcessingResult) => void;
+  onJobDelete: () => void;
 }
 
 const MainTabs = ({
@@ -19,7 +20,8 @@ const MainTabs = ({
   onTabChange,
   batchResults,
   batchSummary,
-  onBatchComplete
+  onBatchComplete,
+  onJobDelete
 }: MainTabsProps) => {
   return (
     <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
@@ -30,7 +32,10 @@ const MainTabs = ({
       
       <TabsContent value="batch" className="mt-6">
         <ClassificationErrorBoundary context="File Processing">
-          <BatchClassificationForm onComplete={onBatchComplete} />
+          <BatchClassificationForm 
+            onComplete={onBatchComplete} 
+            onJobDelete={onJobDelete}
+          />
           
           {batchSummary && batchResults.length > 0 && (
             <div className="mt-6">

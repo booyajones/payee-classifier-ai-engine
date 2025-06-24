@@ -15,6 +15,7 @@ const Index = () => {
     batchSummary,
     hasApiKey,
     handleBatchComplete,
+    handleJobDelete,
     handleKeySet
   } = useIndexState();
 
@@ -47,6 +48,7 @@ const Index = () => {
                 batchResults={batchResults}
                 batchSummary={batchSummary}
                 onBatchComplete={handleBatchComplete}
+                onJobDelete={handleJobDelete}
               />
             </ErrorBoundary>
           </main>
