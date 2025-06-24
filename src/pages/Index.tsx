@@ -13,12 +13,9 @@ const Index = () => {
     setActiveTab,
     batchResults,
     batchSummary,
-    allResults,
     hasApiKey,
-    isLoadingResults,
     handleBatchComplete,
-    handleKeySet,
-    clearAllResults
+    handleKeySet
   } = useIndexState();
 
   if (!hasApiKey) {
@@ -39,29 +36,18 @@ const Index = () => {
         <div className="min-h-screen bg-background">
           <AppHeader 
             title="Payee Classification System"
-            description="File-based payee classification processing with database storage"
+            description="File-based payee classification processing with CSV download"
           />
 
           <main className="container px-4 pb-8">
             <ErrorBoundary>
-              {isLoadingResults ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                    <p className="text-muted-foreground mt-2">Loading stored results from database...</p>
-                  </div>
-                </div>
-              ) : (
-                <MainTabs
-                  activeTab={activeTab}
-                  onTabChange={setActiveTab}
-                  allResults={allResults}
-                  batchResults={batchResults}
-                  batchSummary={batchSummary}
-                  onBatchComplete={handleBatchComplete}
-                  onClearAllResults={clearAllResults}
-                />
-              )}
+              <MainTabs
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                batchResults={batchResults}
+                batchSummary={batchSummary}
+                onBatchComplete={handleBatchComplete}
+              />
             </ErrorBoundary>
           </main>
 
