@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Info, Clock, AlertTriangle, FileText, Users, Copy } from 'lucide-react';
+import { Info, AlertTriangle, FileText, Users, Copy } from 'lucide-react';
 import { FileProcessingInfo } from '@/hooks/useSmartFileUpload';
 
 interface ColumnSelectionAreaProps {
@@ -66,12 +66,6 @@ const ColumnSelectionArea = ({
               <span>{processingInfo.duplicates.toLocaleString()} duplicates</span>
             </div>
           )}
-          {processingInfo.estimatedTime && (
-            <div className="flex items-center gap-2">
-              <Clock className="h-3 w-3 text-blue-500" />
-              <span>~{processingInfo.estimatedTime}</span>
-            </div>
-          )}
         </div>
       </div>
 
@@ -111,12 +105,10 @@ const ColumnSelectionArea = ({
       </div>
 
       {/* Processing Info */}
-      {selectedColumn && processingInfo.estimatedTime && (
+      {selectedColumn && (
         <Alert>
-          <Clock className="h-4 w-4" />
           <AlertDescription>
             <div className="space-y-1">
-              <div>Estimated processing time: <strong>{processingInfo.estimatedTime}</strong></div>
               <div className="text-xs text-muted-foreground">
                 Large files are processed using OpenAI's Batch API for cost efficiency. 
                 You can leave this page - we'll save your progress automatically.
@@ -133,10 +125,7 @@ const ColumnSelectionArea = ({
           disabled={!selectedColumn || disabled}
           className="flex-1"
         >
-          {processingInfo.estimatedTime ? 
-            `Process File (~${processingInfo.estimatedTime})` : 
-            'Process File'
-          }
+          Process File
         </Button>
         <Button 
           variant="outline" 

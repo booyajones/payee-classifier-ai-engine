@@ -1,3 +1,4 @@
+
 import { useState, useRef } from 'react';
 import { parseUploadedFile } from '@/lib/utils';
 import { createPayeeRowMapping, PayeeRowData } from '@/lib/rowMapping';
@@ -9,7 +10,6 @@ import { useToast } from '@/hooks/use-toast';
 export type UploadState = 'idle' | 'uploaded' | 'processing' | 'complete' | 'error';
 
 export interface FileProcessingInfo {
-  estimatedTime?: string;
   sizeWarning?: string;
   totalRows?: number;
   uniquePayees?: number;
@@ -137,8 +137,6 @@ export const useSmartFileUpload = () => {
 
       // Enhanced processing info with file validation details
       const enhancedProcessingInfo: FileProcessingInfo = {
-        estimatedTime: validationResult.fileInfo?.estimatedRows ? 
-          `${Math.ceil(validationResult.fileInfo.estimatedRows / 1000)} minutes` : '1-2 minutes',
         totalRows: data.length,
         fileInfo: validationResult.fileInfo
       };
@@ -161,7 +159,7 @@ export const useSmartFileUpload = () => {
       // Enhanced file info toast
       toast({
         title: "File Analysis Complete",
-        description: `Found ${data.length.toLocaleString()} rows with ${headers.length} columns. ${validationResult.fileInfo?.hasHeaders ? 'Headers detected.' : ''} Estimated processing time: ${enhancedProcessingInfo.estimatedTime}`,
+        description: `Found ${data.length.toLocaleString()} rows with ${headers.length} columns. ${validationResult.fileInfo?.hasHeaders ? 'Headers detected.' : ''}`,
       });
 
     } catch (error) {
@@ -219,7 +217,7 @@ export const useSmartFileUpload = () => {
       // Enhanced toast with detailed information
       toast({
         title: "Processing Started",
-        description: `Processing ${payeeRowData.uniquePayeeNames.length} unique payees from ${fileData.length} total rows (${duplicates} duplicates found). Estimated time: ${processingInfo.estimatedTime || 'calculating...'}`,
+        description: `Processing ${payeeRowData.uniquePayeeNames.length} unique payees from ${fileData.length} total rows (${duplicates} duplicates found).`,
       });
 
       return payeeRowData;
