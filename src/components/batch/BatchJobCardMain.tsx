@@ -10,14 +10,7 @@ interface BatchJobCardMainProps {
   payeeCount: number;
   payeeData?: PayeeRowData;
   isRefreshing: boolean;
-  isDownloading: boolean;
   isPolling: boolean;
-  progress?: { current: number; total: number };
-  customProgress?: {
-    stage: string;
-    percentage: number;
-    isActive: boolean;
-  };
   lastError?: string;
   onRefresh: () => void;
   onCancel: () => void;
@@ -35,10 +28,7 @@ const BatchJobCardMain = React.memo(({
   payeeCount,
   payeeData,
   isRefreshing,
-  isDownloading,
   isPolling,
-  progress,
-  customProgress,
   lastError,
   onRefresh,
   onCancel,
@@ -85,10 +75,7 @@ const BatchJobCardMain = React.memo(({
         payeeCount={payeeCount}
         payeeData={payeeData}
         isRefreshing={isRefreshing}
-        isDownloading={isDownloading}
         isPolling={isPolling}
-        progress={progress}
-        customProgress={customProgress}
         lastError={lastError}
         onRefresh={onRefresh}
         onCancel={onCancel}
