@@ -2,42 +2,35 @@
 import React from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
-import { useBatchJobActions } from './useBatchJobActions';
 import BatchJobCardMain from './BatchJobCardMain';
 import DirectCSVExport from './DirectCSVExport';
 
 interface BatchJobListProps {
   jobs: BatchJob[];
   payeeRowDataMap: Record<string, PayeeRowData>;
-  onJobUpdate: (job: BatchJob) => void;
-  onJobComplete: (results: any[], summary: any, jobId: string) => void;
+  refreshingJobs: Set<string>;
+  downloadingJobs: Set<string>;
+  downloadProgress: Record<string, { current: number; total: number }>;
+  pollingStates: Record<string, { isPolling: boolean }>;
+  onRefresh: (jobId: string) => Promise<void>;
+  onDownload: (job: BatchJob) => Promise<void>;
+  onCancel: (jobId: string) => void;
   onJobDelete: (jobId: string) => void;
 }
 
 const BatchJobList = ({ 
   jobs, 
-  payeeRowDataMap, 
-  onJobUpdate, 
-  onJobComplete, 
-  onJobDelete 
+  payeeRowDataMap,
+  refreshingJobs,
+  downloadingJobs,
+  downloadProgress,
+  pollingStates,
+  onRefresh,
+  onDownload,
+  onCancel,
+  onJobDelete
 }: BatchJobListProps) => {
   console.log(`[BATCH JOB LIST] Rendering ${jobs.length} jobs`);
-
-  const {
-    refreshingJobs,
-    downloadingJobs,
-    downloadProgress,
-    pollingStates,
-    handleRefreshJob,
-    handleDownloadResults,
-    handleCancelDownload,
-    handleCancelJob
-  } = useBatchJobActions({
-    jobs,
-    payeeRowDataMap,
-    onJobUpdate,
-    onJobComplete
-  });
 
   if (jobs.length === 0) {
     return (
@@ -67,8 +60,8 @@ const BatchJobList = ({
               isDownloading={isDownloading}
               isPolling={isPolling}
               progress={progress}
-              onRefresh={() => handleRefreshJob(job.id)}
-              onCancel={() => handleCancelJob(job.id)}
+              onRefresh={() => onRefresh(job.id)}
+              onCancel={() => onCancel(job.id)}
               onDelete={() => onJobDelete(job.id)}
             />
             
@@ -77,7 +70,7 @@ const BatchJobList = ({
               <DirectCSVExport 
                 job={job}
                 payeeData={payeeData}
-                onDownloadResults={() => handleDownloadResults(job)}
+                onDownloadResults={() => onDownload(job)}
               />
             )}
           </div>

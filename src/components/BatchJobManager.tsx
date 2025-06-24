@@ -112,57 +112,19 @@ const BatchJobManager = React.memo(({
     onJobDelete
   });
 
-  // Memoize the job list props
-  const jobListProps = useMemo(() => ({
-    jobs,
-    payeeRowDataMap,
-    refreshingJobs,
-    downloadingJobs,
-    downloadProgress,
-    pollingStates,
-    processedJobs,
-    processingInProgress,
-    onRefresh: handleRefreshJob,
-    onDownload: handleDownloadResults,
-    onCancel: showCancelConfirmation,
-    onJobDelete: showDeleteConfirmation,
-    getSmartState,
-    updateProgress,
-    getTimeoutState,
-    isJobStuck,
-    shouldJobTimeout,
-    getFormattedElapsedTime,
-    onJobRecovery: handleJobRecovery,
-    recoveringJobs,
-  }), [
-    jobs,
-    payeeRowDataMap,
-    refreshingJobs,
-    downloadingJobs,
-    downloadProgress,
-    pollingStates,
-    processedJobs,
-    processingInProgress,
-    handleRefreshJob,
-    handleDownloadResults,
-    showCancelConfirmation,
-    showDeleteConfirmation,
-    getSmartState,
-    updateProgress,
-    getTimeoutState,
-    isJobStuck,
-    shouldJobTimeout,
-    getFormattedElapsedTime,
-    handleJobRecovery,
-    recoveringJobs
-  ]);
-
   return (
     <>
       <BatchJobContainer 
         jobs={jobs}
         payeeRowDataMap={payeeRowDataMap}
-        listProps={jobListProps}
+        refreshingJobs={refreshingJobs}
+        downloadingJobs={downloadingJobs}
+        downloadProgress={downloadProgress}
+        pollingStates={pollingStates}
+        onRefresh={handleRefreshJob}
+        onDownload={handleDownloadResults}
+        onCancel={showCancelConfirmation}
+        onJobDelete={showDeleteConfirmation}
       />
 
       <BatchJobConfirmation
