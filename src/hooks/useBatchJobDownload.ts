@@ -1,3 +1,4 @@
+
 import { useToast } from "@/components/ui/use-toast";
 import { BatchJob, getBatchJobResults } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
@@ -29,16 +30,15 @@ export const useBatchJobDownload = ({
     isRetrying: isDownloadRetrying
   } = useRetry(getBatchJobResults, { maxRetries: 3, baseDelay: 2000 });
 
-  // Create a safe progress update function
+  // Create a bulletproof progress update function
   const safeUpdateProgress = (jobId: string, current: number, total: number) => {
     try {
-      if (typeof updateProgress === 'function') {
+      if (updateProgress && typeof updateProgress === 'function') {
         updateProgress(jobId, current, total);
-      } else {
-        console.warn(`[DOWNLOAD] updateProgress is not a function for job ${jobId}`);
       }
     } catch (error) {
-      console.error(`[DOWNLOAD] Error updating progress for job ${jobId}:`, error);
+      // Progress updates are non-critical, fail silently
+      console.warn(`[DOWNLOAD] Progress update failed for job ${jobId}:`, error);
     }
   };
 
@@ -57,7 +57,7 @@ export const useBatchJobDownload = ({
     const allResults = [];
     
     for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
-      if (isDownloadCancelled(job.id)) {
+      if (isDownloadCancelled && typeof isDownloadCancelled === 'function' && isDownloadCancelled(job.id)) {
         console.log(`[CHUNKED DOWNLOAD] Download cancelled for job ${job.id}`);
         throw new Error('Download cancelled by user');
       }
@@ -76,7 +76,9 @@ export const useBatchJobDownload = ({
         
         // Safe progress update
         try {
-          onProgress(allResults.length, uniquePayeeNames.length);
+          if (onProgress && typeof onProgress === 'function') {
+            onProgress(allResults.length, uniquePayeeNames.length);
+          }
         } catch (error) {
           console.warn(`[CHUNKED DOWNLOAD] Progress callback error:`, error);
         }
@@ -227,7 +229,9 @@ export const useBatchJobDownload = ({
       failureCount
     });
 
-    onJobComplete(finalClassifications, summary, job.id);
+    if (onJobComplete && typeof onJobComplete === 'function') {
+      onJobComplete(finalClassifications, summary, job.id);
+    }
 
     toast({
       title: "Download Complete",

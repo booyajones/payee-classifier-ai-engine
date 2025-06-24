@@ -37,16 +37,15 @@ export const useBatchJobActions = ({
     isDownloadCancelled
   } = useDownloadProgress();
 
-  // Create a safe updateProgress function that ensures it's always defined
+  // Create a robust progress update function that never fails
   const safeUpdateProgress = (jobId: string, current: number, total: number) => {
     try {
-      if (typeof updateProgress === 'function') {
+      if (updateProgress && typeof updateProgress === 'function') {
         updateProgress(jobId, current, total);
-      } else {
-        console.warn('[BATCH ACTIONS] updateProgress is not a function, skipping progress update');
       }
     } catch (error) {
-      console.error('[BATCH ACTIONS] Error in updateProgress:', error);
+      // Silent fail - progress updates are not critical
+      console.warn('[BATCH ACTIONS] Progress update failed silently:', error);
     }
   };
 
@@ -59,30 +58,38 @@ export const useBatchJobActions = ({
 
   // Manual refresh (user-initiated) - shows toast
   const handleRefreshJob = async (jobId: string) => {
-    await refreshSpecificJob(jobId, () => baseHandleRefreshJob(jobId, false));
-  };
-
-  // Auto refresh (system-initiated) - silent
-  const handleAutoRefreshJob = async (jobId: string) => {
-    await refreshSpecificJob(jobId, () => baseHandleRefreshJob(jobId, true));
+    try {
+      await refreshSpecificJob(jobId, () => baseHandleRefreshJob(jobId, false));
+    } catch (error) {
+      console.error('[BATCH ACTIONS] Refresh error:', error);
+      // Error is already handled in the base refresh hook
+    }
   };
 
   const handleDownloadResults = async (job: BatchJob) => {
     try {
-      startDownload(job.id);
+      if (startDownload && typeof startDownload === 'function') {
+        startDownload(job.id);
+      }
       await baseHandleDownloadResults(job);
     } catch (error) {
       console.error('[BATCH ACTIONS] Download error:', error);
       throw error;
     } finally {
-      finishDownload(job.id);
+      if (finishDownload && typeof finishDownload === 'function') {
+        finishDownload(job.id);
+      }
     }
   };
 
   const handleCancelDownloadWithCleanup = (jobId: string) => {
     try {
-      cancelDownload(jobId);
-      handleCancelDownload(jobId);
+      if (cancelDownload && typeof cancelDownload === 'function') {
+        cancelDownload(jobId);
+      }
+      if (handleCancelDownload && typeof handleCancelDownload === 'function') {
+        handleCancelDownload(jobId);
+      }
     } catch (error) {
       console.error('[BATCH ACTIONS] Cancel download error:', error);
     }
@@ -97,7 +104,6 @@ export const useBatchJobActions = ({
     
     // Actions
     handleRefreshJob,
-    handleAutoRefreshJob,
     handleDownloadResults,
     handleCancelDownload: handleCancelDownloadWithCleanup,
     handleCancelJob

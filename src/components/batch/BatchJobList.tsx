@@ -39,6 +39,20 @@ const BatchJobList = ({
     onJobComplete
   });
 
+  // Safe delete handler with proper error handling
+  const handleSafeDelete = (jobId: string) => {
+    try {
+      console.log(`[BATCH JOB LIST] Deleting job ${jobId}`);
+      if (typeof onJobDelete === 'function') {
+        onJobDelete(jobId);
+      } else {
+        console.error('[BATCH JOB LIST] onJobDelete is not a function');
+      }
+    } catch (error) {
+      console.error('[BATCH JOB LIST] Error deleting job:', error);
+    }
+  };
+
   if (jobs.length === 0) {
     return (
       <div className="text-center py-8 border rounded-md">
@@ -70,14 +84,15 @@ const BatchJobList = ({
               onRefresh={() => handleRefreshJob(job.id)}
               onDownload={() => handleDownloadResults(job)}
               onCancel={() => handleCancelDownload(job.id)}
-              onDelete={() => onJobDelete(job.id)}
+              onDelete={() => handleSafeDelete(job.id)}
             />
             
-            {/* Add direct CSV export for completed jobs */}
+            {/* Enhanced direct CSV export for completed jobs */}
             {job.status === 'completed' && payeeData && (
               <DirectCSVExport 
                 job={job}
                 payeeData={payeeData}
+                onDownloadResults={() => handleDownloadResults(job)}
               />
             )}
           </div>
