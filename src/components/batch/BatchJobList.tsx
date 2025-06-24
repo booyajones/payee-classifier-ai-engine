@@ -20,6 +20,8 @@ const BatchJobList = ({
   onJobComplete, 
   onJobDelete 
 }: BatchJobListProps) => {
+  console.log(`[BATCH JOB LIST] Rendering ${jobs.length} jobs`);
+
   const {
     refreshingJobs,
     downloadingJobs,
@@ -32,7 +34,7 @@ const BatchJobList = ({
   } = useBatchJobActions({
     jobs,
     payeeRowDataMap,
-    onJobUpdate, // Ensure this is passed correctly
+    onJobUpdate,
     onJobComplete
   });
 
@@ -56,7 +58,7 @@ const BatchJobList = ({
 
         return (
           <BatchJobCard
-            key={job.id}
+            key={`${job.id}-${job.status}-${job.request_counts.completed}`}
             job={job}
             payeeCount={payeeCount}
             payeeData={payeeData}

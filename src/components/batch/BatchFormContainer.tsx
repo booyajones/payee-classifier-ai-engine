@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { useBatchManager } from "@/hooks/useBatchManager";
@@ -16,12 +16,8 @@ interface BatchFormContainerProps {
 const BatchFormContainer = ({ onBatchClassify, onComplete }: BatchFormContainerProps) => {
   const batchManager = useBatchManager();
   const formState = useSimplifiedBatchForm();
-  const [renderKey, setRenderKey] = useState(0);
 
-  // Force re-render when jobs change
-  useEffect(() => {
-    setRenderKey(prev => prev + 1);
-  }, [batchManager.jobs.length]);
+  console.log(`[BATCH CONTAINER] Rendering with ${batchManager.jobs.length} jobs`);
 
   // Show loading until batch manager has loaded existing jobs
   if (!batchManager.isLoaded) {
@@ -33,17 +29,18 @@ const BatchFormContainer = ({ onBatchClassify, onComplete }: BatchFormContainerP
     );
   }
 
-  const handleFileUploadBatchJob = async (batchJob: any, payeeRowData: any) => {
-    // Job is already added to batchManager state in createBatch
-    // Just switch to jobs tab to show it
+  const handleFileUploadBatchJob = useCallback(async (batchJob: any, payeeRowData: any) => {
     console.log(`[BATCH CONTAINER] Job ${batchJob.id} created, switching to jobs tab`);
+    
+    // Small delay to ensure state propagation before switching tabs
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     formState.setActiveTab("jobs");
     
-    // Force a re-render to ensure the new job shows up
-    setRenderKey(prev => prev + 1);
-  };
+    console.log(`[BATCH CONTAINER] Switched to jobs tab, current job count: ${batchManager.jobs.length}`);
+  }, [formState, batchManager.jobs.length]);
 
-  const handleJobComplete = (
+  const handleJobComplete = useCallback((
     results: PayeeClassification[], 
     summary: BatchProcessingResult, 
     jobId: string
@@ -59,12 +56,10 @@ const BatchFormContainer = ({ onBatchClassify, onComplete }: BatchFormContainerP
     if (onComplete) {
       onComplete(results, summary);
     }
-  };
-
-  console.log(`[BATCH CONTAINER] Rendering with ${batchManager.jobs.length} jobs (key: ${renderKey})`);
+  }, [formState, onBatchClassify, onComplete]);
 
   return (
-    <Card key={renderKey}>
+    <Card>
       <BatchFormHeader />
       <CardContent>
         <BatchFormContent

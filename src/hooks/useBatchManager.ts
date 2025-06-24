@@ -1,4 +1,3 @@
-
 import { useCallback, useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
@@ -39,12 +38,16 @@ export const useBatchManager = () => {
         console.log('[BATCH MANAGER] Loading existing jobs from database...');
         const { jobs, payeeRowDataMap } = await loadAllBatchJobs();
         
-        setState(prev => ({
-          ...prev,
-          jobs,
-          payeeDataMap: payeeRowDataMap,
-          isLoaded: true
-        }));
+        setState(prev => {
+          const newState = {
+            ...prev,
+            jobs,
+            payeeDataMap: payeeRowDataMap,
+            isLoaded: true
+          };
+          console.log(`[BATCH MANAGER] State updated with ${jobs.length} jobs`);
+          return newState;
+        });
         
         console.log(`[BATCH MANAGER] Loaded ${jobs.length} existing jobs`);
       } catch (error) {
@@ -80,12 +83,12 @@ export const useBatchManager = () => {
       // Save to database first
       await saveBatchJob(job, payeeRowData);
       
-      // Then update state immediately to ensure UI updates
+      // Update state immediately with functional update to ensure consistency
       setState(prev => {
         const updatedJobs = [...prev.jobs, job];
         const updatedPayeeDataMap = { ...prev.payeeDataMap, [job.id]: payeeRowData };
         
-        console.log(`[BATCH MANAGER] Job ${job.id} added to state. Total jobs: ${updatedJobs.length}`);
+        console.log(`[BATCH MANAGER] Adding job ${job.id} to state. New total: ${updatedJobs.length}`);
         
         return {
           ...prev,
@@ -94,6 +97,7 @@ export const useBatchManager = () => {
         };
       });
       
+      console.log(`[BATCH MANAGER] Job ${job.id} successfully added to state`);
       return job;
 
     } catch (error) {
@@ -114,11 +118,14 @@ export const useBatchManager = () => {
   const updateJob = useCallback(async (updatedJob: BatchJob, silent: boolean = true) => {
     try {
       await updateBatchJobStatus(updatedJob);
-      setState(prev => ({
-        ...prev,
-        jobs: prev.jobs.map(job => job.id === updatedJob.id ? updatedJob : job)
-      }));
-      console.log(`[BATCH MANAGER] Job ${updatedJob.id} updated in state`);
+      setState(prev => {
+        const updatedJobs = prev.jobs.map(job => job.id === updatedJob.id ? updatedJob : job);
+        console.log(`[BATCH MANAGER] Job ${updatedJob.id} updated in state`);
+        return {
+          ...prev,
+          jobs: updatedJobs
+        };
+      });
     } catch (error) {
       console.error('[BATCH MANAGER] Update failed:', error);
       setState(prev => ({
@@ -131,18 +138,24 @@ export const useBatchManager = () => {
   const deleteJob = useCallback(async (jobId: string) => {
     try {
       await deleteBatchJob(jobId);
-      setState(prev => ({
-        ...prev,
-        jobs: prev.jobs.filter(job => job.id !== jobId),
-        payeeDataMap: Object.fromEntries(
+      setState(prev => {
+        const updatedJobs = prev.jobs.filter(job => job.id !== jobId);
+        const updatedPayeeDataMap = Object.fromEntries(
           Object.entries(prev.payeeDataMap).filter(([id]) => id !== jobId)
-        ),
-        errors: Object.fromEntries(
+        );
+        const updatedErrors = Object.fromEntries(
           Object.entries(prev.errors).filter(([id]) => id !== jobId)
-        )
-      }));
-      
-      console.log(`[BATCH MANAGER] Job ${jobId} removed from state`);
+        );
+        
+        console.log(`[BATCH MANAGER] Job ${jobId} removed from state. Remaining: ${updatedJobs.length}`);
+        
+        return {
+          ...prev,
+          jobs: updatedJobs,
+          payeeDataMap: updatedPayeeDataMap,
+          errors: updatedErrors
+        };
+      });
       
       toast({
         title: "Job Deleted",

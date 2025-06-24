@@ -34,6 +34,8 @@ const BatchFormTabs = ({
   onJobDelete,
   onReset
 }: BatchFormTabsProps) => {
+  console.log(`[BATCH FORM TABS] Rendering with ${batchJobs.length} jobs, active tab: ${activeTab}`);
+
   return (
     <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
       <TabsList className="grid w-full grid-cols-3">
@@ -60,6 +62,7 @@ const BatchFormTabs = ({
           </div>
         ) : (
           <BatchJobManager
+            key={`jobs-${batchJobs.length}`}
             jobs={batchJobs}
             payeeRowDataMap={payeeRowDataMap}
             onJobUpdate={onJobUpdate}
