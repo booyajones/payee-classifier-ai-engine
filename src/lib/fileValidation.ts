@@ -1,3 +1,4 @@
+
 import { FileValidationError, ERROR_CODES } from './errorHandler';
 
 export interface FileValidationResult {
@@ -9,7 +10,6 @@ export interface FileValidationResult {
     type: string;
     rowCount?: number;
     columnCount?: number;
-    estimatedProcessingTime?: string;
     sizeWarning?: string;
   };
 }
@@ -20,26 +20,6 @@ export const MAX_ROWS = 100000; // Increased to 100K rows
 export const LARGE_FILE_WARNING_SIZE = 25 * 1024 * 1024; // 25MB warning threshold
 export const LARGE_ROW_WARNING_COUNT = 25000; // 25K rows warning threshold
 export const SUPPORTED_EXTENSIONS = ['xlsx', 'xls', 'csv'];
-
-/**
- * Estimate processing time based on file characteristics
- */
-export const estimateProcessingTime = (fileSize: number, rowCount?: number): string => {
-  // Base estimation: ~1 second per MB + ~0.1 second per 100 rows
-  const sizeSeconds = Math.ceil(fileSize / (1024 * 1024)) * 60; // 1 minute per MB for batch processing
-  const rowSeconds = rowCount ? Math.ceil(rowCount / 100) * 6 : 0; // 6 seconds per 100 rows
-  
-  const totalSeconds = Math.max(sizeSeconds, rowSeconds, 30); // Minimum 30 seconds
-  
-  if (totalSeconds < 120) {
-    return `${Math.ceil(totalSeconds / 60)} minute${totalSeconds >= 120 ? 's' : ''}`;
-  } else if (totalSeconds < 3600) {
-    return `${Math.ceil(totalSeconds / 60)} minutes`;
-  } else {
-    const hours = Math.ceil(totalSeconds / 3600);
-    return `${hours} hour${hours > 1 ? 's' : ''}`;
-  }
-};
 
 /**
  * Generate size warning messages for large files
@@ -104,8 +84,7 @@ export const validateFile = (file: File): FileValidationResult => {
     console.warn(`[FILE VALIDATION] Unexpected MIME type: ${file.type}, but extension is valid`);
   }
 
-  // Generate initial file info with estimates
-  const estimatedTime = estimateProcessingTime(file.size);
+  // Generate initial file info without time estimates
   const sizeWarning = generateSizeWarning(file.size);
 
   return {
@@ -114,7 +93,6 @@ export const validateFile = (file: File): FileValidationResult => {
       name: file.name,
       size: file.size,
       type: file.type || 'unknown',
-      estimatedProcessingTime: estimatedTime,
       sizeWarning
     }
   };
@@ -182,9 +160,8 @@ export const validatePayeeData = (data: any[], selectedColumn: string): FileVali
 
   console.log(`[PAYEE VALIDATION] Found ${payeeNames.length} total payees, ${uniquePayees.length} unique, ${duplicateCount} duplicates`);
 
-  // Generate enhanced file info with processing estimates
+  // Generate enhanced file info without processing estimates
   const dataSize = JSON.stringify(data).length;
-  const estimatedTime = estimateProcessingTime(dataSize, data.length);
   const sizeWarning = generateSizeWarning(dataSize, data.length);
 
   return {
@@ -195,13 +172,11 @@ export const validatePayeeData = (data: any[], selectedColumn: string): FileVali
       type: 'payee-list',
       rowCount: data.length,
       columnCount: Object.keys(data[0] || {}).length,
-      estimatedProcessingTime: estimatedTime,
       sizeWarning
     }
   };
 };
 
-// ... keep existing code (cleanPayeeNames function)
 export const cleanPayeeNames = (payeeNames: string[]): string[] => {
   return [...new Set(
     payeeNames
