@@ -1,12 +1,11 @@
 
 import { Progress } from "@/components/ui/progress";
 import { Clock, Loader2, CheckCircle, AlertCircle, Package } from "lucide-react";
+import { useMemo } from "react";
 
 interface BatchProcessingProgressProps {
   progress: number;
   status: string;
-  showTimeRemaining?: boolean;
-  estimatedTimeRemaining?: string;
   currentStep?: string;
   totalSteps?: number;
   isComplete?: boolean;
@@ -40,9 +39,18 @@ const BatchProcessingProgress = ({
     return "bg-blue-500";
   };
 
+  // Only show meaningful progress changes
+  const shouldShowProgress = useMemo(() => {
+    return progress > 0 || isComplete || hasError;
+  }, [progress, isComplete, hasError]);
+
+  if (!shouldShowProgress) {
+    return null;
+  }
+
   return (
     <div className="space-y-3">
-      {/* Status Header */}
+      {/* Status Header - only show if there's meaningful info */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {getStatusIcon()}
@@ -63,27 +71,29 @@ const BatchProcessingProgress = ({
         />
       </div>
       
-      {/* Additional Info */}
+      {/* Additional Info - only show when there are meaningful changes */}
       <div className="space-y-1 text-xs text-muted-foreground">
-        {/* Chunked Processing Info */}
+        {/* Chunked Processing Info - only show when chunked */}
         {isChunked && totalChunks > 1 && (
           <div className="flex items-center gap-1">
             <Package className="h-3 w-3" />
-            <span>Processing large file in {totalChunks} chunks - {completedChunks} completed</span>
+            <span>Processing {totalChunks} chunks - {completedChunks} completed</span>
           </div>
         )}
 
+        {/* Step info - only when steps are defined */}
         {currentStep && totalSteps && (
           <div className="flex items-center gap-1">
             <span>Step {currentStep} of {totalSteps}</span>
           </div>
         )}
         
+        {/* Help text - only show when actively processing */}
         {progress > 0 && !isComplete && !hasError && (
           <div>
             {isChunked && totalChunks > 1 
-              ? `Large file automatically split into ${totalChunks} chunks for efficient processing. You can safely leave this page.`
-              : "Processing may take several minutes for large files. You can safely leave this page - your progress will be saved."
+              ? `Processing large file in ${totalChunks} chunks. You can safely leave this page.`
+              : "Processing your file. You can safely leave this page - progress will be saved."
             }
           </div>
         )}

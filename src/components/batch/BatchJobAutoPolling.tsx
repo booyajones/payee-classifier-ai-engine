@@ -17,10 +17,7 @@ export const useBatchJobAutoPolling = ({
 }: UseBatchJobAutoPollingProps) => {
   const pollTimeouts = useRef<Record<string, NodeJS.Timeout>>({});
   const isPollingRef = useRef<Set<string>>(new Set());
-  const lastJobsRef = useRef<string>('');
-
-  // Memoize the jobs string to prevent unnecessary effects
-  const jobsString = jobs.map(j => `${j.id}-${j.status}-${j.request_counts.completed}`).join(',');
+  const lastJobStatesRef = useRef<Record<string, { status: string; completed: number }>>({});
 
   const cleanupPolling = useCallback((jobId: string) => {
     if (pollTimeouts.current[jobId]) {
@@ -29,6 +26,21 @@ export const useBatchJobAutoPolling = ({
     }
     isPollingRef.current.delete(jobId);
     console.log(`[AUTO POLLING] Stopped polling for job ${jobId.slice(-8)}`);
+  }, []);
+
+  const hasJobChanged = useCallback((job: BatchJob): boolean => {
+    const lastState = lastJobStatesRef.current[job.id];
+    if (!lastState) {
+      lastJobStatesRef.current[job.id] = { status: job.status, completed: job.request_counts.completed };
+      return true;
+    }
+    
+    const hasChanged = lastState.status !== job.status || lastState.completed !== job.request_counts.completed;
+    if (hasChanged) {
+      lastJobStatesRef.current[job.id] = { status: job.status, completed: job.request_counts.completed };
+    }
+    
+    return hasChanged;
   }, []);
 
   const startPolling = useCallback(async (jobId: string) => {
@@ -41,15 +53,26 @@ export const useBatchJobAutoPolling = ({
     
     const poll = async () => {
       try {
-        console.log(`[AUTO POLLING] Polling job ${jobId.slice(-8)}`);
-        await handleRefreshJob(jobId);
+        const job = jobs.find(j => j.id === jobId);
+        if (!job) {
+          cleanupPolling(jobId);
+          return;
+        }
+
+        // Only poll if there's a chance for change or if it's been a while
+        const shouldPoll = hasJobChanged(job) || Math.random() < 0.3; // Reduce frequency
+        
+        if (shouldPoll) {
+          console.log(`[AUTO POLLING] Checking job ${jobId.slice(-8)} for changes`);
+          await handleRefreshJob(jobId);
+        }
         
         // Check if job is still active after refresh
-        const job = jobs.find(j => j.id === jobId);
-        if (job && ['validating', 'in_progress', 'finalizing'].includes(job.status)) {
-          // Schedule next poll
-          pollTimeouts.current[jobId] = setTimeout(poll, 8000); // Poll every 8 seconds
-          console.log(`[AUTO POLLING] Scheduled next poll for job ${jobId.slice(-8)} in 8 seconds`);
+        const updatedJob = jobs.find(j => j.id === jobId);
+        if (updatedJob && ['validating', 'in_progress', 'finalizing'].includes(updatedJob.status)) {
+          // Use longer intervals to reduce noise
+          const delay = updatedJob.status === 'in_progress' ? 15000 : 10000; // 15s for in_progress, 10s for others
+          pollTimeouts.current[jobId] = setTimeout(poll, delay);
         } else {
           console.log(`[AUTO POLLING] Job ${jobId.slice(-8)} completed or failed, stopping polling`);
           cleanupPolling(jobId);
@@ -62,33 +85,23 @@ export const useBatchJobAutoPolling = ({
       } catch (error) {
         console.error(`[AUTO POLLING] Error polling job ${jobId}:`, error);
         // Continue polling even on error, but with longer delay
-        pollTimeouts.current[jobId] = setTimeout(poll, 15000); // 15 second delay on error
+        pollTimeouts.current[jobId] = setTimeout(poll, 20000); // 20 second delay on error
       }
     };
 
     // Start polling with initial delay
-    pollTimeouts.current[jobId] = setTimeout(poll, 3000); // Start in 3 seconds
-  }, [jobs, handleRefreshJob, cleanupPolling, setAutoPollingJobs]);
+    pollTimeouts.current[jobId] = setTimeout(poll, 5000); // Start in 5 seconds
+  }, [jobs, handleRefreshJob, cleanupPolling, setAutoPollingJobs, hasJobChanged]);
 
   useEffect(() => {
-    // Only run if jobs actually changed
-    if (jobsString === lastJobsRef.current) {
-      return;
-    }
-    lastJobsRef.current = jobsString;
-
-    console.log(`[AUTO POLLING] Jobs changed, checking active jobs. Total jobs: ${jobs.length}`);
-
     const activeJobs = jobs.filter(job => 
       ['validating', 'in_progress', 'finalizing'].includes(job.status)
     );
 
-    console.log(`[AUTO POLLING] Found ${activeJobs.length} active jobs`);
-
     // Start polling for new active jobs
     for (const job of activeJobs) {
       if (!autoPollingJobs.has(job.id) && !isPollingRef.current.has(job.id)) {
-        console.log(`[AUTO POLLING] Starting auto-polling for new active job ${job.id.slice(-8)} (status: ${job.status})`);
+        console.log(`[AUTO POLLING] Starting auto-polling for active job ${job.id.slice(-8)} (status: ${job.status})`);
         setAutoPollingJobs(prev => new Set(prev).add(job.id));
         startPolling(job.id);
       }
@@ -107,7 +120,7 @@ export const useBatchJobAutoPolling = ({
         });
       }
     }
-  }, [jobsString, jobs, autoPollingJobs, setAutoPollingJobs, startPolling, cleanupPolling]);
+  }, [jobs, autoPollingJobs, setAutoPollingJobs, startPolling, cleanupPolling]);
 
   // Cleanup on unmount
   useEffect(() => {
