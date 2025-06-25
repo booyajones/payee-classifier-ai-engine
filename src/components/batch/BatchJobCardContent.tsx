@@ -18,7 +18,7 @@ const BatchJobCardContent = ({
   isCompleted,
   onDownload
 }: BatchJobCardContentProps) => {
-  const payeeCount = payeeRowData?.payees?.length || 0;
+  const payeeCount = payeeRowData?.uniquePayeeNames?.length || 0;
   const { total, completed, failed } = job.request_counts;
   
   const getProgressPercentage = () => {

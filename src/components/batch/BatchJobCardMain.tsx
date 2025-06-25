@@ -7,8 +7,7 @@ import BatchJobCardContent from './BatchJobCardContent';
 
 interface BatchJobCardMainProps {
   job: BatchJob;
-  payeeCount: number;
-  payeeData?: PayeeRowData;
+  payeeRowData?: PayeeRowData;
   isRefreshing: boolean;
   isPolling: boolean;
   lastError?: string;
@@ -21,12 +20,12 @@ interface BatchJobCardMainProps {
   elapsedTime?: string;
   onRecover?: () => void;
   isRecovering?: boolean;
+  onDownload: () => void;
 }
 
 const BatchJobCardMain = React.memo(({
   job,
-  payeeCount,
-  payeeData,
+  payeeRowData,
   isRefreshing,
   isPolling,
   lastError,
@@ -38,12 +37,14 @@ const BatchJobCardMain = React.memo(({
   shouldTimeout = false,
   elapsedTime = '',
   onRecover = () => {},
-  isRecovering = false
+  isRecovering = false,
+  onDownload
 }: BatchJobCardMainProps) => {
   const [showDetails, setShowDetails] = useState(false);
 
   // Determine if job is actually completed
   const actuallyCompleted = job.status === 'completed';
+  const payeeCount = payeeRowData?.uniquePayeeNames?.length || 0;
 
   // Memoize status color calculation
   const statusColor = useMemo(() => {
@@ -72,25 +73,9 @@ const BatchJobCardMain = React.memo(({
     <Card className={`transition-all duration-200 ${isCompleted ? 'ring-2 ring-green-200' : ''}`}>
       <BatchJobCardContent
         job={job}
-        payeeCount={payeeCount}
-        payeeData={payeeData}
-        isRefreshing={isRefreshing}
-        isPolling={isPolling}
-        lastError={lastError}
-        onRefresh={onRefresh}
-        onCancel={onCancel}
-        onDelete={onDelete}
-        isCompleted={isCompleted}
-        isStuck={isStuck}
-        shouldTimeout={shouldTimeout}
-        elapsedTime={elapsedTime}
-        onRecover={onRecover}
-        isRecovering={isRecovering}
-        actuallyCompleted={actuallyCompleted}
-        statusColor={statusColor}
-        statusDisplay={statusDisplay}
-        showDetails={showDetails}
-        setShowDetails={setShowDetails}
+        payeeRowData={payeeRowData}
+        isCompleted={actuallyCompleted}
+        onDownload={onDownload}
       />
     </Card>
   );

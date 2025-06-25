@@ -15,7 +15,7 @@ const BatchJobHeader = ({
   job,
   payeeRowData
 }: BatchJobHeaderProps) => {
-  const payeeCount = payeeRowData?.payees?.length || 0;
+  const payeeCount = payeeRowData?.uniquePayeeNames?.length || 0;
   const isCompleted = job.status === 'completed';
   
   const getElapsedTime = () => {
