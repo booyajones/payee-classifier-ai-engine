@@ -37,19 +37,25 @@ export const useBatchManager = () => {
 
   const { refreshJobs } = useBatchJobLoader(updateJobs, updatePayeeDataMap, setLoaded);
 
-  // Use ref to prevent multiple simultaneous refresh attempts
+  // Use refs to prevent multiple simultaneous operations
   const refreshInProgress = useRef(false);
+  const eventListenerActive = useRef(false);
 
-  // Listen for job updates from other components
+  // Listen for job updates from other components with improved debouncing
   useEffect(() => {
     const handleJobUpdate = async () => {
       // Prevent multiple simultaneous refreshes
-      if (refreshInProgress.current) {
-        console.log('[BATCH MANAGER] Refresh already in progress, skipping...');
+      if (refreshInProgress.current || eventListenerActive.current) {
+        console.log('[BATCH MANAGER] Operation already in progress, skipping event...');
         return;
       }
 
+      eventListenerActive.current = true;
+      
       try {
+        // Add a small delay to batch rapid events
+        await new Promise(resolve => setTimeout(resolve, 250));
+        
         refreshInProgress.current = true;
         console.log('[BATCH MANAGER] Received job update event, refreshing jobs...');
         await refreshJobs(true);
@@ -57,6 +63,7 @@ export const useBatchManager = () => {
         console.error('[BATCH MANAGER] Error during event-triggered refresh:', error);
       } finally {
         refreshInProgress.current = false;
+        eventListenerActive.current = false;
       }
     };
 
