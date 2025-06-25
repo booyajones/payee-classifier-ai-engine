@@ -1,108 +1,74 @@
 
 import React from 'react';
-import { CardContent, CardHeader } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Download, Trash2 } from 'lucide-react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
-import BatchJobTimeoutIndicator from './BatchJobTimeoutIndicator';
-import BatchJobHeader from './BatchJobHeader';
-import BatchJobProgress from './BatchJobProgress';
-import BatchJobDetails from './BatchJobDetails';
-import BatchJobCardFooter from './BatchJobCardFooter';
 
 interface BatchJobCardContentProps {
   job: BatchJob;
-  payeeCount: number;
-  payeeData?: PayeeRowData;
-  isRefreshing: boolean;
-  isPolling: boolean;
-  lastError?: string;
-  onRefresh: () => void;
-  onCancel: () => void;
-  onDelete: () => void;
+  payeeRowData?: PayeeRowData;
   isCompleted: boolean;
-  isStuck: boolean;
-  shouldTimeout: boolean;
-  elapsedTime: string;
-  onRecover: () => void;
-  isRecovering: boolean;
-  actuallyCompleted: boolean;
-  statusColor: string;
-  statusDisplay: string;
-  showDetails: boolean;
-  setShowDetails: (show: boolean) => void;
+  onDownload: () => void;
 }
 
 const BatchJobCardContent = ({
   job,
-  payeeCount,
-  payeeData,
-  isRefreshing,
-  isPolling,
-  lastError,
-  onRefresh,
-  onCancel,
-  onDelete,
+  payeeRowData,
   isCompleted,
-  isStuck,
-  shouldTimeout,
-  elapsedTime,
-  onRecover,
-  isRecovering,
-  actuallyCompleted,
-  statusColor,
-  statusDisplay,
-  showDetails,
-  setShowDetails
+  onDownload
 }: BatchJobCardContentProps) => {
+  const payeeCount = payeeRowData?.payees?.length || 0;
+  const { total, completed, failed } = job.request_counts;
+  
+  const getProgressPercentage = () => {
+    if (total === 0) return 0;
+    return Math.round((completed / total) * 100);
+  };
+
+  const showProgress = total > 0 && job.status === 'in_progress';
+
   return (
-    <>
-      <CardHeader className="pb-3">
-        <BatchJobHeader
-          job={job}
-          payeeCount={payeeCount}
-          isCompleted={isCompleted}
-          elapsedTime={elapsedTime}
-          statusColor={statusColor}
-          statusDisplay={statusDisplay}
-        />
-      </CardHeader>
+    <div className="space-y-3">
+      {/* Progress Bar */}
+      {showProgress && (
+        <div className="space-y-1">
+          <div className="flex justify-between text-sm">
+            <span>Progress: {completed}/{total} requests</span>
+            <span>{getProgressPercentage()}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+              style={{ width: `${getProgressPercentage()}%` }}
+            />
+          </div>
+        </div>
+      )}
 
-      <CardContent className="space-y-3">
-        <BatchJobProgress
-          job={job}
-          isCompleted={isCompleted}
-        />
+      {/* Request Counts */}
+      {total > 0 && (
+        <div className="flex gap-4 text-sm text-muted-foreground">
+          <span>Total: {total}</span>
+          <span>Completed: {completed}</span>
+          {failed > 0 && <span className="text-red-600">Failed: {failed}</span>}
+        </div>
+      )}
 
-        <BatchJobTimeoutIndicator
-          job={job}
-          isStuck={isStuck}
-          shouldTimeout={shouldTimeout}
-          elapsedTime={elapsedTime}
-          onRecover={onRecover}
-          isRecovering={isRecovering}
-        />
-
-        {showDetails && (
-          <BatchJobDetails
-            job={job}
-            payeeData={payeeData}
-            lastError={lastError}
-          />
-        )}
-
-        <BatchJobCardFooter
-          job={job}
-          actuallyCompleted={actuallyCompleted}
-          isRefreshing={isRefreshing}
-          isPolling={isPolling}
-          showDetails={showDetails}
-          onRefresh={onRefresh}
-          onCancel={onCancel}
-          onDelete={onDelete}
-          setShowDetails={setShowDetails}
-        />
-      </CardContent>
-    </>
+      {/* Download Button */}
+      {isCompleted && (
+        <div className="flex justify-end">
+          <Button 
+            onClick={onDownload} 
+            size="sm" 
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Download Results
+          </Button>
+        </div>
+      )}
+    </div>
   );
 };
 
