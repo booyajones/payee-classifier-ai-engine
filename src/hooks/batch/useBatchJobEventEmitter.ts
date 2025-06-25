@@ -1,13 +1,13 @@
 
-// Simple event emitter for batch job updates with rate limiting
+// Simple event emitter for batch job updates with improved rate limiting
 const jobUpdateListeners = new Set<() => void>();
 let lastEmitTime = 0;
-const EMIT_THROTTLE_MS = 500; // Throttle emissions to max once per 500ms
+const EMIT_THROTTLE_MS = 250; // Reduced from 500ms for more responsive updates
 
 export const emitBatchJobUpdate = () => {
   const now = Date.now();
   
-  // Throttle rapid fire events
+  // Less aggressive throttling for better responsiveness
   if (now - lastEmitTime < EMIT_THROTTLE_MS) {
     console.log('[BATCH EVENT] Throttling batch job update event');
     return;
@@ -29,7 +29,7 @@ export const emitBatchJobUpdate = () => {
 };
 
 export const useBatchJobEventListener = (callback: () => void) => {
-  // Wrap callback to prevent multiple rapid calls
+  // Reduced callback throttling for better responsiveness
   let isProcessing = false;
   const throttledCallback = async () => {
     if (isProcessing) {

@@ -17,7 +17,7 @@ export const useBatchJobAutoPolling = ({
 }: UseBatchJobAutoPollingProps) => {
   const pollTimeouts = useRef<Record<string, NodeJS.Timeout>>({});
   const isPollingRef = useRef<Set<string>>(new Set());
-  const lastJobStatesRef = useRef<Record<string, { status: string; completed: number }>>({});
+  const lastJobStatesRef = useRef<Record<string, { status: string; completed: number; lastUpdate: number }>>({});
 
   const cleanupPolling = useCallback((jobId: string) => {
     if (pollTimeouts.current[jobId]) {
@@ -30,14 +30,33 @@ export const useBatchJobAutoPolling = ({
 
   const hasJobChanged = useCallback((job: BatchJob): boolean => {
     const lastState = lastJobStatesRef.current[job.id];
+    const now = Date.now();
+    
     if (!lastState) {
-      lastJobStatesRef.current[job.id] = { status: job.status, completed: job.request_counts.completed };
+      lastJobStatesRef.current[job.id] = { 
+        status: job.status, 
+        completed: job.request_counts.completed,
+        lastUpdate: now
+      };
       return true;
     }
     
-    const hasChanged = lastState.status !== job.status || lastState.completed !== job.request_counts.completed;
+    const hasStatusChange = lastState.status !== job.status;
+    const hasProgressChange = lastState.completed !== job.request_counts.completed;
+    const timeSinceLastUpdate = now - lastState.lastUpdate;
+    
+    // Force update every 30 seconds for in-progress jobs
+    const shouldForceUpdate = job.status === 'in_progress' && timeSinceLastUpdate > 30000;
+    
+    const hasChanged = hasStatusChange || hasProgressChange || shouldForceUpdate;
+    
     if (hasChanged) {
-      lastJobStatesRef.current[job.id] = { status: job.status, completed: job.request_counts.completed };
+      lastJobStatesRef.current[job.id] = { 
+        status: job.status, 
+        completed: job.request_counts.completed,
+        lastUpdate: now
+      };
+      console.log(`[AUTO POLLING] Job ${job.id.slice(-8)} changed: status=${job.status}, completed=${job.request_counts.completed}`);
     }
     
     return hasChanged;
@@ -59,20 +78,19 @@ export const useBatchJobAutoPolling = ({
           return;
         }
 
-        // Only poll if there's a chance for change or if it's been a while
-        const shouldPoll = hasJobChanged(job) || Math.random() < 0.3; // Reduce frequency
+        // More aggressive polling for in-progress jobs
+        const shouldPoll = job.status === 'in_progress' || hasJobChanged(job) || Math.random() < 0.4;
         
         if (shouldPoll) {
-          console.log(`[AUTO POLLING] Silently checking job ${jobId.slice(-8)} for changes`);
-          // Pass silent: true to prevent toast notifications during auto-polling
+          console.log(`[AUTO POLLING] Checking job ${jobId.slice(-8)} (status: ${job.status})`);
           await handleRefreshJob(jobId, true);
         }
         
         // Check if job is still active after refresh
         const updatedJob = jobs.find(j => j.id === jobId);
         if (updatedJob && ['validating', 'in_progress', 'finalizing'].includes(updatedJob.status)) {
-          // Use longer intervals to reduce noise
-          const delay = updatedJob.status === 'in_progress' ? 15000 : 10000; // 15s for in_progress, 10s for others
+          // More frequent polling intervals
+          const delay = updatedJob.status === 'in_progress' ? 10000 : 8000; // 10s for in_progress, 8s for others
           pollTimeouts.current[jobId] = setTimeout(poll, delay);
         } else {
           console.log(`[AUTO POLLING] Job ${jobId.slice(-8)} completed or failed, stopping polling`);
@@ -86,18 +104,22 @@ export const useBatchJobAutoPolling = ({
       } catch (error) {
         console.error(`[AUTO POLLING] Error polling job ${jobId}:`, error);
         // Continue polling even on error, but with longer delay
-        pollTimeouts.current[jobId] = setTimeout(poll, 20000); // 20 second delay on error
+        pollTimeouts.current[jobId] = setTimeout(poll, 15000); // 15 second delay on error
       }
     };
 
-    // Start polling with initial delay
-    pollTimeouts.current[jobId] = setTimeout(poll, 5000); // Start in 5 seconds
+    // Start polling immediately for in-progress jobs, with delay for others
+    const job = jobs.find(j => j.id === jobId);
+    const initialDelay = job?.status === 'in_progress' ? 2000 : 5000;
+    pollTimeouts.current[jobId] = setTimeout(poll, initialDelay);
   }, [jobs, handleRefreshJob, cleanupPolling, setAutoPollingJobs, hasJobChanged]);
 
   useEffect(() => {
     const activeJobs = jobs.filter(job => 
       ['validating', 'in_progress', 'finalizing'].includes(job.status)
     );
+
+    console.log(`[AUTO POLLING] Found ${activeJobs.length} active jobs to poll`);
 
     // Start polling for new active jobs
     for (const job of activeJobs) {

@@ -12,10 +12,11 @@ import { useBatchJobAutoPolling } from "./batch/BatchJobAutoPolling";
 import { useBatchJobRecovery } from "./batch/BatchJobRecovery";
 import { useBatchJobConfirmationDialogs } from "./batch/BatchJobConfirmationDialogs";
 import { useBatchJobManagerState } from "@/hooks/useBatchJobManagerState";
+import { useBatchJobRealtime } from "@/hooks/useBatchJobRealtime";
 import BatchJobContainer from "./batch/BatchJobContainer";
 import BatchJobConfirmation from "./batch/BatchJobConfirmation";
 import { exportDirectCSV } from "@/lib/classification/batchExporter";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface BatchJobManagerProps {
   jobs: BatchJob[];
@@ -58,6 +59,9 @@ const BatchJobManager = React.memo(({
     setAutoPollingJobs,
     handleJobComplete: baseHandleJobComplete
   } = useBatchJobManagerState();
+
+  // Set up real-time subscriptions for instant job updates
+  useBatchJobRealtime(onJobUpdate);
 
   // Auto-download CSV when job completes
   const handleJobCompleteWithAutoDownload = useMemo(() => 

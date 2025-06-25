@@ -37,32 +37,30 @@ export const useBatchManager = () => {
 
   const { refreshJobs } = useBatchJobLoader(updateJobs, updatePayeeDataMap, setLoaded);
 
-  // Use refs to prevent multiple simultaneous operations
-  const refreshInProgress = useRef(false);
+  // Use refs to prevent multiple simultaneous operations - but allow per-job operations
+  const refreshInProgress = useRef<Set<string>>(new Set());
   const eventListenerActive = useRef(false);
 
-  // Listen for job updates from other components with improved debouncing
+  // Listen for job updates from other components with improved handling
   useEffect(() => {
     const handleJobUpdate = async () => {
-      // Prevent multiple simultaneous refreshes
-      if (refreshInProgress.current || eventListenerActive.current) {
-        console.log('[BATCH MANAGER] Operation already in progress, skipping event...');
+      // Prevent multiple simultaneous event handlers
+      if (eventListenerActive.current) {
+        console.log('[BATCH MANAGER] Event handler already active, skipping...');
         return;
       }
 
       eventListenerActive.current = true;
       
       try {
-        // Add a small delay to batch rapid events
-        await new Promise(resolve => setTimeout(resolve, 250));
+        // Shorter delay for more responsive updates
+        await new Promise(resolve => setTimeout(resolve, 100));
         
-        refreshInProgress.current = true;
         console.log('[BATCH MANAGER] Received job update event, refreshing jobs...');
         await refreshJobs(true);
       } catch (error) {
         console.error('[BATCH MANAGER] Error during event-triggered refresh:', error);
       } finally {
-        refreshInProgress.current = false;
         eventListenerActive.current = false;
       }
     };
@@ -86,18 +84,36 @@ export const useBatchManager = () => {
     deleteJob: (jobId: string) => deleteJob(jobId),
     clearAll: () => clearAll(state.jobs),
     refreshJobs: useCallback(async (silent = false) => {
-      if (refreshInProgress.current) {
-        console.log('[BATCH MANAGER] Manual refresh already in progress, skipping...');
+      // Allow individual job refreshes to proceed
+      if (refreshInProgress.current.has('global')) {
+        console.log('[BATCH MANAGER] Global refresh already in progress, skipping...');
         return;
       }
       
       try {
-        refreshInProgress.current = true;
+        refreshInProgress.current.add('global');
         await refreshJobs(silent);
       } finally {
-        refreshInProgress.current = false;
+        refreshInProgress.current.delete('global');
       }
     }, [refreshJobs]),
+    
+    // New method for individual job refresh
+    refreshJob: useCallback(async (jobId: string, silent = false) => {
+      // Allow individual job refreshes even during global refresh
+      if (refreshInProgress.current.has(jobId)) {
+        console.log(`[BATCH MANAGER] Job ${jobId} refresh already in progress, skipping...`);
+        return;
+      }
+      
+      try {
+        refreshInProgress.current.add(jobId);
+        // Emit update to trigger refresh
+        emitBatchJobUpdate();
+      } finally {
+        refreshInProgress.current.delete(jobId);
+      }
+    }, []),
     
     // Utilities
     getJobData: useCallback((jobId: string) => state.payeeDataMap[jobId], [state.payeeDataMap]),
