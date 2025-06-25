@@ -40,7 +40,6 @@ const BatchJobList = ({
     <div className="space-y-4">
       {jobs.map((job) => {
         const payeeData = payeeRowDataMap[job.id];
-        const payeeCount = payeeData?.uniquePayeeNames?.length || 0;
         const isRefreshing = refreshingJobs.has(job.id);
         const isPolling = pollingStates[job.id]?.isPolling || false;
 
@@ -48,13 +47,13 @@ const BatchJobList = ({
           <div key={`${job.id}-${job.status}-${job.request_counts.completed}`} className="space-y-2">
             <BatchJobCardMain
               job={job}
-              payeeCount={payeeCount}
-              payeeData={payeeData}
+              payeeRowData={payeeData}
               isRefreshing={isRefreshing}
               isPolling={isPolling}
               onRefresh={() => onRefresh(job.id)}
               onCancel={() => onCancel(job.id)}
               onDelete={() => onJobDelete(job.id)}
+              onDownload={() => onDownload(job)}
             />
             
             {/* Simple download interface for completed jobs */}
