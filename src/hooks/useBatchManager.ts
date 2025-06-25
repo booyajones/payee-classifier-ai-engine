@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
@@ -37,11 +37,27 @@ export const useBatchManager = () => {
 
   const { refreshJobs } = useBatchJobLoader(updateJobs, updatePayeeDataMap, setLoaded);
 
+  // Use ref to prevent multiple simultaneous refresh attempts
+  const refreshInProgress = useRef(false);
+
   // Listen for job updates from other components
   useEffect(() => {
-    const handleJobUpdate = () => {
-      console.log('[BATCH MANAGER] Received job update event, refreshing jobs...');
-      refreshJobs(true);
+    const handleJobUpdate = async () => {
+      // Prevent multiple simultaneous refreshes
+      if (refreshInProgress.current) {
+        console.log('[BATCH MANAGER] Refresh already in progress, skipping...');
+        return;
+      }
+
+      try {
+        refreshInProgress.current = true;
+        console.log('[BATCH MANAGER] Received job update event, refreshing jobs...');
+        await refreshJobs(true);
+      } catch (error) {
+        console.error('[BATCH MANAGER] Error during event-triggered refresh:', error);
+      } finally {
+        refreshInProgress.current = false;
+      }
     };
 
     const unsubscribe = useBatchJobEventListener(handleJobUpdate);
@@ -62,7 +78,19 @@ export const useBatchManager = () => {
     updateJob: updateJobStatus,
     deleteJob: (jobId: string) => deleteJob(jobId),
     clearAll: () => clearAll(state.jobs),
-    refreshJobs,
+    refreshJobs: useCallback(async (silent = false) => {
+      if (refreshInProgress.current) {
+        console.log('[BATCH MANAGER] Manual refresh already in progress, skipping...');
+        return;
+      }
+      
+      try {
+        refreshInProgress.current = true;
+        await refreshJobs(silent);
+      } finally {
+        refreshInProgress.current = false;
+      }
+    }, [refreshJobs]),
     
     // Utilities
     getJobData: useCallback((jobId: string) => state.payeeDataMap[jobId], [state.payeeDataMap]),
