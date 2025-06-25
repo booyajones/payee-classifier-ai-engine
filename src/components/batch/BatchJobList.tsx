@@ -2,7 +2,7 @@
 import React from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
-import BatchJobCardMain from './BatchJobCardMain';
+import BatchJobCard from './BatchJobCard';
 import DirectCSVExport from './DirectCSVExport';
 
 interface BatchJobListProps {
@@ -42,14 +42,16 @@ const BatchJobList = ({
         const payeeData = payeeRowDataMap[job.id];
         const isRefreshing = refreshingJobs.has(job.id);
         const isPolling = pollingStates[job.id]?.isPolling || false;
+        const pollingState = pollingStates[job.id];
 
         return (
           <div key={`${job.id}-${job.status}-${job.request_counts.completed}`} className="space-y-2">
-            <BatchJobCardMain
+            <BatchJobCard
               job={job}
               payeeRowData={payeeData}
               isRefreshing={isRefreshing}
               isPolling={isPolling}
+              pollingState={pollingState}
               onRefresh={() => onRefresh(job.id)}
               onCancel={() => onCancel(job.id)}
               onDelete={() => onJobDelete(job.id)}
