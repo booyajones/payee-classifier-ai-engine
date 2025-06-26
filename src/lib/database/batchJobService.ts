@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
@@ -46,13 +47,14 @@ export const saveBatchJob = async (
   const payeeCount = payeeRowData.uniquePayeeNames.length;
   const originalDataCount = payeeRowData.originalFileData.length;
   
-  console.log(`[DB BATCH SERVICE] Processing job with ${payeeCount} payees and ${originalDataCount} original rows`);
+  console.log(`[DB BATCH SERVICE] Processing job with ${payeeCount} unique payees and ${originalDataCount} original rows`);
 
   // For large files, use a simplified approach to avoid timeouts
   const isLargeFile = originalDataCount > 10000 || payeeCount > 5000;
   
   let processedOriginalData;
   let processedRowMappings;
+  let updatedMetadata;
   
   if (isLargeFile) {
     console.log(`[DB BATCH SERVICE] Large file detected, using simplified data storage`);
@@ -61,9 +63,9 @@ export const saveBatchJob = async (
     processedOriginalData = payeeRowData.originalFileData.slice(0, 100); // Keep first 100 rows as sample
     processedRowMappings = payeeRowData.rowMappings.slice(0, 100); // Keep first 100 mappings as sample
     
-    // Add metadata about truncation
-    batchJob.metadata = {
-      ...batchJob.metadata,
+    // Add metadata about truncation - properly handle existing metadata
+    updatedMetadata = {
+      ...(batchJob.metadata || {}),
       original_data_truncated: true,
       original_total_rows: originalDataCount,
       stored_sample_rows: processedOriginalData.length
@@ -71,6 +73,7 @@ export const saveBatchJob = async (
   } else {
     processedOriginalData = payeeRowData.originalFileData;
     processedRowMappings = payeeRowData.rowMappings;
+    updatedMetadata = batchJob.metadata;
   }
 
   const dbRecord = {
@@ -86,7 +89,7 @@ export const saveBatchJob = async (
     request_counts_total: batchJob.request_counts.total,
     request_counts_completed: batchJob.request_counts.completed,
     request_counts_failed: batchJob.request_counts.failed,
-    metadata: batchJob.metadata || null,
+    metadata: updatedMetadata || null,
     errors: batchJob.errors || null,
     output_file_id: batchJob.output_file_id || null,
     unique_payee_names: payeeRowData.uniquePayeeNames,
@@ -131,7 +134,7 @@ export const saveBatchJob = async (
         original_file_data: [], // Empty array for retry
         row_mappings: [],
         metadata: {
-          ...batchJob.metadata,
+          ...(batchJob.metadata || {}),
           data_storage_failed: true,
           payee_count: payeeCount,
           original_rows: originalDataCount
