@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
@@ -61,15 +62,17 @@ const performChunkedDatabaseOperation = async <T>(
     try {
       console.log(`[DB BATCH SERVICE] ${context} - Attempt ${attempt}/${maxRetries}`);
       
-      // Set longer timeout for this session
-      await supabase.rpc('set_config', {
-        setting_name: 'statement_timeout',
-        new_value: '300000', // 5 minutes
-        is_local: true
-      }).catch(() => {
-        // Ignore if RPC doesn't exist, fallback to default timeout
-        console.log(`[DB BATCH SERVICE] Could not set custom timeout, using default`);
-      });
+      // Try to set longer timeout, but don't fail if it doesn't work
+      try {
+        await supabase.rpc('set_config', {
+          setting_name: 'statement_timeout',
+          new_value: '300000',
+          is_local: true
+        });
+      } catch (rpcError) {
+        // Ignore RPC errors - the timeout setting is optional
+        console.log(`[DB BATCH SERVICE] Could not set custom timeout via RPC, using default`);
+      }
       
       const result = await operation();
       
@@ -124,7 +127,7 @@ export const saveBatchJob = async (
   
   console.log(`[DB BATCH SERVICE] Data analysis: ${totalDataSize} bytes total, ${avgRowSize} avg row size, ${complexity} complexity`);
 
-  // Prepare complete database record (NO TRUNCATION)
+  // Prepare complete database record (NO TRUNCATION) with proper type casting
   const dbRecord = {
     id: batchJob.id,
     status: batchJob.status,
@@ -138,7 +141,7 @@ export const saveBatchJob = async (
     request_counts_total: batchJob.request_counts.total,
     request_counts_completed: batchJob.request_counts.completed,
     request_counts_failed: batchJob.request_counts.failed,
-    metadata: {
+    metadata: JSON.parse(JSON.stringify({
       ...(batchJob.metadata || {}),
       data_optimization: {
         original_rows: originalDataCount,
@@ -149,12 +152,12 @@ export const saveBatchJob = async (
         full_data_stored: true,
         optimization_version: '2.0'
       }
-    },
-    errors: batchJob.errors || null,
+    })),
+    errors: batchJob.errors ? JSON.parse(JSON.stringify(batchJob.errors)) : null,
     output_file_id: batchJob.output_file_id || null,
     unique_payee_names: payeeRowData.uniquePayeeNames,
-    original_file_data: payeeRowData.originalFileData, // FULL DATA - NO TRUNCATION
-    row_mappings: payeeRowData.rowMappings, // FULL DATA - NO TRUNCATION
+    original_file_data: JSON.parse(JSON.stringify(payeeRowData.originalFileData)), // Cast to Json type
+    row_mappings: JSON.parse(JSON.stringify(payeeRowData.rowMappings)), // Cast to Json type
     file_name: (payeeRowData as any).fileName || null,
     file_headers: (payeeRowData as any).fileHeaders || null,
     selected_payee_column: (payeeRowData as any).selectedPayeeColumn || null,
@@ -234,8 +237,8 @@ export const updateBatchJobStatus = async (
     request_counts_total: batchJob.request_counts.total,
     request_counts_completed: batchJob.request_counts.completed,
     request_counts_failed: batchJob.request_counts.failed,
-    metadata: batchJob.metadata || null,
-    errors: batchJob.errors || null,
+    metadata: batchJob.metadata ? JSON.parse(JSON.stringify(batchJob.metadata)) : null,
+    errors: batchJob.errors ? JSON.parse(JSON.stringify(batchJob.errors)) : null,
     output_file_id: batchJob.output_file_id || null,
   };
 
@@ -319,8 +322,9 @@ export const loadAllBatchJobs = async (): Promise<{
       const rowMappings = Array.isArray(record.row_mappings) ? record.row_mappings : [];
       const uniquePayeeNames = Array.isArray(record.unique_payee_names) ? record.unique_payee_names : [];
 
-      // Check for optimization metadata
-      const optimizationMeta = record.metadata?.data_optimization;
+      // Check for optimization metadata - safely access nested properties
+      const metadata = record.metadata as any;
+      const optimizationMeta = metadata && typeof metadata === 'object' ? metadata.data_optimization : null;
       if (optimizationMeta?.full_data_stored) {
         console.log(`[DB BATCH SERVICE] Job ${record.id} has full data stored (v${optimizationMeta.optimization_version})`);
       }
