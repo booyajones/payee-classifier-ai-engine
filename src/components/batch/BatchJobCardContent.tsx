@@ -27,6 +27,15 @@ const BatchJobCardContent = ({
   };
 
   const showProgress = total > 0 && job.status === 'in_progress';
+  
+  // Check if job is effectively complete (100% done OR officially completed)
+  const isEffectivelyComplete = job.status === 'completed' || 
+    (total > 0 && completed === total && job.status === 'finalizing');
+  
+  // Check if job has been stuck in finalizing for too long
+  const isStuckFinalizing = job.status === 'finalizing' && 
+    job.finalizing_at && 
+    (Date.now() - (job.finalizing_at * 1000)) > (60 * 60 * 1000); // 1 hour
 
   return (
     <div className="space-y-3">
@@ -52,19 +61,32 @@ const BatchJobCardContent = ({
           <span>Total: {total}</span>
           <span>Completed: {completed}</span>
           {failed > 0 && <span className="text-red-600">Failed: {failed}</span>}
+          {getProgressPercentage() === 100 && job.status === 'finalizing' && (
+            <span className="text-orange-600">Finalizing...</span>
+          )}
         </div>
       )}
 
-      {/* Download Button */}
-      {isCompleted && (
+      {/* Stuck Finalizing Warning */}
+      {isStuckFinalizing && (
+        <div className="bg-orange-50 border border-orange-200 rounded-md p-2">
+          <p className="text-sm text-orange-800">
+            Job appears stuck in finalizing. Results may still be downloadable.
+          </p>
+        </div>
+      )}
+
+      {/* Download Button - Show for completed OR 100% done jobs */}
+      {isEffectivelyComplete && (
         <div className="flex justify-end">
           <Button 
             onClick={onDownload} 
             size="sm" 
             className="flex items-center gap-2"
+            variant={isStuckFinalizing ? "outline" : "default"}
           >
             <Download className="h-4 w-4" />
-            Download Results
+            {isStuckFinalizing ? "Force Download" : "Download Results"}
           </Button>
         </div>
       )}

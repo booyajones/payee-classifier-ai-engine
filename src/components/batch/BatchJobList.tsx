@@ -43,6 +43,12 @@ const BatchJobList = ({
         const isRefreshing = refreshingJobs.has(job.id);
         const isPolling = pollingStates[job.id]?.isPolling || false;
         const pollingState = pollingStates[job.id];
+        
+        // Check if job is effectively complete (completed OR 100% done in finalizing)
+        const isEffectivelyComplete = job.status === 'completed' || 
+          (job.request_counts.total > 0 && 
+           job.request_counts.completed === job.request_counts.total && 
+           job.status === 'finalizing');
 
         return (
           <div key={`${job.id}-${job.status}-${job.request_counts.completed}`} className="space-y-2">
@@ -58,8 +64,8 @@ const BatchJobList = ({
               onDownload={() => onDownload(job)}
             />
             
-            {/* Simple download interface for completed jobs */}
-            {job.status === 'completed' && payeeData && (
+            {/* Download interface for completed OR effectively complete jobs */}
+            {isEffectivelyComplete && payeeData && (
               <DirectCSVExport 
                 job={job}
                 payeeData={payeeData}
