@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
@@ -61,18 +60,6 @@ const performChunkedDatabaseOperation = async <T>(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`[DB BATCH SERVICE] ${context} - Attempt ${attempt}/${maxRetries}`);
-      
-      // Try to set longer timeout, but don't fail if it doesn't work
-      try {
-        await supabase.rpc('set_config', {
-          setting_name: 'statement_timeout',
-          new_value: '300000',
-          is_local: true
-        });
-      } catch (rpcError) {
-        // Ignore RPC errors - the timeout setting is optional
-        console.log(`[DB BATCH SERVICE] Could not set custom timeout via RPC, using default`);
-      }
       
       const result = await operation();
       
