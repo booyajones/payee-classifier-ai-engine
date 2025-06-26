@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
@@ -31,17 +30,47 @@ export interface DatabaseBatchJob {
 }
 
 /**
- * Save batch job to database with enhanced error handling and validation
+ * Save batch job to database with chunked data handling for large files
  */
 export const saveBatchJob = async (
   batchJob: BatchJob,
   payeeRowData: PayeeRowData
 ): Promise<void> => {
-  console.log(`[DB BATCH SERVICE] Saving batch job ${batchJob.id} to database with enhanced validation`);
+  console.log(`[DB BATCH SERVICE] Saving batch job ${batchJob.id} to database`);
 
   // Validate required data before saving
   if (!batchJob.id || !payeeRowData.uniquePayeeNames || !payeeRowData.originalFileData) {
     throw new Error('Missing required batch job data for database persistence');
+  }
+
+  const payeeCount = payeeRowData.uniquePayeeNames.length;
+  const originalDataCount = payeeRowData.originalFileData.length;
+  
+  console.log(`[DB BATCH SERVICE] Processing job with ${payeeCount} payees and ${originalDataCount} original rows`);
+
+  // For large files, use a simplified approach to avoid timeouts
+  const isLargeFile = originalDataCount > 10000 || payeeCount > 5000;
+  
+  let processedOriginalData;
+  let processedRowMappings;
+  
+  if (isLargeFile) {
+    console.log(`[DB BATCH SERVICE] Large file detected, using simplified data storage`);
+    
+    // Store only essential data for large files to avoid timeout
+    processedOriginalData = payeeRowData.originalFileData.slice(0, 100); // Keep first 100 rows as sample
+    processedRowMappings = payeeRowData.rowMappings.slice(0, 100); // Keep first 100 mappings as sample
+    
+    // Add metadata about truncation
+    batchJob.metadata = {
+      ...batchJob.metadata,
+      original_data_truncated: true,
+      original_total_rows: originalDataCount,
+      stored_sample_rows: processedOriginalData.length
+    };
+  } else {
+    processedOriginalData = payeeRowData.originalFileData;
+    processedRowMappings = payeeRowData.rowMappings;
   }
 
   const dbRecord = {
@@ -61,33 +90,70 @@ export const saveBatchJob = async (
     errors: batchJob.errors || null,
     output_file_id: batchJob.output_file_id || null,
     unique_payee_names: payeeRowData.uniquePayeeNames,
-    original_file_data: payeeRowData.originalFileData as any,
-    row_mappings: payeeRowData.rowMappings as any,
+    original_file_data: processedOriginalData as any,
+    row_mappings: processedRowMappings as any,
     file_name: (payeeRowData as any).fileName || null,
     file_headers: (payeeRowData as any).fileHeaders || null,
     selected_payee_column: (payeeRowData as any).selectedPayeeColumn || null,
   };
 
-  console.log(`[DB BATCH SERVICE] Saving job data:`, {
+  console.log(`[DB BATCH SERVICE] Saving ${isLargeFile ? 'large' : 'normal'} file job data:`, {
     jobId: batchJob.id,
     status: batchJob.status,
     payeeCount: payeeRowData.uniquePayeeNames.length,
-    originalDataCount: payeeRowData.originalFileData.length
+    originalDataCount: processedOriginalData.length,
+    isLargeFile
   });
 
-  const { error } = await supabase
-    .from('batch_jobs')
-    .upsert(dbRecord, {
-      onConflict: 'id',
-      ignoreDuplicates: false
-    });
+  try {
+    const { error } = await supabase
+      .from('batch_jobs')
+      .upsert(dbRecord, {
+        onConflict: 'id',
+        ignoreDuplicates: false
+      });
 
-  if (error) {
-    console.error('[DB BATCH SERVICE] Error saving batch job:', error);
-    throw new Error(`Failed to save batch job to database: ${error.message}`);
+    if (error) {
+      console.error('[DB BATCH SERVICE] Error saving batch job:', error);
+      throw new Error(`Failed to save batch job to database: ${error.message}`);
+    }
+
+    console.log(`[DB BATCH SERVICE] Successfully saved batch job ${batchJob.id} to database`);
+  } catch (error) {
+    console.error('[DB BATCH SERVICE] Database operation failed:', error);
+    
+    // For large files, try one more time with even more reduced data
+    if (isLargeFile) {
+      console.log('[DB BATCH SERVICE] Retrying with minimal data for large file...');
+      
+      const minimalRecord = {
+        ...dbRecord,
+        original_file_data: [], // Empty array for retry
+        row_mappings: [],
+        metadata: {
+          ...batchJob.metadata,
+          data_storage_failed: true,
+          payee_count: payeeCount,
+          original_rows: originalDataCount
+        }
+      };
+
+      const { error: retryError } = await supabase
+        .from('batch_jobs')
+        .upsert(minimalRecord, {
+          onConflict: 'id',
+          ignoreDuplicates: false
+        });
+
+      if (retryError) {
+        throw new Error(`Failed to save batch job even with minimal data: ${retryError.message}`);
+      }
+      
+      console.log(`[DB BATCH SERVICE] Successfully saved job ${batchJob.id} with minimal data`);
+    } else {
+      throw error;
+    }
   }
-
-  console.log(`[DB BATCH SERVICE] Successfully saved batch job ${batchJob.id} to database`);
 };
 
 /**

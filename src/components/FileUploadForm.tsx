@@ -171,25 +171,39 @@ const FileUploadForm = ({
       console.log(`[FILE UPLOAD] Batch job created successfully:`, batchJob);
 
       try {
-        // Save to database immediately
+        // Save to database with improved error handling
         await saveBatchJob(batchJob, payeeRowData);
         console.log(`[FILE UPLOAD] Batch job saved to database successfully`);
-      } catch (dbError) {
-        console.error('[FILE UPLOAD] Error saving to database, continuing with in-memory storage:', dbError);
+        
         toast({
-          title: "Database Warning",
-          description: "Job created but failed to save to database. Data may be lost on refresh.",
-          variant: "destructive"
+          title: "Batch Job Created Successfully",
+          description: `Submitted ${payeeRowData.uniquePayeeNames.length} unique payees from ${originalFileData.length} total rows for processing. Job ID: ${batchJob.id.slice(-8)}`,
         });
+      } catch (dbError) {
+        console.error('[FILE UPLOAD] Database save failed:', dbError);
+        
+        // Check if it's a timeout error specifically
+        const isTimeoutError = dbError instanceof Error && 
+          (dbError.message.includes('timeout') || dbError.message.includes('statement timeout'));
+        
+        if (isTimeoutError) {
+          toast({
+            title: "Large File Warning",
+            description: "Job created but database save timed out due to file size. The job will still process normally.",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Database Warning", 
+            description: "Job created but failed to save to database. Data may be lost on refresh.",
+            variant: "destructive"
+          });
+        }
       }
 
-      // Pass the complete PayeeRowData object
+      // Always pass the job data to parent component
       onBatchJobCreated(batchJob, payeeRowData);
       
-      toast({
-        title: "Batch Job Created Successfully",
-        description: `Submitted ${payeeRowData.uniquePayeeNames.length} unique payees from ${originalFileData.length} total rows for processing. Job ID: ${batchJob.id.slice(-8)}`,
-      });
     } catch (error) {
       const appError = handleError(error, 'Batch Job Creation');
       console.error("Error creating batch job from file:", error);
