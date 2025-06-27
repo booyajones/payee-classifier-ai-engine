@@ -8,6 +8,8 @@ import { useBatchJobActions } from './batch/useBatchJobActions';
 import { useBatchJobLoader } from './batch/useBatchJobLoader';
 import { useBatchJobEventListener, emitBatchJobUpdate } from './batch/useBatchJobEventEmitter';
 import { createBatchJob } from '@/lib/openai/trueBatchAPI';
+import { deleteBatchJob } from '@/lib/database/batchJobService';
+import { useToast } from '@/hooks/use-toast';
 
 interface BatchCreationOptions {
   description?: string;
@@ -17,6 +19,7 @@ interface BatchCreationOptions {
 }
 
 export const useBatchManager = () => {
+  const { toast } = useToast();
   const {
     state,
     updateJobs,
@@ -105,12 +108,38 @@ export const useBatchManager = () => {
     }
   }, [addJob, setError]);
 
-  // Delete job function
-  const deleteJob = useCallback((jobId: string) => {
-    console.log(`[BATCH MANAGER] Deleting job ${jobId}`);
-    removeJob(jobId);
-    emitBatchJobUpdate();
-  }, [removeJob]);
+  // Delete job function with database deletion
+  const deleteJob = useCallback(async (jobId: string) => {
+    try {
+      console.log(`[BATCH MANAGER] Deleting job ${jobId} from database and local state`);
+      
+      // Delete from database first
+      await deleteBatchJob(jobId);
+      
+      // Remove from local state
+      removeJob(jobId);
+      
+      // Emit update to refresh UI
+      emitBatchJobUpdate();
+      
+      // Show success toast
+      toast({
+        title: "Job Deleted",
+        description: "Batch job has been successfully removed.",
+      });
+      
+      console.log(`[BATCH MANAGER] Successfully deleted job ${jobId}`);
+    } catch (error) {
+      console.error(`[BATCH MANAGER] Error deleting job ${jobId}:`, error);
+      
+      // Show error toast
+      toast({
+        title: "Delete Failed",
+        description: `Failed to delete batch job: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
+    }
+  }, [removeJob, toast]);
 
   // Update job function
   const updateJobInManager = useCallback((job: BatchJob) => {

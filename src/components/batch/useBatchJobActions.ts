@@ -62,22 +62,57 @@ export const useBatchJobActions = ({
     onJobComplete: safeOnJobComplete
   });
 
-  // Manual refresh (user-initiated) - now properly handles silent parameter
+  // Manual refresh (user-initiated) with better error handling
   const handleRefreshJob = async (jobId: string, silent: boolean = false) => {
     try {
       console.log(`[BATCH ACTIONS] Starting refresh for job ${jobId}${silent ? ' (silent)' : ''}`);
+      
+      // Validate jobId parameter
+      if (!jobId || typeof jobId !== 'string') {
+        throw new Error(`Invalid jobId: ${jobId}`);
+      }
+      
+      // Call refresh with proper parameters
       await refreshSpecificJob(jobId, () => baseHandleRefreshJob(jobId, silent));
+      
+      console.log(`[BATCH ACTIONS] Refresh completed for job ${jobId}`);
     } catch (error) {
-      console.error('[BATCH ACTIONS] Refresh error:', error);
+      console.error(`[BATCH ACTIONS] Refresh error for job ${jobId}:`, error);
+      throw error;
     }
   };
 
   const handleDownloadResults = async (job: BatchJob) => {
     try {
-      console.log(`[BATCH ACTIONS] Starting simple download for job ${job.id}`);
+      console.log(`[BATCH ACTIONS] Starting download for job ${job.id}`);
+      
+      // Validate job parameter
+      if (!job || !job.id) {
+        throw new Error('Invalid job object provided to download');
+      }
+      
       await baseHandleDownloadResults(job);
+      console.log(`[BATCH ACTIONS] Download completed for job ${job.id}`);
     } catch (error) {
-      console.error('[BATCH ACTIONS] Download error:', error);
+      console.error(`[BATCH ACTIONS] Download error for job ${job?.id}:`, error);
+      throw error;
+    }
+  };
+
+  // Wrapper for cancel job with validation
+  const handleCancelJobWithValidation = async (jobId: string) => {
+    try {
+      console.log(`[BATCH ACTIONS] Starting cancellation for job ${jobId}`);
+      
+      // Validate jobId parameter
+      if (!jobId || typeof jobId !== 'string') {
+        throw new Error(`Invalid jobId for cancellation: ${jobId}`);
+      }
+      
+      await handleCancelJob(jobId);
+      console.log(`[BATCH ACTIONS] Cancellation completed for job ${jobId}`);
+    } catch (error) {
+      console.error(`[BATCH ACTIONS] Cancellation error for job ${jobId}:`, error);
       throw error;
     }
   };
@@ -87,9 +122,9 @@ export const useBatchJobActions = ({
     refreshingJobs,
     pollingStates,
     
-    // Actions
+    // Actions with improved error handling
     handleRefreshJob,
     handleDownloadResults,
-    handleCancelJob
+    handleCancelJob: handleCancelJobWithValidation
   };
 };

@@ -30,13 +30,22 @@ export const useBatchJobConfirmationDialogs = ({
 
   const showCancelConfirmation = (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
-    if (!job) return;
+    if (!job) {
+      console.error(`[CONFIRMATION DIALOGS] Job not found for cancellation: ${jobId}`);
+      return;
+    }
+    
+    console.log(`[CONFIRMATION DIALOGS] Showing cancel confirmation for job ${jobId}`);
     
     setConfirmDialog({
       isOpen: true,
       title: 'Cancel Batch Job',
       description: `Are you sure you want to cancel this job? This action cannot be undone and you may be charged for completed requests.`,
-      onConfirm: () => handleCancelJob(job.id),
+      onConfirm: () => {
+        console.log(`[CONFIRMATION DIALOGS] User confirmed cancellation for job ${jobId}`);
+        handleCancelJob(job.id);
+        closeConfirmDialog();
+      },
       variant: 'destructive'
     });
   };
@@ -45,30 +54,41 @@ export const useBatchJobConfirmationDialogs = ({
     const job = jobs.find(j => j.id === jobId);
     const jobStatus = job?.status || 'unknown';
     
+    console.log(`[CONFIRMATION DIALOGS] Showing delete confirmation for job ${jobId} with status: ${jobStatus}`);
+    
     let description = '';
     if (jobStatus === 'cancelling') {
-      description = 'This job is currently being cancelled. Removing it will hide it from your view but the cancellation will continue on OpenAI\'s side.';
+      description = 'This job is currently being cancelled. Removing it will delete it permanently from your account and the database.';
     } else if (['cancelled', 'failed', 'expired'].includes(jobStatus)) {
-      description = 'This will remove the job from your list. The job data will no longer be visible, but this does not affect the actual OpenAI batch job.';
+      description = 'This will permanently delete the job from your account and the database. This action cannot be undone.';
     } else if (jobStatus === 'completed') {
-      description = 'This will remove the completed job from your list. You can still download results before removing if needed.';
+      description = 'This will permanently delete the completed job from your account and the database. Make sure you have downloaded any results you need first.';
     } else {
-      description = 'This will remove the job from your view. This does not cancel or affect the actual OpenAI batch job.';
+      description = 'This will permanently delete the job from your account and the database. This action cannot be undone.';
     }
 
     setConfirmDialog({
       isOpen: true,
-      title: 'Remove Job from List',
+      title: 'Delete Job Permanently',
       description,
       onConfirm: () => {
-        console.log(`[DEBUG] Deleting job ${jobId} from list`);
-        onJobDelete(jobId);
+        console.log(`[CONFIRMATION DIALOGS] User confirmed deletion for job ${jobId}`);
+        
+        // Validate onJobDelete function before calling
+        if (typeof onJobDelete === 'function') {
+          onJobDelete(jobId);
+        } else {
+          console.error('[CONFIRMATION DIALOGS] onJobDelete is not a function:', typeof onJobDelete);
+        }
+        
+        closeConfirmDialog();
       },
       variant: 'destructive'
     });
   };
 
   const closeConfirmDialog = () => {
+    console.log('[CONFIRMATION DIALOGS] Closing confirmation dialog');
     setConfirmDialog(prev => ({ ...prev, isOpen: false }));
   };
 

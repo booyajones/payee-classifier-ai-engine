@@ -25,7 +25,7 @@ const BatchJobActions = ({
   onDelete
 }: BatchJobActionsProps) => {
   
-  // Safe handler wrappers with better error handling
+  // Safe handler wrappers with better error handling and validation
   const safeRefresh = () => {
     try {
       console.log(`[BATCH ACTIONS] Refreshing job ${job.id}`);
@@ -56,8 +56,11 @@ const BatchJobActions = ({
 
   const safeDelete = () => {
     try {
-      console.log(`[BATCH ACTIONS] Deleting job ${job.id}`);
+      console.log(`[BATCH ACTIONS] Initiating delete for job ${job.id}`);
+      
+      // Validate onDelete function
       if (typeof onDelete === 'function') {
+        console.log(`[BATCH ACTIONS] Calling onDelete for job ${job.id}`);
         onDelete();
       } else {
         console.error('[BATCH ACTIONS] onDelete is not a function:', typeof onDelete);
