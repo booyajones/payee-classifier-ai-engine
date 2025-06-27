@@ -64,7 +64,7 @@ export const useBatchManager = () => {
     return unsubscribe;
   }, [refreshJobs]);
 
-  // Create batch job function
+  // Create batch job function with proper options handling
   const createBatch = useCallback(async (
     payeeRowData: PayeeRowData,
     options: BatchCreationOptions = {}
@@ -72,25 +72,38 @@ export const useBatchManager = () => {
     try {
       console.log(`[BATCH MANAGER] Creating batch job for ${payeeRowData.uniquePayeeNames.length} payees`);
       
-      // Pass the uniquePayeeNames array, not the entire PayeeRowData object
-      const job = await createBatchJob(payeeRowData.uniquePayeeNames, options.description || 'Batch Classification Job');
+      // Create the batch job with the correct parameters
+      const job = await createBatchJob(
+        payeeRowData.uniquePayeeNames, 
+        options.description || 'Batch Classification Job'
+      );
       
       if (job) {
+        // Add the job to state with the payee data
         addJob(job, payeeRowData);
         
+        // Call the onJobUpdate callback if provided
         if (options.onJobUpdate) {
           options.onJobUpdate(job);
         }
         
-        console.log(`[BATCH MANAGER] Batch job created: ${job.id}`);
+        console.log(`[BATCH MANAGER] Batch job created successfully: ${job.id}`);
+        
+        // Emit batch job update to refresh UI
+        emitBatchJobUpdate();
       }
       
       return job;
     } catch (error) {
       console.error('[BATCH MANAGER] Failed to create batch job:', error);
+      
+      if (!options.silent) {
+        setError('create', error instanceof Error ? error.message : 'Failed to create batch job');
+      }
+      
       return null;
     }
-  }, [addJob]);
+  }, [addJob, setError]);
 
   // Delete job function
   const deleteJob = useCallback((jobId: string) => {
@@ -98,6 +111,13 @@ export const useBatchManager = () => {
     removeJob(jobId);
     emitBatchJobUpdate();
   }, [removeJob]);
+
+  // Update job function
+  const updateJobInManager = useCallback((job: BatchJob) => {
+    console.log(`[BATCH MANAGER] Updating job ${job.id} with status: ${job.status}`);
+    updateJob(job);
+    emitBatchJobUpdate();
+  }, [updateJob]);
 
   return {
     // State
@@ -107,7 +127,7 @@ export const useBatchManager = () => {
     errors: state.errors,
     isLoaded: state.isLoaded,
     
-    // Actions - simplified to match actual available functionality
+    // Actions - properly exported functions
     refreshJobs: useCallback(async (silent = false) => {
       // Allow individual job refreshes to proceed
       if (refreshInProgress.current.has('global')) {
@@ -140,9 +160,9 @@ export const useBatchManager = () => {
       }
     }, []),
     
-    // New methods
+    // Core batch operations
     createBatch,
-    updateJob,
+    updateJob: updateJobInManager,
     deleteJob,
     
     // Utilities
