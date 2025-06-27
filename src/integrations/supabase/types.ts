@@ -105,6 +105,8 @@ export type Database = {
           processing_tier: string
           reasoning: string
           row_index: number | null
+          sic_code: string | null
+          sic_description: string | null
           similarity_scores: Json | null
           updated_at: string
         }
@@ -122,6 +124,8 @@ export type Database = {
           processing_tier: string
           reasoning: string
           row_index?: number | null
+          sic_code?: string | null
+          sic_description?: string | null
           similarity_scores?: Json | null
           updated_at?: string
         }
@@ -139,6 +143,8 @@ export type Database = {
           processing_tier?: string
           reasoning?: string
           row_index?: number | null
+          sic_code?: string | null
+          sic_description?: string | null
           similarity_scores?: Json | null
           updated_at?: string
         }

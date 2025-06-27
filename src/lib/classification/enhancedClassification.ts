@@ -7,7 +7,7 @@ import { enhancedClassifyPayeeWithAI, consensusClassification } from '../openai/
 import { detectBusinessByExtendedRules, detectIndividualByExtendedRules, normalizeText } from './enhancedRules';
 
 /**
- * Enhanced classification function that implements a multi-tiered approach
+ * Enhanced classification function that implements a multi-tiered approach with SIC code determination
  */
 export async function enhancedClassifyPayee(
   payeeName: string,
@@ -33,7 +33,8 @@ export async function enhancedClassifyPayee(
       confidence: 99,
       reasoning: `Classified as business based on extended rules: ${businessCheck.rules.join(", ")}`,
       processingTier: 'Rule-Based',
-      matchingRules: businessCheck.rules
+      matchingRules: businessCheck.rules,
+      // Note: Rule-based classifications don't get SIC codes - only AI classifications do
     };
   }
   
@@ -71,7 +72,9 @@ export async function enhancedClassifyPayee(
         confidence: aiResult.confidence,
         reasoning: aiResult.reasoning,
         processingTier: 'AI-Assisted',
-        matchingRules: aiResult.matchingRules
+        matchingRules: aiResult.matchingRules,
+        sicCode: aiResult.sicCode,
+        sicDescription: aiResult.sicDescription
       };
     } catch (error) {
       console.error("Error with AI classification:", error);
@@ -93,7 +96,7 @@ export async function enhancedClassifyPayee(
     return nlpResult;
   }
   
-  // Tier 3: Apply AI-assisted classification
+  // Tier 3: Apply AI-assisted classification with SIC codes
   try {
     const aiResult = await consensusClassification(payeeName, 2);
     return {
@@ -101,7 +104,9 @@ export async function enhancedClassifyPayee(
       confidence: aiResult.confidence,
       reasoning: aiResult.reasoning,
       processingTier: 'AI-Assisted',
-      matchingRules: aiResult.matchingRules
+      matchingRules: aiResult.matchingRules,
+      sicCode: aiResult.sicCode,
+      sicDescription: aiResult.sicDescription
     };
   } catch (error) {
     console.error("Error with consensus classification:", error);
@@ -114,7 +119,9 @@ export async function enhancedClassifyPayee(
         confidence: result.confidence,
         reasoning: result.reasoning,
         processingTier: 'AI-Assisted',
-        matchingRules: result.matchingRules
+        matchingRules: result.matchingRules,
+        sicCode: result.sicCode,
+        sicDescription: result.sicDescription
       };
     } catch (innerError) {
       console.error("Error with enhanced AI classification:", innerError);

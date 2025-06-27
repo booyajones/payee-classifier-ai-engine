@@ -1,4 +1,3 @@
-
 export interface ClassificationResult {
   classification: 'Business' | 'Individual';
   confidence: number;
@@ -8,6 +7,8 @@ export interface ClassificationResult {
   similarityScores?: SimilarityScores;
   keywordExclusion?: KeywordExclusionResult;
   processingMethod?: string;
+  sicCode?: string;
+  sicDescription?: string;
 }
 
 export interface SimilarityScores {

@@ -74,7 +74,7 @@ export const useIntelligentFileProcessor = () => {
     setIsProcessing(true);
     
     try {
-      console.log(`[INTELLIGENT PROCESSOR] Processing file with comprehensive standardization: ${file.name}`);
+      console.log(`[INTELLIGENT PROCESSOR] Processing file with comprehensive standardization and SIC code support: ${file.name}`);
 
       // Step 1: Validate file
       const fileValidation = validateFile(file);
@@ -125,7 +125,7 @@ export const useIntelligentFileProcessor = () => {
       }
 
       // Step 6: Create row mapping WITH COMPREHENSIVE STANDARDIZATION
-      console.log(`[INTELLIGENT PROCESSOR] Creating payee mappings with comprehensive data standardization...`);
+      console.log(`[INTELLIGENT PROCESSOR] Creating payee mappings with comprehensive data standardization and SIC code preparation...`);
       const payeeRowData = createPayeeRowMapping(cleanedData, detectedColumn);
 
       // Enhanced logging with standardization stats
@@ -140,8 +140,8 @@ export const useIntelligentFileProcessor = () => {
       });
 
       toast({
-        title: "File Processed with Enhanced Standardization",
-        description: `Auto-detected "${detectedColumn}" column. Processed ${payeeRowData.uniquePayeeNames.length} unique payees with ${standardizationStats.changesDetected} names improved through standardization (${(standardizationStats.changesDetected / standardizationStats.totalProcessed * 100).toFixed(1)}% improvement rate).`,
+        title: "File Processed with Enhanced Classification",
+        description: `Auto-detected "${detectedColumn}" column. Processed ${payeeRowData.uniquePayeeNames.length} unique payees with ${standardizationStats.changesDetected} names improved through standardization. Ready for business/individual classification with SIC code assignment.`,
       });
 
       return {

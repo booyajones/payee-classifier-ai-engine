@@ -16,12 +16,14 @@ export interface DatabaseClassificationResult {
   original_data: any;
   row_index: number | null;
   batch_id: string | null;
+  sic_code: string | null;
+  sic_description: string | null;
   created_at: string;
   updated_at: string;
 }
 
 /**
- * Save classification results to the database
+ * Save classification results to the database with SIC codes
  */
 export const saveClassificationResults = async (
   results: PayeeClassification[],
@@ -32,7 +34,7 @@ export const saveClassificationResults = async (
     return;
   }
 
-  console.log(`[DB SERVICE] Saving ${results.length} classification results to database`);
+  console.log(`[DB SERVICE] Saving ${results.length} classification results with SIC codes to database`);
 
   const dbRecords = results.map((result) => ({
     payee_name: result.payeeName,
@@ -47,6 +49,8 @@ export const saveClassificationResults = async (
     original_data: result.originalData ? JSON.parse(JSON.stringify(result.originalData)) : null,
     row_index: result.rowIndex || null,
     batch_id: batchId || null,
+    sic_code: result.result.sicCode || null,
+    sic_description: result.result.sicDescription || null,
   }));
 
   // Use upsert to handle conflicts based on unique constraint
@@ -62,14 +66,14 @@ export const saveClassificationResults = async (
     throw new Error(`Failed to save classification results: ${error.message}`);
   }
 
-  console.log(`[DB SERVICE] Successfully saved ${results.length} classification results`);
+  console.log(`[DB SERVICE] Successfully saved ${results.length} classification results with SIC codes`);
 };
 
 /**
- * Load all classification results from the database
+ * Load all classification results from the database including SIC codes
  */
 export const loadAllClassificationResults = async (): Promise<PayeeClassification[]> => {
-  console.log('[DB SERVICE] Loading all classification results from database');
+  console.log('[DB SERVICE] Loading all classification results with SIC codes from database');
 
   const { data, error } = await supabase
     .from('payee_classifications')
@@ -86,7 +90,7 @@ export const loadAllClassificationResults = async (): Promise<PayeeClassificatio
     return [];
   }
 
-  console.log(`[DB SERVICE] Loaded ${data.length} classification results from database`);
+  console.log(`[DB SERVICE] Loaded ${data.length} classification results with SIC codes from database`);
 
   // Convert database records back to PayeeClassification format
   const results: PayeeClassification[] = data.map((record): PayeeClassification => ({
@@ -105,7 +109,9 @@ export const loadAllClassificationResults = async (): Promise<PayeeClassificatio
         matchedKeywords: [],
         confidence: 0,
         reasoning: 'No keyword exclusion applied'
-      }
+      },
+      sicCode: record.sic_code || undefined,
+      sicDescription: record.sic_description || undefined
     },
     timestamp: new Date(record.created_at),
     originalData: record.original_data || null,

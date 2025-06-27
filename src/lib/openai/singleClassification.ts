@@ -5,7 +5,7 @@ import { timeoutPromise } from './utils';
 import { DEFAULT_API_TIMEOUT, CLASSIFICATION_MODEL } from './config';
 
 /**
- * Classify a single payee name using the OpenAI API
+ * Classify a single payee name using the OpenAI API with SIC code determination
  */
 export async function classifyPayeeWithAI(
   payeeName: string, 
@@ -14,6 +14,8 @@ export async function classifyPayeeWithAI(
   classification: 'Business' | 'Individual';
   confidence: number;
   reasoning: string;
+  sicCode?: string;
+  sicDescription?: string;
 }> {
   const openaiClient = getOpenAIClient();
   if (!openaiClient) {
@@ -25,26 +27,36 @@ export async function classifyPayeeWithAI(
   }
 
   try {
-    console.log(`[DEBUG] Classifying "${payeeName}" with OpenAI API...`);
+    console.log(`[DEBUG] Classifying "${payeeName}" with OpenAI API including SIC code analysis...`);
     
     const apiCall = openaiClient.chat.completions.create({
       model: CLASSIFICATION_MODEL,
       messages: [
         {
           role: "system",
-          content: `Classify payee names as "Business" or "Individual". Return JSON: {"classification": "Business|Individual", "confidence": number, "reasoning": "brief explanation"}`
+          content: `Classify payee names as "Business" or "Individual" and determine SIC codes for businesses. 
+
+For businesses, provide:
+- 4-digit SIC code (Standard Industrial Classification)
+- SIC description
+- Use SIC code 7389 (Business Services, NEC) for unclear business types
+- Government entities use SIC 9199 (General Government, NEC)
+
+For individuals, do not provide SIC codes.
+
+Return JSON: {"classification": "Business|Individual", "confidence": number, "reasoning": "brief explanation", "sicCode": "4-digit code or null", "sicDescription": "description or null"}`
         },
         {
           role: "user",
-          content: `Classify: "${payeeName}"`
+          content: `Classify and determine SIC code for: "${payeeName}"`
         }
       ],
       response_format: { "type": "json_object" },
       temperature: 0.1,
-      max_tokens: 150 // Reduced for faster response
+      max_tokens: 200
     });
     
-    console.log(`[DEBUG] Making API call for "${payeeName}"...`);
+    console.log(`[DEBUG] Making API call with SIC analysis for "${payeeName}"...`);
     
     const response = await timeoutPromise(apiCall, timeout);
 
@@ -62,12 +74,21 @@ export async function classifyPayeeWithAI(
         throw new Error(`Invalid response structure: ${JSON.stringify(result)}`);
       }
       
-      console.log(`[DEBUG] Successfully classified "${payeeName}": ${result.classification} (${result.confidence}%)`);
+      // Validate SIC code format if provided
+      if (result.sicCode && !/^\d{4}$/.test(result.sicCode)) {
+        console.warn(`[DEBUG] Invalid SIC code format "${result.sicCode}" for "${payeeName}", setting to null`);
+        result.sicCode = null;
+        result.sicDescription = null;
+      }
+      
+      console.log(`[DEBUG] Successfully classified "${payeeName}": ${result.classification} (${result.confidence}%) SIC: ${result.sicCode || 'N/A'}`);
       
       return {
         classification: result.classification as 'Business' | 'Individual',
         confidence: Math.min(100, Math.max(0, result.confidence)),
-        reasoning: result.reasoning
+        reasoning: result.reasoning,
+        sicCode: result.sicCode || undefined,
+        sicDescription: result.sicDescription || undefined
       };
     } catch (parseError) {
       console.error(`[DEBUG] Failed to parse response for "${payeeName}":`, content);

@@ -1,4 +1,3 @@
-
 import { ClassificationResult } from '../types';
 import { getOpenAIClient } from './client';
 import { timeoutPromise } from './utils';
@@ -8,6 +7,8 @@ interface AIClassificationResponse {
   confidence: number;
   reasoning: string;
   matchingRules?: string[];
+  sicCode?: string;
+  sicDescription?: string;
 }
 
 interface CacheEntry {
@@ -127,9 +128,9 @@ function loadCacheFromStorage(): void {
 loadCacheFromStorage();
 
 /**
- * Enhanced AI classification using chain-of-thought reasoning and specific payee classification rules
+ * Enhanced AI classification using chain-of-thought reasoning and specific payee classification rules with SIC code determination
  * @param payeeName Name to classify
- * @returns Classification result with confidence and reasoning
+ * @returns Classification result with confidence, reasoning, and SIC code
  */
 export async function enhancedClassifyPayeeWithAI(payeeName: string): Promise<AIClassificationResponse> {
   // Check cache first
@@ -147,11 +148,11 @@ export async function enhancedClassifyPayeeWithAI(payeeName: string): Promise<AI
   
   try {
     const prompt = `
-You are a payee name classifier that determines if a name belongs to a business (organization) or an individual (person).
+You are a payee name classifier that determines if a name belongs to a business (organization) or an individual (person), and assigns SIC codes to businesses.
 
 ANALYZE THE FOLLOWING NAME: "${payeeName}"
 
-First, consider these classification rules:
+Classification Rules:
 1. Legal entity suffixes like LLC, Inc, Ltd, GmbH, S.A., etc. indicate businesses
 2. Words like Company, Corporation, Group, Partners, etc. indicate businesses
 3. Government entities (City of, Department of, etc.) are businesses
@@ -160,23 +161,34 @@ First, consider these classification rules:
 6. Name suffixes (Jr, Sr, III, etc.) indicate individuals
 7. Consider cultural patterns for names across different languages/regions
 
+SIC Code Rules for Businesses:
+- Assign appropriate 4-digit SIC code based on apparent industry/business type
+- Use SIC 7389 (Business Services, NEC) for unclear business types
+- Government entities use SIC 9199 (General Government, NEC)
+- Healthcare: 8011 (Offices of Physicians), 8021 (Offices of Dentists), etc.
+- Retail: 5311 (Department Stores), 5411 (Grocery Stores), etc.
+- Construction: 1521 (General Building Contractors), etc.
+- Professional Services: 8111 (Legal Services), 8721 (Accounting Services), etc.
+
+For Individuals: Do not assign SIC codes (leave null).
+
 Step-by-step analysis:
 `;
     
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // Use faster model
+      model: "gpt-4o-mini",
       temperature: 0.2,
       messages: [
         {
           role: "system", 
-          content: "You are an expert in payee name classification that determines if a name belongs to a business entity or an individual person. You must analyze names carefully using linguistic markers, legal entity identifiers, and cross-cultural name patterns."
+          content: "You are an expert in payee name classification and SIC code assignment. You determine if a name belongs to a business entity or an individual person, and assign appropriate SIC codes to businesses based on their apparent industry."
         },
         { role: "user", content: prompt }
       ],
       functions: [
         {
           name: "classifyPayeeName",
-          description: "Classify a payee name as either a business or individual",
+          description: "Classify a payee name as either a business or individual and assign SIC code if business",
           parameters: {
             type: "object",
             properties: {
@@ -197,6 +209,14 @@ Step-by-step analysis:
                 type: "array",
                 description: "List of rules that matched during classification",
                 items: { type: "string" }
+              },
+              sicCode: {
+                type: "string",
+                description: "4-digit SIC code for businesses only, null for individuals"
+              },
+              sicDescription: {
+                type: "string",
+                description: "SIC code description for businesses only, null for individuals"
               }
             },
             required: ["classification", "confidence", "reasoning"]
@@ -215,6 +235,13 @@ Step-by-step analysis:
     try {
       const parsedResult = JSON.parse(result) as AIClassificationResponse;
       
+      // Validate SIC code format if provided
+      if (parsedResult.sicCode && !/^\d{4}$/.test(parsedResult.sicCode)) {
+        console.warn(`Invalid SIC code format "${parsedResult.sicCode}" for "${payeeName}", setting to null`);
+        parsedResult.sicCode = undefined;
+        parsedResult.sicDescription = undefined;
+      }
+      
       // Cache the result for future use
       saveToCache(payeeName, parsedResult);
       
@@ -222,7 +249,9 @@ Step-by-step analysis:
         classification: parsedResult.classification,
         confidence: parsedResult.confidence,
         reasoning: parsedResult.reasoning,
-        matchingRules: parsedResult.matchingRules || []
+        matchingRules: parsedResult.matchingRules || [],
+        sicCode: parsedResult.sicCode,
+        sicDescription: parsedResult.sicDescription
       };
     } catch (error) {
       throw new Error("Failed to parse OpenAI API response");
@@ -234,16 +263,11 @@ Step-by-step analysis:
 }
 
 /**
- * Consensus classification that runs multiple AI classifications and combines results
- * Improved for better performance by reducing runs and using cached results
- * 
- * @param payeeName The payee name to classify
- * @param runs Number of classification runs to perform (default: 2, reduced from 3)
- * @returns Combined classification result with consensus confidence
+ * Consensus classification that runs multiple AI classifications and combines results with SIC codes
  */
 export async function consensusClassification(
   payeeName: string,
-  runs: number = 2 // Reduced from 3 to 2 for better performance
+  runs: number = 2
 ): Promise<AIClassificationResponse> {
   // Check cache first for quick return
   const cachedResult = getFromCache(payeeName);
@@ -285,7 +309,6 @@ export async function consensusClassification(
   const totalRuns = businessCount + individualCount;
   const businessProb = businessCount / totalRuns;
   const individualProb = individualCount / totalRuns;
-  const entropy = calculateEntropy(businessProb, individualProb);
   
   // Get the majority classification
   const majorityClassification = businessCount > individualCount ? 'Business' : 'Individual';
@@ -313,11 +336,39 @@ export async function consensusClassification(
     c.matchingRules?.forEach(rule => allMatchingRules.add(rule));
   });
   
+  // Get SIC code consensus for businesses
+  let consensusSicCode: string | undefined;
+  let consensusSicDescription: string | undefined;
+  
+  if (majorityClassification === 'Business') {
+    const businessClassifications = classifications.filter(c => c.classification === 'Business');
+    const sicCodes = businessClassifications
+      .map(c => c.sicCode)
+      .filter(code => code && /^\d{4}$/.test(code));
+    
+    if (sicCodes.length > 0) {
+      // Use most common SIC code, or first one if tied
+      const sicCodeCounts = sicCodes.reduce((acc, code) => {
+        acc[code!] = (acc[code!] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      const mostCommonSicCode = Object.entries(sicCodeCounts)
+        .sort(([, a], [, b]) => b - a)[0][0];
+      
+      consensusSicCode = mostCommonSicCode;
+      consensusSicDescription = businessClassifications
+        .find(c => c.sicCode === mostCommonSicCode)?.sicDescription;
+    }
+  }
+  
   const result: AIClassificationResponse = {
     classification: majorityClassification,
     confidence: adjustedConfidence,
     reasoning: `Consensus classification (${Math.round(consensusRatio * 100)}% agreement): ${majorityReasoning}`,
-    matchingRules: Array.from(allMatchingRules)
+    matchingRules: Array.from(allMatchingRules),
+    sicCode: consensusSicCode,
+    sicDescription: consensusSicDescription
   };
   
   // Cache the consensus result
