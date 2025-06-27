@@ -22,7 +22,7 @@ export interface DatabaseClassificationResult {
 }
 
 /**
- * Save classification results to the database with SIC codes
+ * Save classification results to the database with enhanced SIC code tracking
  */
 export const saveClassificationResults = async (
   results: PayeeClassification[],
@@ -35,16 +35,29 @@ export const saveClassificationResults = async (
 
   console.log(`[DB SERVICE] Saving ${results.length} classification results with SIC codes to database`);
   
-  // Debug SIC code distribution
+  // Enhanced SIC code statistics
   const sicCodeStats = {
     totalResults: results.length,
     businessResults: results.filter(r => r.result.classification === 'Business').length,
     resultsWithSicCode: results.filter(r => r.result.sicCode).length,
-    resultsWithSicDescription: results.filter(r => r.result.sicDescription).length
+    resultsWithSicDescription: results.filter(r => r.result.sicDescription).length,
+    individualResults: results.filter(r => r.result.classification === 'Individual').length
   };
-  console.log('[DB SERVICE] SIC Code Statistics:', sicCodeStats);
+  console.log('[DB SERVICE] Enhanced SIC Code Statistics:', sicCodeStats);
 
-  const dbRecords = results.map((result) => {
+  // Log sample SIC codes for debugging
+  const businessesWithSic = results.filter(r => r.result.classification === 'Business' && r.result.sicCode);
+  if (businessesWithSic.length > 0) {
+    console.log('[DB SERVICE] Sample businesses with SIC codes:', businessesWithSic.slice(0, 3).map(r => ({
+      payee: r.payeeName,
+      sicCode: r.result.sicCode,
+      sicDescription: r.result.sicDescription?.substring(0, 50) + '...'
+    })));
+  } else {
+    console.warn('[DB SERVICE] NO BUSINESSES WITH SIC CODES FOUND! This indicates a problem with SIC code generation.');
+  }
+
+  const dbRecords = results.map((result, index) => {
     const record = {
       payee_name: result.payeeName,
       classification: result.result.classification,
@@ -62,13 +75,23 @@ export const saveClassificationResults = async (
       sic_description: result.result.sicDescription || null,
     };
     
-    // Debug individual record SIC data
+    // Enhanced debugging for each record
     if (result.result.classification === 'Business') {
-      console.log(`[DB SERVICE] Business "${result.payeeName}" - SIC Code: ${record.sic_code}, Description: ${record.sic_description}`);
+      if (record.sic_code) {
+        console.log(`[DB SERVICE] ✅ Business "${result.payeeName}" has SIC Code: ${record.sic_code}`);
+      } else {
+        console.warn(`[DB SERVICE] ❌ Business "${result.payeeName}" missing SIC code! Raw result:`, {
+          sicCode: result.result.sicCode,
+          sicDescription: result.result.sicDescription,
+          classification: result.result.classification
+        });
+      }
     }
     
     return record;
   });
+
+  console.log(`[DB SERVICE] Prepared ${dbRecords.length} database records for saving`);
 
   // Use upsert to handle conflicts based on unique constraint
   const { error } = await supabase
@@ -83,8 +106,8 @@ export const saveClassificationResults = async (
     throw new Error(`Failed to save classification results: ${error.message}`);
   }
 
-  console.log(`[DB SERVICE] Successfully saved ${results.length} classification results with SIC codes`);
-  console.log(`[DB SERVICE] SIC Code Summary: ${sicCodeStats.resultsWithSicCode}/${sicCodeStats.businessResults} businesses have SIC codes`);
+  console.log(`[DB SERVICE] ✅ Successfully saved ${results.length} classification results with SIC codes`);
+  console.log(`[DB SERVICE] Final SIC Summary: ${sicCodeStats.resultsWithSicCode}/${sicCodeStats.businessResults} businesses have SIC codes (${sicCodeStats.businessResults > 0 ? Math.round((sicCodeStats.resultsWithSicCode / sicCodeStats.businessResults) * 100) : 0}%)`);
 };
 
 /**
@@ -108,7 +131,7 @@ export const loadAllClassificationResults = async (): Promise<PayeeClassificatio
     return [];
   }
 
-  console.log(`[DB SERVICE] Loaded ${data.length} classification results with SIC codes from database`);
+  console.log(`[DB SERVICE] Loading ${data.length} classification results with SIC codes from database`);
 
   // Convert database records back to PayeeClassification format
   const results: PayeeClassification[] = data.map((record): PayeeClassification => ({
@@ -135,6 +158,11 @@ export const loadAllClassificationResults = async (): Promise<PayeeClassificatio
     originalData: record.original_data || null,
     rowIndex: record.row_index || undefined
   }));
+
+  // Log SIC code loading statistics
+  const businessResults = results.filter(r => r.result.classification === 'Business');
+  const sicResults = results.filter(r => r.result.sicCode);
+  console.log(`[DB SERVICE] Loaded SIC Statistics: ${sicResults.length}/${businessResults.length} businesses have SIC codes`);
 
   return results;
 };

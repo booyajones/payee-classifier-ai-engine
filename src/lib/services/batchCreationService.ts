@@ -28,12 +28,12 @@ export class BatchCreationService {
   ): Promise<BatchJob | null> {
     const { description, onJobComplete, silent = false } = options;
     
-    console.log(`[BATCH CREATION] Creating batch for ${payeeRowData.uniquePayeeNames.length} payees`);
+    console.log(`[BATCH CREATION] Creating batch for ${payeeRowData.uniquePayeeNames.length} payees with SIC codes`);
     
     // Validate input using the dedicated validation service
     batchValidationService.validateBatchInput(payeeRowData);
 
-    // For large files (>45k payees), use local processing
+    // For large files (>45k payees), use local processing with SIC codes
     if (payeeRowData.uniquePayeeNames.length > 45000) {
       return await this.handleLargeFileProcessing(payeeRowData, onJobComplete, silent);
     }
@@ -47,17 +47,21 @@ export class BatchCreationService {
     onJobComplete?: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void,
     silent: boolean = false
   ): Promise<null> {
-    console.log(`[BATCH CREATION] Large file detected, using local processing`);
+    console.log(`[BATCH CREATION] Large file detected, using local processing with SIC codes`);
 
     const result = await batchProcessingService.processBatch(
       payeeRowData.uniquePayeeNames,
       {
         ...DEFAULT_CLASSIFICATION_CONFIG,
         offlineMode: true,
-        aiThreshold: 75
+        aiThreshold: 75,
+        useEnhanced: true,
+        includeSicCodes: true
       },
       payeeRowData.originalFileData
     );
+
+    console.log(`[BATCH CREATION] Local processing complete with SIC codes: ${result.results.filter(r => r.result.sicCode).length} SIC codes assigned`);
 
     if (onJobComplete) {
       onJobComplete(result.results, result, 'local-processing');
@@ -70,7 +74,7 @@ export class BatchCreationService {
     payeeRowData: PayeeRowData,
     description?: string
   ): Promise<BatchJob> {
-    console.log(`[BATCH CREATION] Creating OpenAI batch job`);
+    console.log(`[BATCH CREATION] Creating OpenAI batch job with SIC code support`);
     
     const job = await createBatchJob(payeeRowData.uniquePayeeNames, description);
     console.log(`[BATCH CREATION] Created OpenAI batch job: ${job.id}`);

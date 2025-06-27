@@ -10,7 +10,7 @@ export const processBatchResults = (
   payeeRowData: PayeeRowData,
   job: BatchJob
 ): { finalClassifications: PayeeClassification[]; summary: BatchProcessingResult } => {
-  console.log(`[RESULT PROCESSOR] Creating classifications for ${rawResults.length} unique payees...`);
+  console.log(`[RESULT PROCESSOR] Creating classifications for ${rawResults.length} unique payees with SIC codes...`);
 
   // Create classifications for unique payees
   const uniquePayeeClassifications: PayeeClassification[] = [];
@@ -21,6 +21,12 @@ export const processBatchResults = (
     
     const keywordExclusion = checkKeywordExclusion(payeeName);
     
+    // Extract SIC code information from the raw result
+    const sicCode = rawResult?.sicCode || rawResult?.sic_code || null;
+    const sicDescription = rawResult?.sicDescription || rawResult?.sic_description || null;
+    
+    console.log(`[RESULT PROCESSOR] Processing "${payeeName}": Classification=${rawResult?.classification}, SIC=${sicCode}`);
+    
     uniquePayeeClassifications.push({
       id: `job-${job.id}-payee-${i}`,
       payeeName: payeeName,
@@ -29,8 +35,10 @@ export const processBatchResults = (
         confidence: rawResult?.confidence || 50,
         reasoning: rawResult?.reasoning || 'OpenAI batch processing result',
         processingTier: rawResult?.status === 'success' ? 'AI-Powered' : 'Failed',
-        processingMethod: 'OpenAI Batch API',
-        keywordExclusion: keywordExclusion
+        processingMethod: 'OpenAI Batch API with SIC Codes',
+        keywordExclusion: keywordExclusion,
+        sicCode: sicCode,
+        sicDescription: sicDescription
       },
       timestamp: new Date(),
       originalData: null,
@@ -38,7 +46,12 @@ export const processBatchResults = (
     });
   }
 
-  console.log(`[RESULT PROCESSOR] Created ${uniquePayeeClassifications.length} unique payee classifications`);
+  console.log(`[RESULT PROCESSOR] Created ${uniquePayeeClassifications.length} unique payee classifications with SIC codes`);
+
+  // Debug SIC code assignment
+  const businessResults = uniquePayeeClassifications.filter(c => c.result.classification === 'Business');
+  const sicResults = uniquePayeeClassifications.filter(c => c.result.sicCode);
+  console.log(`[RESULT PROCESSOR] SIC Code Summary: ${sicResults.length}/${businessResults.length} businesses have SIC codes`);
 
   // Map results to original rows
   console.log(`[RESULT PROCESSOR] Mapping ${uniquePayeeClassifications.length} unique results to ${payeeRowData.originalFileData.length} original rows...`);
@@ -56,7 +69,7 @@ export const processBatchResults = (
     throw new Error(`Expected exactly ${payeeRowData.originalFileData.length} results, got ${mappedResults.length}`);
   }
   
-  // Create final classifications
+  // Create final classifications with SIC code preservation
   const finalClassifications: PayeeClassification[] = mappedResults.map((mappedRow, index) => {
     return {
       id: `job-${job.id}-row-${index}`,
@@ -66,7 +79,9 @@ export const processBatchResults = (
         confidence: parseInt(mappedRow.confidence) || 50,
         reasoning: mappedRow.reasoning || 'Mapped from unique payee classification',
         processingTier: mappedRow.processingTier || 'AI-Powered',
-        processingMethod: mappedRow.processingMethod || 'OpenAI Batch API',
+        processingMethod: mappedRow.processingMethod || 'OpenAI Batch API with SIC Codes',
+        sicCode: mappedRow.sicCode || mappedRow.sic_code || undefined,
+        sicDescription: mappedRow.sicDescription || mappedRow.sic_description || undefined,
         keywordExclusion: {
           isExcluded: mappedRow.keywordExclusion === 'Yes',
           matchedKeywords: mappedRow.matchedKeywords ? mappedRow.matchedKeywords.split('; ').filter(k => k) : [],
@@ -82,6 +97,7 @@ export const processBatchResults = (
 
   const successCount = finalClassifications.filter(c => c.result.processingTier !== 'Failed').length;
   const failureCount = finalClassifications.length - successCount;
+  const finalSicCount = finalClassifications.filter(c => c.result.sicCode).length;
 
   const summary: BatchProcessingResult = {
     results: finalClassifications,
@@ -90,11 +106,12 @@ export const processBatchResults = (
     originalFileData: mappedResults
   };
 
-  console.log(`[RESULT PROCESSOR] === PROCESSING SUCCESS FOR JOB ${job.id} ===`, {
+  console.log(`[RESULT PROCESSOR] === PROCESSING SUCCESS FOR JOB ${job.id} WITH SIC CODES ===`, {
     originalRows: payeeRowData.originalFileData.length,
     finalResults: finalClassifications.length,
     successCount,
-    failureCount
+    failureCount,
+    sicCodesAssigned: finalSicCount
   });
 
   return { finalClassifications, summary };
