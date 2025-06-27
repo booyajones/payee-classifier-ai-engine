@@ -103,10 +103,18 @@ export class BatchJobLoader {
           console.log(`[BATCH JOB LOADER] Job ${record.id} is in preview/background loading mode`);
         }
 
+        // Create PayeeRowData with all required properties
         const payeeRowData: PayeeRowData = {
           uniquePayeeNames,
+          uniqueNormalizedNames: uniquePayeeNames, // Default to same as original names for legacy data
           originalFileData,
           rowMappings: rowMappings as any[],
+          standardizationStats: {
+            totalProcessed: uniquePayeeNames.length,
+            changesDetected: 0,
+            averageStepsPerName: 0,
+            mostCommonSteps: []
+          },
           ...(record.file_name && { fileName: record.file_name }),
           ...(record.file_headers && { fileHeaders: record.file_headers }),
           ...(record.selected_payee_column && { selectedPayeeColumn: record.selected_payee_column }),

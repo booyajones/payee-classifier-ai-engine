@@ -83,8 +83,15 @@ export const chunkPayeeData = (payeeRowData: PayeeRowData): FileChunk[] => {
 export const createPayeeRowDataFromChunk = (chunk: FileChunk, originalPayeeRowData: PayeeRowData): PayeeRowData => {
   return {
     uniquePayeeNames: chunk.uniquePayeeNames,
+    uniqueNormalizedNames: chunk.uniquePayeeNames, // Default to same as original for chunks
     originalFileData: chunk.originalFileData,
-    rowMappings: chunk.rowMappings
+    rowMappings: chunk.rowMappings,
+    standardizationStats: {
+      totalProcessed: chunk.uniquePayeeNames.length,
+      changesDetected: 0,
+      averageStepsPerName: 0,
+      mostCommonSteps: []
+    }
   };
 };
 
