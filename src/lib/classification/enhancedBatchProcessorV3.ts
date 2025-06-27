@@ -31,8 +31,8 @@ export async function enhancedProcessBatchV3(
       // Use the enhanced classification that includes SIC codes
       const classification = await enhancedClassifyPayeeWithAI(payeeName);
       
-      // Apply keyword exclusion
-      const keywordResult = await checkEnhancedKeywordExclusion(payeeName);
+      // Apply keyword exclusion - use the correct function name
+      const keywordResult = await checkKeywordExclusion(payeeName);
       
       const result: PayeeClassification = {
         id: `${Date.now()}-${i}`,

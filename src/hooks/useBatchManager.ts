@@ -72,7 +72,8 @@ export const useBatchManager = () => {
     try {
       console.log(`[BATCH MANAGER] Creating batch job for ${payeeRowData.uniquePayeeNames.length} payees`);
       
-      const job = await createBatchJob(payeeRowData, options.description || 'Batch Classification Job');
+      // Pass the uniquePayeeNames array, not the entire PayeeRowData object
+      const job = await createBatchJob(payeeRowData.uniquePayeeNames, options.description || 'Batch Classification Job');
       
       if (job) {
         addJob(job, payeeRowData);
