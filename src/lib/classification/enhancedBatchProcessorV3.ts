@@ -19,6 +19,7 @@ export async function enhancedProcessBatchV3(
   const errors: string[] = [];
   let successCount = 0;
   let failureCount = 0;
+  let sicCodeCount = 0;
 
   // Process each payee
   for (let i = 0; i < payeeNames.length; i++) {
@@ -31,7 +32,10 @@ export async function enhancedProcessBatchV3(
       // Use the enhanced classification that includes SIC codes
       const classification = await enhancedClassifyPayeeWithAI(payeeName);
       
-      // Apply keyword exclusion - use the correct function name
+      // Debug SIC code extraction
+      console.log(`[SIC DEBUG] Payee: "${payeeName}" | Classification: ${classification.classification} | SIC Code: ${classification.sicCode || 'None'} | SIC Description: ${classification.sicDescription || 'None'}`);
+      
+      // Apply keyword exclusion
       const keywordResult = await checkKeywordExclusion(payeeName);
       
       const result: PayeeClassification = {
@@ -52,6 +56,14 @@ export async function enhancedProcessBatchV3(
         originalData,
         rowIndex: i
       };
+      
+      // Track SIC code assignment
+      if (result.result.sicCode && result.result.classification === 'Business') {
+        sicCodeCount++;
+        console.log(`[SIC SUCCESS] Assigned SIC ${result.result.sicCode} to business "${payeeName}"`);
+      } else if (result.result.classification === 'Business') {
+        console.warn(`[SIC WARNING] Business "${payeeName}" missing SIC code`);
+      }
       
       results.push(result);
       successCount++;
@@ -82,8 +94,10 @@ export async function enhancedProcessBatchV3(
     // Don't throw here - we still want to return the results even if database save fails
   }
 
+  const businessCount = results.filter(r => r.result.classification === 'Business').length;
+  
   console.log(`[ENHANCED BATCH V3] Batch processing complete: ${successCount} success, ${failureCount} failures`);
-  console.log(`[ENHANCED BATCH V3] SIC codes assigned: ${results.filter(r => r.result.sicCode).length} out of ${results.filter(r => r.result.classification === 'Business').length} businesses`);
+  console.log(`[SIC SUMMARY] SIC codes assigned: ${sicCodeCount} out of ${businessCount} businesses (${businessCount > 0 ? Math.round((sicCodeCount / businessCount) * 100) : 0}%)`);
 
   return batchResult;
 }

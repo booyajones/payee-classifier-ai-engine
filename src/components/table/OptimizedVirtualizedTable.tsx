@@ -23,6 +23,28 @@ const MAX_HEIGHT = 600;
 const OVERSCAN_COUNT = 5; // Number of items to render outside visible area
 const PERFORMANCE_THRESHOLD = 1000; // Use virtualization for 1000+ items
 
+// Enhanced columns including SIC fields - CORRECTED VERSION
+const getEnhancedColumns = (originalColumns: Array<{ key: string; label: string; isOriginal: boolean }>) => {
+  console.log('[OPTIMIZED TABLE] Original columns:', originalColumns);
+  
+  const classificationColumns = [
+    { key: 'classification', label: 'Classification', isOriginal: false },
+    { key: 'confidence', label: 'Confidence', isOriginal: false },
+    { key: 'sicCode', label: 'SIC Code', isOriginal: false },
+    { key: 'sicDescription', label: 'SIC Description', isOriginal: false },
+    { key: 'processingTier', label: 'Processing Tier', isOriginal: false },
+    { key: 'reasoning', label: 'Reasoning', isOriginal: false },
+    { key: 'keywordExclusion', label: 'Excluded', isOriginal: false },
+    { key: 'matchedKeywords', label: 'Keywords', isOriginal: false },
+    { key: 'details', label: 'Details', isOriginal: false }
+  ];
+  
+  const enhancedColumns = [...originalColumns, ...classificationColumns];
+  console.log('[OPTIMIZED TABLE] Enhanced columns with SIC:', enhancedColumns);
+  
+  return enhancedColumns;
+};
+
 const OptimizedVirtualizedTable = memo<OptimizedVirtualizedTableProps>(({
   results,
   columns,
@@ -34,10 +56,32 @@ const OptimizedVirtualizedTable = memo<OptimizedVirtualizedTableProps>(({
 }) => {
   const { startOperation, finishOperation } = usePerformanceMonitoring(enablePerformanceMonitoring);
 
+  // Enhanced column configuration with SIC fields
+  const enhancedColumns = useMemo(() => getEnhancedColumns(columns), [columns]);
+
+  // Debug SIC data presence
+  React.useEffect(() => {
+    const businessResults = results.filter(r => r.result.classification === 'Business');
+    const sicResults = results.filter(r => r.result.sicCode);
+    console.log(`[OPTIMIZED TABLE DEBUG] Business entities: ${businessResults.length}, With SIC codes: ${sicResults.length}`);
+    
+    // Sample SIC data logging
+    if (sicResults.length > 0) {
+      console.log('[OPTIMIZED TABLE DEBUG] Sample SIC codes:', sicResults.slice(0, 3).map(r => ({
+        payee: r.payeeName,
+        classification: r.result.classification,
+        sicCode: r.result.sicCode,
+        sicDescription: r.result.sicDescription?.substring(0, 50) + '...'
+      })));
+    } else {
+      console.warn('[OPTIMIZED TABLE DEBUG] No SIC codes found in results');
+    }
+  }, [results]);
+
   // Memoize table height calculation
   const tableHeight = useMemo(() => {
     const height = Math.min(results.length * ITEM_HEIGHT, MAX_HEIGHT);
-    console.log(`[TABLE] Calculated height: ${height}px for ${results.length} items`);
+    console.log(`[OPTIMIZED TABLE] Calculated height: ${height}px for ${results.length} items`);
     return height;
   }, [results.length]);
 
@@ -49,20 +93,20 @@ const OptimizedVirtualizedTable = memo<OptimizedVirtualizedTableProps>(({
     return (
       <VirtualizedTableRow
         result={result}
-        columns={columns}
+        columns={enhancedColumns}
         index={index}
         style={style}
         onViewDetails={onViewDetails}
       />
     );
-  }, [results, columns, onViewDetails]);
+  }, [results, enhancedColumns, onViewDetails]);
 
   // Memoize the decision whether to use virtualization
   const shouldVirtualize = useMemo(() => {
     const memoryStats = MemoryOptimizer.getMemoryStats();
     const forceVirtualization = memoryStats.memoryPressure === 'high' || results.length > PERFORMANCE_THRESHOLD;
     
-    console.log(`[TABLE] Virtualization decision:`, {
+    console.log(`[OPTIMIZED TABLE] Virtualization decision:`, {
       itemCount: results.length,
       memoryPressure: memoryStats.memoryPressure,
       shouldVirtualize: forceVirtualization
@@ -86,7 +130,7 @@ const OptimizedVirtualizedTable = memo<OptimizedVirtualizedTableProps>(({
   React.useEffect(() => {
     return () => {
       if (results.length > 1000) {
-        console.log('[TABLE] Performing cleanup for large dataset');
+        console.log('[OPTIMIZED TABLE] Performing cleanup for large dataset');
         MemoryOptimizer.suggestGarbageCollection();
       }
     };
@@ -98,7 +142,7 @@ const OptimizedVirtualizedTable = memo<OptimizedVirtualizedTableProps>(({
       <div className="optimized-table-container">
         <Table>
           <ClassificationTableHeader 
-            columns={columns}
+            columns={enhancedColumns}
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={onSort}
@@ -108,7 +152,7 @@ const OptimizedVirtualizedTable = memo<OptimizedVirtualizedTableProps>(({
               <VirtualizedTableRow
                 key={`${result.id}-${index}`}
                 result={result}
-                columns={columns}
+                columns={enhancedColumns}
                 index={index}
                 style={{}}
                 onViewDetails={onViewDetails}
@@ -125,7 +169,7 @@ const OptimizedVirtualizedTable = memo<OptimizedVirtualizedTableProps>(({
     <div className="optimized-table-container">
       <Table>
         <ClassificationTableHeader 
-          columns={columns}
+          columns={enhancedColumns}
           sortField={sortField}
           sortDirection={sortDirection}
           onSort={onSort}

@@ -48,20 +48,28 @@ const TableCell = React.memo(({ result, column, onViewDetails }: TableCellProps)
         );
       case 'sicCode':
         const sicCode = result.result.sicCode;
-        console.log('[TABLE CELL] SIC Code for result:', sicCode);
+        console.log('[TABLE CELL] SIC Code for result:', sicCode, 'Classification:', result.result.classification);
         return sicCode ? (
-          <Badge variant="outline" className="font-mono">
+          <Badge variant="outline" className="font-mono text-blue-700 bg-blue-50">
             {sicCode}
           </Badge>
-        ) : '-';
+        ) : (
+          <span className="text-gray-400 text-sm">
+            {result.result.classification === 'Business' ? 'Missing' : '-'}
+          </span>
+        );
       case 'sicDescription':
         const sicDescription = result.result.sicDescription;
-        console.log('[TABLE CELL] SIC Description for result:', sicDescription);
+        console.log('[TABLE CELL] SIC Description for result:', sicDescription?.substring(0, 50));
         return sicDescription ? (
           <div className="max-w-xs truncate" title={sicDescription}>
-            {sicDescription}
+            <span className="text-sm text-gray-700">{sicDescription}</span>
           </div>
-        ) : '-';
+        ) : (
+          <span className="text-gray-400 text-sm">
+            {result.result.classification === 'Business' ? 'Missing' : '-'}
+          </span>
+        );
       case 'keywordExclusion':
         const isExcluded = result.result.keywordExclusion?.isExcluded;
         console.log('[TABLE CELL] Keyword exclusion for result:', isExcluded, result.result.keywordExclusion);
@@ -73,7 +81,11 @@ const TableCell = React.memo(({ result, column, onViewDetails }: TableCellProps)
       case 'matchedKeywords':
         const keywords = result.result.keywordExclusion?.matchedKeywords || [];
         console.log('[TABLE CELL] Matched keywords:', keywords);
-        return keywords.length > 0 ? keywords.join(', ') : '-';
+        return keywords.length > 0 ? (
+          <div className="max-w-xs truncate" title={keywords.join(', ')}>
+            <span className="text-sm text-orange-700">{keywords.join(', ')}</span>
+          </div>
+        ) : '-';
       case 'keywordReasoning':
         const reasoning = result.result.keywordExclusion?.reasoning;
         console.log('[TABLE CELL] Keyword reasoning:', reasoning);
@@ -85,6 +97,7 @@ const TableCell = React.memo(({ result, column, onViewDetails }: TableCellProps)
           </Button>
         );
       default:
+        console.warn('[TABLE CELL] Unknown column key:', column.key);
         return '';
     }
   }, [result, column, handleViewDetails]);

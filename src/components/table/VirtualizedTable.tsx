@@ -18,8 +18,10 @@ interface VirtualizedTableProps {
 const ITEM_HEIGHT = 48; // Height of each row in pixels
 const MAX_HEIGHT = 600; // Maximum table height
 
-// Define enhanced columns that include SIC fields
+// Define enhanced columns that include SIC fields - FIXED VERSION
 const getEnhancedColumns = (originalColumns: Array<{ key: string; label: string; isOriginal: boolean }>) => {
+  console.log('[TABLE COLUMNS] Original columns:', originalColumns);
+  
   const classificationColumns = [
     { key: 'classification', label: 'Classification', isOriginal: false },
     { key: 'confidence', label: 'Confidence', isOriginal: false },
@@ -27,10 +29,15 @@ const getEnhancedColumns = (originalColumns: Array<{ key: string; label: string;
     { key: 'sicDescription', label: 'SIC Description', isOriginal: false },
     { key: 'processingTier', label: 'Processing Tier', isOriginal: false },
     { key: 'reasoning', label: 'Reasoning', isOriginal: false },
+    { key: 'keywordExclusion', label: 'Excluded', isOriginal: false },
+    { key: 'matchedKeywords', label: 'Keywords', isOriginal: false },
     { key: 'details', label: 'Details', isOriginal: false }
   ];
   
-  return [...originalColumns, ...classificationColumns];
+  const enhancedColumns = [...originalColumns, ...classificationColumns];
+  console.log('[TABLE COLUMNS] Enhanced columns with SIC:', enhancedColumns);
+  
+  return enhancedColumns;
 };
 
 const VirtualizedTable = React.memo(({
@@ -46,6 +53,21 @@ const VirtualizedTable = React.memo(({
   const tableHeight = useMemo(() => {
     return Math.min(results.length * ITEM_HEIGHT, MAX_HEIGHT);
   }, [results.length]);
+
+  // Debug SIC data in results
+  React.useEffect(() => {
+    const businessResults = results.filter(r => r.result.classification === 'Business');
+    const sicResults = results.filter(r => r.result.sicCode);
+    console.log(`[TABLE DEBUG] Total results: ${results.length}, Business: ${businessResults.length}, With SIC: ${sicResults.length}`);
+    
+    if (sicResults.length > 0) {
+      console.log('[TABLE DEBUG] Sample SIC data:', sicResults.slice(0, 3).map(r => ({
+        payee: r.payeeName,
+        sicCode: r.result.sicCode,
+        sicDescription: r.result.sicDescription
+      })));
+    }
+  }, [results]);
 
   const Row = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => (
     <VirtualizedTableRow
