@@ -1,3 +1,4 @@
+
 import { getOpenAIClient } from './client';
 import { makeAPIRequest, logMemoryUsage } from './apiUtils';
 import { CLASSIFICATION_MODEL } from './config';
@@ -11,12 +12,12 @@ export interface BatchJob {
   expired_at?: number;
   finalizing_at?: number;
   in_progress_at?: number;
-  cancelled_at?: number; // Added missing property
+  cancelled_at?: number;
   output_file_id?: string;
   error_file_id?: string;
-  errors?: any; // Added missing property
-  input_file_id?: string; // Added missing property
-  completion_window?: string; // Added missing property
+  errors?: any;
+  input_file_id?: string;
+  completion_window?: string;
   request_counts: {
     total: number;
     completed: number;
@@ -60,10 +61,12 @@ export interface TrueBatchClassificationResult {
   reasoning: string;
   status: 'success' | 'failed';
   error?: string;
+  sicCode?: string;
+  sicDescription?: string;
 }
 
 /**
- * Create a batch job using the true OpenAI Batch API
+ * Create a batch job using the true OpenAI Batch API with SIC code support
  */
 export async function createBatchJob(
   payeeNames: string[],
@@ -74,27 +77,52 @@ export async function createBatchJob(
   return makeAPIRequest(async () => {
     const client = getOpenAIClient();
     
-    console.log(`[TRUE BATCH API] Creating batch job for ${payeeNames.length} payees with model: ${CLASSIFICATION_MODEL}`);
+    console.log(`[TRUE BATCH API] Creating batch job for ${payeeNames.length} payees with SIC codes using model: ${CLASSIFICATION_MODEL}`);
     
-    // Create batch requests in JSONL format
+    // Create batch requests in JSONL format with enhanced SIC code system prompt
     const batchRequests = payeeNames.map((name, index) => ({
       custom_id: `payee-${index}-${Date.now()}`,
       method: 'POST',
       url: '/v1/chat/completions',
       body: {
-        model: CLASSIFICATION_MODEL, // Use the configured model
+        model: CLASSIFICATION_MODEL,
         messages: [
           {
             role: 'system',
-            content: 'You are an expert at classifying payee names. Classify each name as either "Business" or "Individual". Return only a JSON object with classification, confidence (0-100), and reasoning.'
+            content: `You are an expert at classifying payee names as either "Business" or "Individual". 
+
+For BUSINESS entities, you must also assign a 4-digit SIC (Standard Industrial Classification) code and description based on the business type.
+
+Common SIC codes:
+- 7372: Prepackaged Software
+- 8742: Management Consulting Services  
+- 5411: Grocery Stores
+- 8011: Offices of Doctors of Medicine
+- 6021: National Commercial Banks
+- 7011: Hotels and Motels
+- 5812: Eating Places
+- 1521: General Contractors-Single Family Houses
+- 7381: Detective Guard & Armored Car Services
+- 8999: Services, Not Elsewhere Classified
+
+Return ONLY a JSON object with these exact fields:
+- classification: "Business" or "Individual"
+- confidence: number (0-100)
+- reasoning: string explaining the classification
+- sicCode: string (4-digit code, only for businesses, null for individuals)
+- sicDescription: string (description, only for businesses, null for individuals)
+
+Example responses:
+{"classification": "Business", "confidence": 95, "reasoning": "Contains LLC suffix indicating business entity", "sicCode": "8742", "sicDescription": "Management Consulting Services"}
+{"classification": "Individual", "confidence": 90, "reasoning": "Appears to be a person's name with first and last name", "sicCode": null, "sicDescription": null}`
           },
           {
             role: 'user',
-            content: `Classify this payee name: "${name}"\n\nReturn ONLY a JSON object like: {"classification": "Business", "confidence": 95, "reasoning": "Contains LLC suffix indicating business entity"}`
+            content: `Classify this payee name and assign SIC code if it's a business: "${name}"`
           }
         ],
         temperature: 0.1,
-        max_tokens: 200
+        max_tokens: 300
       }
     }));
     
@@ -103,11 +131,11 @@ export async function createBatchJob(
     
     // Create a file with the batch requests
     const file = await client.files.create({
-      file: new File([jsonlContent], 'batch_requests.jsonl', { type: 'application/jsonl' }),
+      file: new File([jsonlContent], 'batch_requests_with_sic.jsonl', { type: 'application/jsonl' }),
       purpose: 'batch'
     });
     
-    console.log(`[TRUE BATCH API] Created input file: ${file.id} using model: ${CLASSIFICATION_MODEL}`);
+    console.log(`[TRUE BATCH API] Created input file with SIC code support: ${file.id}`);
     
     // Create the batch job
     const batch = await client.batches.create({
@@ -116,11 +144,11 @@ export async function createBatchJob(
       completion_window: '24h',
       metadata: {
         payee_count: payeeNames.length.toString(),
-        description: description || 'Payee classification batch'
+        description: description || 'Payee classification batch with SIC codes'
       }
     });
     
-    console.log(`[TRUE BATCH API] Created batch job: ${batch.id} with updated model`);
+    console.log(`[TRUE BATCH API] Created batch job with SIC codes: ${batch.id}`);
     
     return {
       id: batch.id,
@@ -144,10 +172,10 @@ export async function createBatchJob(
       },
       metadata: {
         payee_count: payeeNames.length,
-        description: description || 'Payee classification batch'
+        description: description || 'Payee classification batch with SIC codes'
       }
     };
-  }, { timeout: 60000, retries: 2 }); // 60s timeout with 2 retries
+  }, { timeout: 60000, retries: 2 });
 }
 
 /**
@@ -188,7 +216,7 @@ export async function checkBatchJobStatus(batchId: string): Promise<BatchJob> {
 }
 
 /**
- * Retrieve and parse batch job results
+ * Retrieve and parse batch job results with SIC code extraction
  */
 export async function getBatchJobResults(
   batchJob: BatchJob,
@@ -201,7 +229,7 @@ export async function getBatchJobResults(
   return makeAPIRequest(async () => {
     const client = getOpenAIClient();
     
-    console.log(`[TRUE BATCH API] Retrieving results from file: ${batchJob.output_file_id}`);
+    console.log(`[TRUE BATCH API] Retrieving SIC code results from file: ${batchJob.output_file_id}`);
     
     // Get the output file content
     const fileContent = await client.files.content(batchJob.output_file_id!);
@@ -211,7 +239,7 @@ export async function getBatchJobResults(
     const results: BatchJobResult[] = responseText
       .trim()
       .split('\n')
-      .filter(line => line.trim()) // Remove empty lines
+      .filter(line => line.trim())
       .map(line => {
         try {
           return JSON.parse(line);
@@ -222,10 +250,10 @@ export async function getBatchJobResults(
       })
       .filter(result => result !== null);
     
-    console.log(`[TRUE BATCH API] Parsed ${results.length} results`);
+    console.log(`[TRUE BATCH API] Parsed ${results.length} results with SIC code support`);
     logMemoryUsage('getBatchJobResults');
     
-    // Map results back to payee names
+    // Map results back to payee names with SIC code extraction
     const classificationResults: TrueBatchClassificationResult[] = payeeNames.map((name, index) => {
       const result = results.find(r => r.custom_id.startsWith(`payee-${index}-`));
       
@@ -266,12 +294,18 @@ export async function getBatchJobResults(
         const content = result.response.body.choices[0]?.message?.content;
         if (content) {
           const parsed = JSON.parse(content);
+          
+          // Debug SIC code extraction
+          console.log(`[SIC EXTRACTION] Payee: "${name}" | Classification: ${parsed.classification} | SIC: ${parsed.sicCode || 'None'} | Description: ${parsed.sicDescription || 'None'}`);
+          
           return {
             payeeName: name,
             classification: parsed.classification || 'Individual',
             confidence: parsed.confidence || 50,
-            reasoning: parsed.reasoning || 'Classified via OpenAI Batch API',
-            status: 'success'
+            reasoning: parsed.reasoning || 'Classified via OpenAI Batch API with SIC codes',
+            status: 'success',
+            sicCode: parsed.sicCode || undefined,
+            sicDescription: parsed.sicDescription || undefined
           };
         }
       } catch (error) {
@@ -288,8 +322,13 @@ export async function getBatchJobResults(
       };
     });
     
+    // Log SIC code statistics
+    const businessResults = classificationResults.filter(r => r.classification === 'Business');
+    const sicResults = classificationResults.filter(r => r.sicCode);
+    console.log(`[TRUE BATCH API] SIC Code Statistics: ${sicResults.length}/${businessResults.length} businesses have SIC codes`);
+    
     return classificationResults;
-  }, { timeout: 120000, retries: 2 }); // 2 minute timeout for large files
+  }, { timeout: 120000, retries: 2 });
 }
 
 /**
