@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { PayeeClassification } from "@/lib/types";
@@ -13,7 +12,7 @@ interface ExportButtonsProps {
 const ExportButtons = ({ results }: ExportButtonsProps) => {
   const { toast } = useToast();
 
-  const performExport = (exportType: 'csv' | 'json' | 'excel') => {
+  const performExport = async (exportType: 'csv' | 'json' | 'excel') => {
     try {
       // STRICT VALIDATION: Check all results have original data
       const invalidResults = results.filter(r => !r.originalData);
@@ -36,28 +35,16 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
         sicCodeCount: results.filter(r => r.result.sicCode).length
       });
 
-      const exportData = exportResultsWithOriginalDataV3(batchResult, true);
-      
-      // Add SIC fields to export data if not already present
-      const enhancedExportData = exportData.map(row => {
-        const result = results.find(r => r.payeeName === row.payeeName);
-        if (result && result.result.classification === 'Business') {
-          return {
-            ...row,
-            sicCode: result.result.sicCode || '',
-            sicDescription: result.result.sicDescription || ''
-          };
-        }
-        return row;
-      });
+      // Use the enhanced export function that includes database SIC data
+      const exportData = await exportResultsWithOriginalDataV3(batchResult, true);
       
       const timestamp = new Date().toISOString().slice(0, 10);
       
       if (exportType === 'csv') {
-        const headers = Object.keys(enhancedExportData[0] || {});
+        const headers = Object.keys(exportData[0] || {});
         const csvContent = [
           headers.join(','),
-          ...enhancedExportData.map(row => 
+          ...exportData.map(row => 
             headers.map(header => {
               const value = row[header] || '';
               return typeof value === 'string' && (value.includes(',') || value.includes('"')) 
@@ -77,7 +64,7 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
         link.click();
         document.body.removeChild(link);
       } else if (exportType === 'json') {
-        const jsonContent = JSON.stringify(enhancedExportData, null, 2);
+        const jsonContent = JSON.stringify(exportData, null, 2);
         const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
@@ -89,7 +76,7 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
         document.body.removeChild(link);
       } else if (exportType === 'excel') {
         const workbook = XLSX.utils.book_new();
-        const worksheet = XLSX.utils.json_to_sheet(enhancedExportData);
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
         
         XLSX.utils.book_append_sheet(workbook, worksheet, "Results");
         
@@ -99,10 +86,10 @@ const ExportButtons = ({ results }: ExportButtonsProps) => {
         XLSX.writeFile(workbook, filename);
       }
 
-      const sicCount = results.filter(r => r.result.sicCode).length;
+      const sicCount = exportData.filter(row => row.sicCode && row.sicCode !== '').length;
       toast({
         title: "Export Complete",
-        description: `Exported ${enhancedExportData.length} rows with SIC codes (${sicCount} businesses with SIC codes).`,
+        description: `Exported ${exportData.length} rows with ${sicCount} SIC codes included.`,
       });
 
     } catch (error) {

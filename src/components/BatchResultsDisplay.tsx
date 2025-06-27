@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { RotateCcw, Download } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -28,7 +27,7 @@ const BatchResultsDisplay = ({
 }: BatchResultsDisplayProps) => {
   const { toast } = useToast();
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (!processingSummary || batchResults.length === 0) {
       toast({
         title: "No Results to Export",
@@ -39,27 +38,13 @@ const BatchResultsDisplay = ({
     }
 
     try {
-      const csvData = exportDirectCSV(processingSummary);
-      
-      // Add SIC information to CSV data
-      const enhancedRows = csvData.rows.map((row, index) => {
-        const result = batchResults[index];
-        if (result && result.result.classification === 'Business') {
-          return [
-            ...row,
-            result.result.sicCode || '',
-            result.result.sicDescription || ''
-          ];
-        }
-        return [...row, '', '']; // Empty SIC fields for individuals
-      });
-      
-      const enhancedHeaders = [...csvData.headers, 'SIC Code', 'SIC Description'];
+      // Use the enhanced CSV export that includes database SIC data
+      const csvData = await exportDirectCSV(processingSummary);
       
       const timestamp = new Date().toISOString().slice(0, 10);
       const csvContent = [
-        enhancedHeaders.join(','),
-        ...enhancedRows.map(row => 
+        csvData.headers.join(','),
+        ...csvData.rows.map(row => 
           row.map(cell => {
             const value = cell || '';
             return typeof value === 'string' && (value.includes(',') || value.includes('"')) 
@@ -79,10 +64,13 @@ const BatchResultsDisplay = ({
       link.click();
       document.body.removeChild(link);
       
-      const sicCount = batchResults.filter(r => r.result.sicCode).length;
+      // Count SIC codes from the actual export data
+      const sicCodeIndex = csvData.headers.indexOf('sicCode');
+      const sicCount = sicCodeIndex >= 0 ? csvData.rows.filter(row => row[sicCodeIndex] && row[sicCodeIndex] !== '').length : 0;
+      
       toast({
         title: "CSV Export Complete",
-        description: `Exported ${enhancedRows.length} rows with SIC codes (${sicCount} businesses classified).`,
+        description: `Exported ${csvData.rows.length} rows with ${sicCount} SIC codes included.`,
       });
     } catch (error) {
       console.error("CSV export error:", error);
@@ -94,7 +82,7 @@ const BatchResultsDisplay = ({
     }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!processingSummary || batchResults.length === 0) {
       toast({
         title: "No Results to Export",
@@ -105,25 +93,15 @@ const BatchResultsDisplay = ({
     }
 
     try {
-      const csvData = exportDirectCSV(processingSummary);
+      // Use the enhanced CSV export for data, then convert to Excel
+      const csvData = await exportDirectCSV(processingSummary);
       
-      // Convert to object format for Excel with SIC information
-      const exportData = csvData.rows.map((row, index) => {
+      // Convert to object format for Excel
+      const exportData = csvData.rows.map(row => {
         const obj: any = {};
         csvData.headers.forEach((header, headerIndex) => {
           obj[header] = row[headerIndex] || '';
         });
-        
-        // Add SIC information
-        const result = batchResults[index];
-        if (result && result.result.classification === 'Business') {
-          obj['SIC Code'] = result.result.sicCode || '';
-          obj['SIC Description'] = result.result.sicDescription || '';
-        } else {
-          obj['SIC Code'] = '';
-          obj['SIC Description'] = '';
-        }
-        
         return obj;
       });
       
@@ -137,10 +115,12 @@ const BatchResultsDisplay = ({
       
       XLSX.writeFile(workbook, filename);
       
-      const sicCount = batchResults.filter(r => r.result.sicCode).length;
+      // Count SIC codes from the actual export data
+      const sicCount = exportData.filter(row => row.sicCode && row.sicCode !== '').length;
+      
       toast({
         title: "Excel Export Complete",
-        description: `Exported ${exportData.length} rows with SIC codes (${sicCount} businesses classified).`,
+        description: `Exported ${exportData.length} rows with ${sicCount} SIC codes included.`,
       });
     } catch (error) {
       console.error("Excel export error:", error);
