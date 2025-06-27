@@ -2,7 +2,7 @@
 import { PayeeClassification, BatchProcessingResult, ClassificationConfig } from '../types';
 import { enhancedClassifyPayeeWithAI } from '../openai/enhancedClassification';
 import { classifyPayeeWithAI } from '../openai/singleClassification';
-import { checkEnhancedKeywordExclusion } from './enhancedKeywordExclusion';
+import { checkKeywordExclusion } from './enhancedKeywordExclusion';
 import { saveClassificationResults } from '../database/classificationService';
 
 /**

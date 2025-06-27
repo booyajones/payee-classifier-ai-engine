@@ -7,6 +7,7 @@ import { useBatchJobState } from './batch/useBatchJobState';
 import { useBatchJobActions } from './batch/useBatchJobActions';
 import { useBatchJobLoader } from './batch/useBatchJobLoader';
 import { useBatchJobEventListener, emitBatchJobUpdate } from './batch/useBatchJobEventEmitter';
+import { createBatchJob } from '@/lib/openai/trueBatchAPI';
 
 interface BatchCreationOptions {
   description?: string;
@@ -63,6 +64,40 @@ export const useBatchManager = () => {
     return unsubscribe;
   }, [refreshJobs]);
 
+  // Create batch job function
+  const createBatch = useCallback(async (
+    payeeRowData: PayeeRowData,
+    options: BatchCreationOptions = {}
+  ): Promise<BatchJob | null> => {
+    try {
+      console.log(`[BATCH MANAGER] Creating batch job for ${payeeRowData.uniquePayeeNames.length} payees`);
+      
+      const job = await createBatchJob(payeeRowData, options.description || 'Batch Classification Job');
+      
+      if (job) {
+        addJob(job, payeeRowData);
+        
+        if (options.onJobUpdate) {
+          options.onJobUpdate(job);
+        }
+        
+        console.log(`[BATCH MANAGER] Batch job created: ${job.id}`);
+      }
+      
+      return job;
+    } catch (error) {
+      console.error('[BATCH MANAGER] Failed to create batch job:', error);
+      return null;
+    }
+  }, [addJob]);
+
+  // Delete job function
+  const deleteJob = useCallback((jobId: string) => {
+    console.log(`[BATCH MANAGER] Deleting job ${jobId}`);
+    removeJob(jobId);
+    emitBatchJobUpdate();
+  }, [removeJob]);
+
   return {
     // State
     jobs: state.jobs,
@@ -103,6 +138,11 @@ export const useBatchManager = () => {
         refreshInProgress.current.delete(jobId);
       }
     }, []),
+    
+    // New methods
+    createBatch,
+    updateJob,
+    deleteJob,
     
     // Utilities
     getJobData: useCallback((jobId: string) => state.payeeDataMap[jobId], [state.payeeDataMap]),
