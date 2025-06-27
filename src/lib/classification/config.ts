@@ -1,4 +1,3 @@
-
 import { ClassificationConfig } from '../types';
 
 // Default classification configuration
@@ -8,7 +7,8 @@ export const DEFAULT_CLASSIFICATION_CONFIG: ClassificationConfig = {
   useEnhanced: false, // Default to NOT using enhanced classification
   offlineMode: false, // Default to online mode
   useFuzzyMatching: true, // Use fuzzy matching for better results
-  useCacheForDuplicates: true // Deduplicate similar names
+  useCacheForDuplicates: true, // Deduplicate similar names
+  includeSicCodes: true // Enable SIC codes by default
 };
 
 // Increased concurrency limits for better parallel processing

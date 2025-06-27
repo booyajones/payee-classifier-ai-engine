@@ -1,3 +1,4 @@
+
 export interface ClassificationResult {
   classification: 'Business' | 'Individual';
   confidence: number;
@@ -75,6 +76,7 @@ export interface ClassificationConfig {
   similarityThreshold?: number; // For fuzzy matching
   retryFailedClassifications?: boolean;
   maxRetries?: number;
+  includeSicCodes?: boolean; // Add this property to support SIC code inclusion
 }
 
 export interface DataIntegrityReport {
