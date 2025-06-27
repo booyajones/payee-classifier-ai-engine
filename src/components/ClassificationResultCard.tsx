@@ -12,7 +12,7 @@ interface ClassificationResultCardProps {
 
 const ClassificationResultCard = ({ result }: ClassificationResultCardProps) => {
   const { payeeName, timestamp } = result;
-  const { classification, confidence, reasoning, processingTier, matchingRules } = result.result;
+  const { classification, confidence, reasoning, processingTier, matchingRules, sicCode, sicDescription } = result.result;
   
   return (
     <Card className="w-full mb-4">
@@ -34,6 +34,21 @@ const ClassificationResultCard = ({ result }: ClassificationResultCardProps) => 
         <p className="text-sm mb-2">
           <span className="font-medium">Processing Tier:</span> {processingTier}
         </p>
+        
+        {sicCode && classification === 'Business' && (
+          <div className="mb-3 p-2 bg-blue-50 rounded border">
+            <p className="text-sm font-medium mb-1">SIC Classification:</p>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="font-mono">
+                {sicCode}
+              </Badge>
+              {sicDescription && (
+                <span className="text-sm text-gray-600">{sicDescription}</span>
+              )}
+            </div>
+          </div>
+        )}
+        
         <p className="text-sm">{reasoning}</p>
 
         {matchingRules && matchingRules.length > 0 && (

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayeeClassification } from '@/lib/types';
 
@@ -35,23 +34,41 @@ export const saveClassificationResults = async (
   }
 
   console.log(`[DB SERVICE] Saving ${results.length} classification results with SIC codes to database`);
+  
+  // Debug SIC code distribution
+  const sicCodeStats = {
+    totalResults: results.length,
+    businessResults: results.filter(r => r.result.classification === 'Business').length,
+    resultsWithSicCode: results.filter(r => r.result.sicCode).length,
+    resultsWithSicDescription: results.filter(r => r.result.sicDescription).length
+  };
+  console.log('[DB SERVICE] SIC Code Statistics:', sicCodeStats);
 
-  const dbRecords = results.map((result) => ({
-    payee_name: result.payeeName,
-    classification: result.result.classification,
-    confidence: result.result.confidence,
-    reasoning: result.result.reasoning,
-    processing_tier: result.result.processingTier,
-    processing_method: result.result.processingMethod || null,
-    matching_rules: result.result.matchingRules || null,
-    similarity_scores: result.result.similarityScores ? JSON.parse(JSON.stringify(result.result.similarityScores)) : null,
-    keyword_exclusion: result.result.keywordExclusion ? JSON.parse(JSON.stringify(result.result.keywordExclusion)) : null,
-    original_data: result.originalData ? JSON.parse(JSON.stringify(result.originalData)) : null,
-    row_index: result.rowIndex || null,
-    batch_id: batchId || null,
-    sic_code: result.result.sicCode || null,
-    sic_description: result.result.sicDescription || null,
-  }));
+  const dbRecords = results.map((result) => {
+    const record = {
+      payee_name: result.payeeName,
+      classification: result.result.classification,
+      confidence: result.result.confidence,
+      reasoning: result.result.reasoning,
+      processing_tier: result.result.processingTier,
+      processing_method: result.result.processingMethod || null,
+      matching_rules: result.result.matchingRules || null,
+      similarity_scores: result.result.similarityScores ? JSON.parse(JSON.stringify(result.result.similarityScores)) : null,
+      keyword_exclusion: result.result.keywordExclusion ? JSON.parse(JSON.stringify(result.result.keywordExclusion)) : null,
+      original_data: result.originalData ? JSON.parse(JSON.stringify(result.originalData)) : null,
+      row_index: result.rowIndex || null,
+      batch_id: batchId || null,
+      sic_code: result.result.sicCode || null,
+      sic_description: result.result.sicDescription || null,
+    };
+    
+    // Debug individual record SIC data
+    if (result.result.classification === 'Business') {
+      console.log(`[DB SERVICE] Business "${result.payeeName}" - SIC Code: ${record.sic_code}, Description: ${record.sic_description}`);
+    }
+    
+    return record;
+  });
 
   // Use upsert to handle conflicts based on unique constraint
   const { error } = await supabase
@@ -67,6 +84,7 @@ export const saveClassificationResults = async (
   }
 
   console.log(`[DB SERVICE] Successfully saved ${results.length} classification results with SIC codes`);
+  console.log(`[DB SERVICE] SIC Code Summary: ${sicCodeStats.resultsWithSicCode}/${sicCodeStats.businessResults} businesses have SIC codes`);
 };
 
 /**

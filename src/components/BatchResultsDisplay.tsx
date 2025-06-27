@@ -41,10 +41,25 @@ const BatchResultsDisplay = ({
     try {
       const csvData = exportDirectCSV(processingSummary);
       
+      // Add SIC information to CSV data
+      const enhancedRows = csvData.rows.map((row, index) => {
+        const result = batchResults[index];
+        if (result && result.result.classification === 'Business') {
+          return [
+            ...row,
+            result.result.sicCode || '',
+            result.result.sicDescription || ''
+          ];
+        }
+        return [...row, '', '']; // Empty SIC fields for individuals
+      });
+      
+      const enhancedHeaders = [...csvData.headers, 'SIC Code', 'SIC Description'];
+      
       const timestamp = new Date().toISOString().slice(0, 10);
       const csvContent = [
-        csvData.headers.join(','),
-        ...csvData.rows.map(row => 
+        enhancedHeaders.join(','),
+        ...enhancedRows.map(row => 
           row.map(cell => {
             const value = cell || '';
             return typeof value === 'string' && (value.includes(',') || value.includes('"')) 
@@ -64,9 +79,10 @@ const BatchResultsDisplay = ({
       link.click();
       document.body.removeChild(link);
       
+      const sicCount = batchResults.filter(r => r.result.sicCode).length;
       toast({
         title: "CSV Export Complete",
-        description: `Exported ${csvData.rows.length} rows successfully.`,
+        description: `Exported ${enhancedRows.length} rows with SIC codes (${sicCount} businesses classified).`,
       });
     } catch (error) {
       console.error("CSV export error:", error);
@@ -91,12 +107,23 @@ const BatchResultsDisplay = ({
     try {
       const csvData = exportDirectCSV(processingSummary);
       
-      // Convert to object format for Excel
-      const exportData = csvData.rows.map(row => {
+      // Convert to object format for Excel with SIC information
+      const exportData = csvData.rows.map((row, index) => {
         const obj: any = {};
-        csvData.headers.forEach((header, index) => {
-          obj[header] = row[index] || '';
+        csvData.headers.forEach((header, headerIndex) => {
+          obj[header] = row[headerIndex] || '';
         });
+        
+        // Add SIC information
+        const result = batchResults[index];
+        if (result && result.result.classification === 'Business') {
+          obj['SIC Code'] = result.result.sicCode || '';
+          obj['SIC Description'] = result.result.sicDescription || '';
+        } else {
+          obj['SIC Code'] = '';
+          obj['SIC Description'] = '';
+        }
+        
         return obj;
       });
       
@@ -110,9 +137,10 @@ const BatchResultsDisplay = ({
       
       XLSX.writeFile(workbook, filename);
       
+      const sicCount = batchResults.filter(r => r.result.sicCode).length;
       toast({
         title: "Excel Export Complete",
-        description: `Exported ${exportData.length} rows.`,
+        description: `Exported ${exportData.length} rows with SIC codes (${sicCount} businesses classified).`,
       });
     } catch (error) {
       console.error("Excel export error:", error);
@@ -137,10 +165,13 @@ const BatchResultsDisplay = ({
           <div className="text-center py-8 border rounded-md mb-4">
             <h3 className="text-lg font-medium mb-2">Results Ready</h3>
             <p className="text-muted-foreground mb-4">
-              Your classification results are ready. The CSV file should have downloaded automatically.
+              Your classification results are ready with SIC codes for businesses. The CSV file should have downloaded automatically.
             </p>
             <p className="text-sm text-muted-foreground">
               {batchResults.length} results processed successfully
+              {batchResults.filter(r => r.result.sicCode).length > 0 && 
+                ` • ${batchResults.filter(r => r.result.sicCode).length} businesses with SIC codes`
+              }
             </p>
           </div>
           
@@ -176,13 +207,13 @@ const BatchResultsDisplay = ({
           </div>
           
           <p className="text-xs text-muted-foreground mt-2">
-            CSV files are automatically downloaded when batch jobs complete. You can also manually download them here.
+            CSV and Excel files now include SIC codes and descriptions for business classifications.
           </p>
         </div>
       ) : (
         <div className="text-center py-8 border rounded-md">
           <p className="text-muted-foreground">
-            No batch results yet. Complete a batch job to get your CSV file.
+            No batch results yet. Complete a batch job to get your CSV file with SIC codes.
           </p>
         </div>
       )}

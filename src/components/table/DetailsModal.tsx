@@ -38,6 +38,22 @@ const DetailsModal = ({ selectedResult, onClose }: DetailsModalProps) => {
                 <span>{selectedResult.result.processingTier}</span>
               </div>
               
+              {selectedResult.result.sicCode && selectedResult.result.classification === 'Business' && (
+                <div>
+                  <h4 className="font-medium mb-2">SIC Classification:</h4>
+                  <div className="bg-blue-50 p-2 rounded border">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="outline" className="font-mono">
+                        {selectedResult.result.sicCode}
+                      </Badge>
+                    </div>
+                    {selectedResult.result.sicDescription && (
+                      <p className="text-sm text-gray-600">{selectedResult.result.sicDescription}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              
               <div>
                 <h4 className="font-medium mb-1">Reasoning:</h4>
                 <p className="text-sm">{selectedResult.result.reasoning}</p>

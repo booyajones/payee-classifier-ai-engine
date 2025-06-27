@@ -46,6 +46,22 @@ const TableCell = React.memo(({ result, column, onViewDetails }: TableCellProps)
             {result.result.reasoning}
           </div>
         );
+      case 'sicCode':
+        const sicCode = result.result.sicCode;
+        console.log('[TABLE CELL] SIC Code for result:', sicCode);
+        return sicCode ? (
+          <Badge variant="outline" className="font-mono">
+            {sicCode}
+          </Badge>
+        ) : '-';
+      case 'sicDescription':
+        const sicDescription = result.result.sicDescription;
+        console.log('[TABLE CELL] SIC Description for result:', sicDescription);
+        return sicDescription ? (
+          <div className="max-w-xs truncate" title={sicDescription}>
+            {sicDescription}
+          </div>
+        ) : '-';
       case 'keywordExclusion':
         const isExcluded = result.result.keywordExclusion?.isExcluded;
         console.log('[TABLE CELL] Keyword exclusion for result:', isExcluded, result.result.keywordExclusion);

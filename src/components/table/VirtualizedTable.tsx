@@ -18,6 +18,21 @@ interface VirtualizedTableProps {
 const ITEM_HEIGHT = 48; // Height of each row in pixels
 const MAX_HEIGHT = 600; // Maximum table height
 
+// Define enhanced columns that include SIC fields
+const getEnhancedColumns = (originalColumns: Array<{ key: string; label: string; isOriginal: boolean }>) => {
+  const classificationColumns = [
+    { key: 'classification', label: 'Classification', isOriginal: false },
+    { key: 'confidence', label: 'Confidence', isOriginal: false },
+    { key: 'sicCode', label: 'SIC Code', isOriginal: false },
+    { key: 'sicDescription', label: 'SIC Description', isOriginal: false },
+    { key: 'processingTier', label: 'Processing Tier', isOriginal: false },
+    { key: 'reasoning', label: 'Reasoning', isOriginal: false },
+    { key: 'details', label: 'Details', isOriginal: false }
+  ];
+  
+  return [...originalColumns, ...classificationColumns];
+};
+
 const VirtualizedTable = React.memo(({
   results,
   columns,
@@ -26,6 +41,8 @@ const VirtualizedTable = React.memo(({
   onSort,
   onViewDetails
 }: VirtualizedTableProps) => {
+  const enhancedColumns = useMemo(() => getEnhancedColumns(columns), [columns]);
+  
   const tableHeight = useMemo(() => {
     return Math.min(results.length * ITEM_HEIGHT, MAX_HEIGHT);
   }, [results.length]);
@@ -33,19 +50,19 @@ const VirtualizedTable = React.memo(({
   const Row = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => (
     <VirtualizedTableRow
       result={results[index]}
-      columns={columns}
+      columns={enhancedColumns}
       index={index}
       style={style}
       onViewDetails={onViewDetails}
     />
-  ), [results, columns, onViewDetails]);
+  ), [results, enhancedColumns, onViewDetails]);
 
   // For small datasets, render normally
   if (results.length < 100) {
     return (
       <Table>
         <ClassificationTableHeader 
-          columns={columns}
+          columns={enhancedColumns}
           sortField={sortField}
           sortDirection={sortDirection}
           onSort={onSort}
@@ -55,7 +72,7 @@ const VirtualizedTable = React.memo(({
             <VirtualizedTableRow
               key={`${result.id}-${index}`}
               result={result}
-              columns={columns}
+              columns={enhancedColumns}
               index={index}
               style={{}}
               onViewDetails={onViewDetails}
@@ -71,7 +88,7 @@ const VirtualizedTable = React.memo(({
     <div>
       <Table>
         <ClassificationTableHeader 
-          columns={columns}
+          columns={enhancedColumns}
           sortField={sortField}
           sortDirection={sortDirection}
           onSort={onSort}
