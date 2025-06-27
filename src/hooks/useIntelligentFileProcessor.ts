@@ -46,15 +46,15 @@ export const useIntelligentFileProcessor = () => {
   }, []);
 
   const cleanAndValidateData = useCallback((data: any[], columnName: string) => {
-    // Auto-fix common data issues
+    // Enhanced data cleaning with comprehensive standardization
     const cleanedData = data.map((row, index) => {
       const cleanedRow = { ...row };
       
-      // Clean the payee name
+      // Apply basic cleaning to the payee name (this will be enhanced by standardization)
       if (cleanedRow[columnName]) {
         let payeeName = String(cleanedRow[columnName]).trim();
         
-        // Remove common prefixes/suffixes
+        // Remove common prefixes/suffixes (basic cleaning)
         payeeName = payeeName.replace(/^(payment to|paid to|check to)\s+/i, '');
         payeeName = payeeName.replace(/\s+(payment|check|invoice)$/i, '');
         
@@ -74,7 +74,7 @@ export const useIntelligentFileProcessor = () => {
     setIsProcessing(true);
     
     try {
-      console.log(`[INTELLIGENT PROCESSOR] Processing file: ${file.name}`);
+      console.log(`[INTELLIGENT PROCESSOR] Processing file with comprehensive standardization: ${file.name}`);
 
       // Step 1: Validate file
       const fileValidation = validateFile(file);
@@ -124,14 +124,24 @@ export const useIntelligentFileProcessor = () => {
         };
       }
 
-      // Step 6: Create row mapping
+      // Step 6: Create row mapping WITH COMPREHENSIVE STANDARDIZATION
+      console.log(`[INTELLIGENT PROCESSOR] Creating payee mappings with comprehensive data standardization...`);
       const payeeRowData = createPayeeRowMapping(cleanedData, detectedColumn);
 
-      console.log(`[INTELLIGENT PROCESSOR] Successfully processed: ${payeeRowData.uniquePayeeNames.length} unique payees from ${cleanedData.length} rows`);
+      // Enhanced logging with standardization stats
+      const { standardizationStats } = payeeRowData;
+      console.log(`[INTELLIGENT PROCESSOR] Successfully processed with standardization:`, {
+        totalRows: cleanedData.length,
+        uniquePayees: payeeRowData.uniquePayeeNames.length,
+        namesImproved: standardizationStats.changesDetected,
+        improvementRate: `${(standardizationStats.changesDetected / standardizationStats.totalProcessed * 100).toFixed(1)}%`,
+        avgCleaningSteps: standardizationStats.averageStepsPerName.toFixed(1),
+        commonSteps: standardizationStats.mostCommonSteps.slice(0, 3).map(s => s.step)
+      });
 
       toast({
-        title: "File Processed Successfully",
-        description: `Auto-detected "${detectedColumn}" column with ${payeeRowData.uniquePayeeNames.length} unique payees.`,
+        title: "File Processed with Enhanced Standardization",
+        description: `Auto-detected "${detectedColumn}" column. Processed ${payeeRowData.uniquePayeeNames.length} unique payees with ${standardizationStats.changesDetected} names improved through standardization (${(standardizationStats.changesDetected / standardizationStats.totalProcessed * 100).toFixed(1)}% improvement rate).`,
       });
 
       return {
