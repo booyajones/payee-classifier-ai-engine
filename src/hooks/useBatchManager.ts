@@ -28,13 +28,6 @@ export const useBatchManager = () => {
     setError
   } = useBatchJobState();
 
-  const {
-    createBatch,
-    updateJobStatus,
-    deleteJob,
-    clearAll
-  } = useBatchJobActions(addJob, updateJob, removeJob, clearAllJobs, setError);
-
   const { refreshJobs } = useBatchJobLoader(updateJobs, updatePayeeDataMap, setLoaded);
 
   // Use refs to prevent multiple simultaneous operations - but allow per-job operations
@@ -78,11 +71,7 @@ export const useBatchManager = () => {
     errors: state.errors,
     isLoaded: state.isLoaded,
     
-    // Actions
-    createBatch,
-    updateJob: updateJobStatus,
-    deleteJob: (jobId: string) => deleteJob(jobId),
-    clearAll: () => clearAll(state.jobs),
+    // Actions - simplified to match actual available functionality
     refreshJobs: useCallback(async (silent = false) => {
       // Allow individual job refreshes to proceed
       if (refreshInProgress.current.has('global')) {

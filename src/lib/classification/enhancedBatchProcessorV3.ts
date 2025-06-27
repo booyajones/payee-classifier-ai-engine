@@ -2,7 +2,7 @@
 import { PayeeClassification, BatchProcessingResult, ClassificationConfig } from '../types';
 import { enhancedClassifyPayeeWithAI } from '../openai/enhancedClassification';
 import { classifyPayeeWithAI } from '../openai/singleClassification';
-import { keywordExclusionService } from './enhancedKeywordExclusion';
+import { checkEnhancedKeywordExclusion } from './enhancedKeywordExclusion';
 import { saveClassificationResults } from '../database/classificationService';
 
 /**
@@ -32,7 +32,7 @@ export async function enhancedProcessBatchV3(
       const classification = await enhancedClassifyPayeeWithAI(payeeName);
       
       // Apply keyword exclusion
-      const keywordResult = await keywordExclusionService.checkPayeeExclusion(payeeName);
+      const keywordResult = await checkEnhancedKeywordExclusion(payeeName);
       
       const result: PayeeClassification = {
         id: `${Date.now()}-${i}`,
@@ -69,8 +69,7 @@ export async function enhancedProcessBatchV3(
     results,
     successCount,
     failureCount,
-    originalFileData: originalFileData || [],
-    errors
+    originalFileData: originalFileData || []
   };
 
   // CRITICAL: Save all results to database immediately after processing
@@ -81,7 +80,6 @@ export async function enhancedProcessBatchV3(
   } catch (error) {
     console.error(`[ENHANCED BATCH V3] ERROR: Failed to save results to database:`, error);
     // Don't throw here - we still want to return the results even if database save fails
-    errors.push(`Database save failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 
   console.log(`[ENHANCED BATCH V3] Batch processing complete: ${successCount} success, ${failureCount} failures`);
@@ -89,3 +87,6 @@ export async function enhancedProcessBatchV3(
 
   return batchResult;
 }
+
+// Export the function that was missing from other files
+export { exportResultsWithOriginalDataV3 } from './batchExporter';

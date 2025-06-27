@@ -65,12 +65,12 @@ const BatchJobManager = React.memo(({
 
   // Auto-download CSV when job completes
   const handleJobCompleteWithAutoDownload = useMemo(() => 
-    (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => {
+    async (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => {
       console.log(`[BATCH MANAGER] Job ${jobId} completed, auto-downloading CSV`);
       
       try {
-        // Auto-download CSV immediately
-        const csvData = exportDirectCSV(summary);
+        // Auto-download CSV immediately - await the promise
+        const csvData = await exportDirectCSV(summary);
         
         const timestamp = new Date().toISOString().slice(0, 10);
         const csvContent = [

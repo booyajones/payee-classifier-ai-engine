@@ -23,76 +23,37 @@ export const useBatchJobActions = ({
   onJobComplete
 }: UseBatchJobActionsProps) => {
   const { toast } = useToast();
-  const { downloadResults } = useBatchJobDownload();
-  const { refreshJob, refreshingJobs, pollingStates } = useBatchJobRefresh();
-  const { cancelJob } = useBatchJobCancellation();
+  const { handleDownloadResults } = useBatchJobDownload({
+    payeeRowDataMap,
+    onJobComplete
+  });
+  const { refreshingJobs, handleRefreshJob, isRefreshRetrying } = useBatchJobRefresh(onJobUpdate);
+  const { handleCancelJob } = useBatchJobCancellation(onJobUpdate);
 
-  const handleRefreshJob = useCallback(async (jobId: string) => {
+  const wrappedHandleRefreshJob = useCallback(async (jobId: string) => {
     console.log(`[BATCH JOB ACTIONS] Refreshing job ${jobId}`);
-    await refreshJob(jobId, onJobUpdate, async (results, summary, completedJobId) => {
-      console.log(`[BATCH JOB ACTIONS] Job ${completedJobId} completed with ${results.length} results`);
-      
-      // CRITICAL: Save all results to database when job completes
-      try {
-        console.log(`[BATCH JOB ACTIONS] Saving ${results.length} classification results to database`);
-        await saveClassificationResults(results, completedJobId);
-        console.log(`[BATCH JOB ACTIONS] Successfully saved results to database for job ${completedJobId}`);
-        
-        const sicCount = results.filter(r => r.result.sicCode).length;
-        const businessCount = results.filter(r => r.result.classification === 'Business').length;
-        console.log(`[BATCH JOB ACTIONS] SIC codes saved: ${sicCount} out of ${businessCount} businesses`);
-        
-        toast({
-          title: "Results Saved",
-          description: `Saved ${results.length} results to database with ${sicCount} SIC codes`,
-        });
-      } catch (error) {
-        console.error(`[BATCH JOB ACTIONS] ERROR: Failed to save results to database:`, error);
-        toast({
-          title: "Database Save Error",
-          description: `Failed to save results: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          variant: "destructive"
-        });
-      }
-      
-      // Call the original completion handler
-      onJobComplete(results, summary, completedJobId);
-    });
-  }, [refreshJob, onJobUpdate, onJobComplete, toast]);
+    await handleRefreshJob(jobId, false);
+  }, [handleRefreshJob]);
 
-  const handleDownloadResults = useCallback(async (job: BatchJob) => {
+  const wrappedHandleDownloadResults = useCallback(async (job: BatchJob) => {
     const payeeData = payeeRowDataMap[job.id];
     if (!payeeData) {
       console.error(`[BATCH JOB ACTIONS] No payee data for job ${job.id}`);
       return;
     }
 
-    await downloadResults(job, payeeData, async (results, summary, jobId) => {
-      console.log(`[BATCH JOB ACTIONS] Download completed for job ${jobId} with ${results.length} results`);
-      
-      // CRITICAL: Save results to database during download if not already saved
-      try {
-        console.log(`[BATCH JOB ACTIONS] Ensuring results are saved to database for job ${jobId}`);
-        await saveClassificationResults(results, jobId);
-        console.log(`[BATCH JOB ACTIONS] Results saved to database for job ${jobId}`);
-      } catch (error) {
-        console.error(`[BATCH JOB ACTIONS] Warning: Failed to save results during download:`, error);
-        // Don't block download for database save failures
-      }
-      
-      onJobComplete(results, summary, jobId);
-    });
-  }, [downloadResults, payeeRowDataMap, onJobComplete]);
+    await handleDownloadResults(job);
+  }, [handleDownloadResults, payeeRowDataMap]);
 
-  const handleCancelJob = useCallback(async (jobId: string) => {
-    await cancelJob(jobId);
-  }, [cancelJob]);
+  const wrappedHandleCancelJob = useCallback(async (jobId: string) => {
+    await handleCancelJob(jobId);
+  }, [handleCancelJob]);
 
   return {
     refreshingJobs,
-    pollingStates,
-    handleRefreshJob,
-    handleDownloadResults,
-    handleCancelJob
+    pollingStates: new Map(), // Add empty polling states for compatibility
+    handleRefreshJob: wrappedHandleRefreshJob,
+    handleDownloadResults: wrappedHandleDownloadResults,
+    handleCancelJob: wrappedHandleCancelJob
   };
 };
