@@ -1,4 +1,3 @@
-
 import { toast } from "@/hooks/use-toast";
 
 export interface AppError {
@@ -226,17 +225,27 @@ export const handleError = (error: unknown, context?: string): AppError => {
 export const showErrorToast = (error: AppError, context?: string) => {
   const title = context ? `${context} Error` : 'Error';
   
+  // Prevent duplicate toasts by checking message content
+  const isDuplicateMessage = error.message.length < 10 || error.message === 'An unexpected error occurred.';
+  
+  if (isDuplicateMessage) {
+    console.warn('[ERROR HANDLER] Skipping generic/duplicate error toast:', error.message);
+    return;
+  }
+  
   toast({
     title,
     description: error.message,
     variant: "destructive",
+    duration: 6000, // Show for 6 seconds instead of default
   });
 
   // Log detailed error for debugging
   console.error(`[${error.code}] ${error.message}`, {
     details: error.details,
     context: error.context,
-    timestamp: error.timestamp
+    timestamp: error.timestamp,
+    retryable: error.retryable
   });
 };
 
@@ -248,16 +257,23 @@ export const showRetryableErrorToast = (
   if (error.retryable) {
     toast({
       title: `${context || 'Operation'} Failed`,
-      description: `${error.message} Click retry to try again.`,
+      description: `${error.message} This error can be retried.`,
       variant: "destructive",
+      duration: 8000, // Longer duration for retryable errors
     });
 
-    // For now, we'll just show the error without the retry button
-    // The user can manually retry through the UI
     console.log('[RETRY] Retryable error occurred:', error);
   } else {
     showErrorToast(error, context);
   }
+};
+
+export const showSuccessToast = (message: string, title?: string) => {
+  toast({
+    title: title || 'Success',
+    description: message,
+    duration: 4000,
+  });
 };
 
 // Utility function to safely execute database operations with error handling

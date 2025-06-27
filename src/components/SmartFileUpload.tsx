@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileCheck } from 'lucide-react';
 import { useBatchManager, emitBatchJobUpdate } from '@/hooks/useBatchManager';
@@ -14,7 +15,8 @@ import UploadSuccessDisplay from './upload/UploadSuccessDisplay';
 import FileCorruptionDetector from './upload/FileCorruptionDetector';
 import { Badge } from '@/components/ui/badge';
 import PerformanceMonitoringDashboard from './performance/PerformanceMonitoringDashboard';
-import { Loader2, Database } from 'lucide-react';
+import { Loader2, Database, AlertTriangle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface SmartFileUploadProps {
   onBatchJobCreated: (batchJob: BatchJob | null, payeeRowData: PayeeRowData) => void;
@@ -22,7 +24,8 @@ interface SmartFileUploadProps {
 }
 
 const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileUploadProps) => {
-  const { createBatch } = useBatchManager();
+  const { createBatch, hasError, getError } = useBatchManager();
+  const { toast } = useToast();
   
   const {
     uploadState,
@@ -60,7 +63,9 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
     try {
       const jobDescription = `Smart Upload: ${fileName} (${payeeRowData.uniquePayeeNames.length} unique payees)`;
 
-      // Create batch job (OpenAI part)
+      console.log(`[SMART UPLOAD] Starting batch creation for ${payeeRowData.uniquePayeeNames.length} payees`);
+
+      // Create batch job with enhanced error handling
       const job = await createBatch(payeeRowData, {
         description: jobDescription,
         onJobUpdate: (updatedJob) => {
@@ -78,14 +83,14 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
           setUploadState('complete');
           completeProgress(UPLOAD_ID, `Successfully processed ${results.length} payees!`);
           onProcessingComplete(results, summary, jobId);
-        }
+        },
+        silent: false // We want to see all errors during upload
       });
 
       if (job) {
         // OpenAI batch created successfully
-        updateProgress(UPLOAD_ID, 'Batch job created! Optimizing data storage...', 70);
+        updateProgress(UPLOAD_ID, 'Batch job created successfully!', 70);
         
-        // Notify parent immediately - the important part (OpenAI batch) worked
         console.log(`[SMART UPLOAD] OpenAI batch created successfully: ${job.id}`);
         onBatchJobCreated(job, payeeRowData);
 
@@ -93,34 +98,98 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
         emitBatchJobUpdate();
 
         setUploadState('processing');
-        updateProgress(UPLOAD_ID, 'OpenAI batch processing started! Background data optimization in progress...', 80, 'Batch processing active', job.id);
+        updateProgress(
+          UPLOAD_ID, 
+          'OpenAI batch processing started! Processing in background...', 
+          80, 
+          'Batch processing active', 
+          job.id
+        );
+
+        // Show success message
+        toast({
+          title: "Batch Job Created",
+          description: `Processing ${payeeRowData.uniquePayeeNames.length} payees. You can monitor progress in the Batch Jobs tab.`,
+        });
 
       } else {
-        // Local processing (large files)
-        console.log(`[SMART UPLOAD] Using local processing for large file`);
-        onBatchJobCreated(null, payeeRowData);
+        // Check if there was a specific error from the batch manager
+        const batchError = getError('create');
+        const errorDetails = batchError || 'Unknown error occurred during batch creation';
         
-        setUploadState('complete');
-        completeProgress(UPLOAD_ID, 'Processing completed using enhanced local classification!');
+        console.error('[SMART UPLOAD] Batch creation failed:', errorDetails);
+        
+        // Handle large files with local processing fallback
+        if (payeeRowData.uniquePayeeNames.length > 45000) {
+          console.log(`[SMART UPLOAD] Large file detected (${payeeRowData.uniquePayeeNames.length} payees), attempting local processing fallback`);
+          
+          updateProgress(UPLOAD_ID, 'Large file detected, switching to local processing...', 40);
+          
+          // Notify parent for local processing
+          onBatchJobCreated(null, payeeRowData);
+          
+          setUploadState('complete');
+          completeProgress(UPLOAD_ID, 'Processing completed using enhanced local classification!');
+          
+          toast({
+            title: "Local Processing",
+            description: `Large file processed locally with ${payeeRowData.uniquePayeeNames.length} payees.`,
+          });
+          
+          return;
+        }
+        
+        // Show specific error based on the type
+        setUploadState('error');
+        
+        if (batchError?.includes('quota') || batchError?.includes('rate limit')) {
+          updateProgress(UPLOAD_ID, '❌ OpenAI Quota Exceeded', 0, 'API quota limit reached - check your OpenAI usage');
+          toast({
+            title: "OpenAI Quota Exceeded",
+            description: "Your OpenAI API quota has been exceeded. Please check your usage limits and try again later.",
+            variant: "destructive"
+          });
+        } else if (batchError?.includes('401') || batchError?.includes('authentication') || batchError?.includes('api key')) {
+          updateProgress(UPLOAD_ID, '❌ Authentication Failed', 0, 'Invalid OpenAI API key - check your settings');
+          toast({
+            title: "Authentication Failed",
+            description: "OpenAI API key is invalid or missing. Please check your API key in the settings.",
+            variant: "destructive"
+          });
+        } else if (batchError?.includes('network') || batchError?.includes('connection')) {
+          updateProgress(UPLOAD_ID, '❌ Network Error', 0, 'Connection to OpenAI failed - check your internet connection');
+          toast({
+            title: "Network Error",
+            description: "Failed to connect to OpenAI API. Please check your internet connection and try again.",
+            variant: "destructive"
+          });
+        } else {
+          updateProgress(UPLOAD_ID, '❌ Batch Creation Failed', 0, errorDetails);
+          toast({
+            title: "Batch Creation Failed",
+            description: errorDetails,
+            variant: "destructive"
+          });
+        }
       }
 
     } catch (error) {
-      console.error('[SMART UPLOAD] Processing failed:', error);
+      console.error('[SMART UPLOAD] Unexpected error during processing:', error);
       setUploadState('error');
       
-      // Better error messaging
-      const isOpenAIError = error instanceof Error && 
-        (error.message.includes('OpenAI') || error.message.includes('API') || error.message.includes('quota'));
+      const errorMessage = error instanceof Error ? error.message : 'Unknown processing error';
+      updateProgress(UPLOAD_ID, '❌ Processing Failed', 0, errorMessage);
       
-      if (isOpenAIError) {
-        updateProgress(UPLOAD_ID, '❌ OpenAI Batch Creation Failed', 0, 'OpenAI API error - check quota and API key');
-      } else {
-        updateProgress(UPLOAD_ID, '❌ Processing Failed', 0, error instanceof Error ? error.message : 'Unknown processing error');
-      }
+      toast({
+        title: "Processing Failed",
+        description: `An unexpected error occurred: ${errorMessage}`,
+        variant: "destructive"
+      });
     }
   };
 
   const isProcessing = uploadState === 'processing';
+  const hasGlobalError = hasError();
 
   return (
     <Card>
@@ -131,6 +200,9 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
           <Badge variant="outline" className="ml-auto">
             Enhanced Performance
           </Badge>
+          {hasGlobalError && (
+            <AlertTriangle className="h-4 w-4 text-destructive ml-2" />
+          )}
         </CardTitle>
         <CardDescription>
           Upload your payee file and select the column containing payee names. 
@@ -146,6 +218,17 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
           onChange={handleFileInputChange}
           disabled={isProcessing}
         />
+
+        {/* Show global error state if present */}
+        {hasGlobalError && (
+          <div className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">
+            <div className="flex items-center gap-1 mb-1">
+              <AlertTriangle className="h-3 w-3" />
+              System Alert
+            </div>
+            <p>There are active errors in the batch processing system. Check the error messages below.</p>
+          </div>
+        )}
 
         {uploadState === 'idle' && (
           <FileSelectionArea 
@@ -192,8 +275,9 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
                 <Loader2 className="h-3 w-3 animate-spin" />
                 Enhanced Processing Active
               </div>
-              <p>✓ OpenAI batch job created and processing</p>
-              <p>✓ Background data optimization in progress</p>
+              <p>✓ OpenAI batch job creation in progress</p>
+              <p>✓ Real-time error detection and handling</p>
+              <p>✓ Automatic fallback for large files (45k+ payees)</p>
               <p>✓ You can continue working - processing happens in background</p>
             </div>
           </>
@@ -211,21 +295,22 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
           <UploadErrorDisplay
             error={errorMessage}
             onRetry={resetUpload}
+            onReset={resetUpload}
             context="Smart File Upload"
           />
         )}
 
-        {/* Enhanced optimization info */}
+        {/* Enhanced system status info */}
         <div className="text-xs text-muted-foreground bg-green-50 p-2 rounded border border-green-200">
           <div className="flex items-center gap-1 text-green-700 font-medium mb-1">
             <Database className="h-3 w-3" />
             Smart Processing Enhancements
           </div>
-          <p>🚀 Instant OpenAI batch creation (no waiting for data saves)</p>
-          <p>📊 Background data optimization with intelligent chunking</p>
-          <p>🔧 Automatic error recovery and retry mechanisms</p>
-          <p>⚡ Real-time progress tracking and status updates</p>
-          <p>🎯 Separation of batch processing from data storage concerns</p>
+          <p>🚀 Instant OpenAI batch creation with comprehensive error handling</p>
+          <p>📊 Intelligent error detection (quota, auth, network issues)</p>
+          <p>🔧 Automatic fallback processing for large files (45k+ payees)</p>
+          <p>⚡ Real-time progress tracking and detailed status updates</p>
+          <p>🎯 Enhanced user feedback with actionable error messages</p>
         </div>
       </CardContent>
     </Card>
