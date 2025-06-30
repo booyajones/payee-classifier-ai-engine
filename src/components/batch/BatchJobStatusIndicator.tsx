@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Clock, Activity, CheckCircle, AlertCircle, XCircle, Loader2 } from 'lucide-react';
+import { Clock, Activity, CheckCircle, AlertCircle, XCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -10,16 +10,20 @@ interface BatchJobStatusIndicatorProps {
   isPolling?: boolean;
   isRefreshing?: boolean;
   lastChecked?: Date;
+  isStalled?: boolean;
 }
 
 const BatchJobStatusIndicator = ({ 
   job, 
   isPolling = false, 
   isRefreshing = false,
-  lastChecked 
+  lastChecked,
+  isStalled = false
 }: BatchJobStatusIndicatorProps) => {
   const getStatusIcon = () => {
     if (isRefreshing) return <Loader2 className="h-3 w-3 animate-spin" />;
+    
+    if (isStalled) return <AlertTriangle className="h-3 w-3" />;
     
     switch (job.status) {
       case 'validating':
@@ -41,6 +45,8 @@ const BatchJobStatusIndicator = ({
   };
 
   const getStatusVariant = () => {
+    if (isStalled) return 'destructive';
+    
     switch (job.status) {
       case 'completed':
         return 'default';
@@ -59,6 +65,8 @@ const BatchJobStatusIndicator = ({
   const getStatusText = () => {
     if (isRefreshing) return 'Refreshing...';
     
+    if (isStalled) return 'Stalled - No Progress';
+    
     let statusText = job.status.charAt(0).toUpperCase() + job.status.slice(1);
     
     if (job.status === 'in_progress' && job.request_counts.total > 0) {
@@ -69,8 +77,13 @@ const BatchJobStatusIndicator = ({
     return statusText;
   };
 
+  const getElapsedTime = () => {
+    const createdTime = new Date(job.created_at * 1000);
+    return formatDistanceToNow(createdTime, { addSuffix: true });
+  };
+
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 flex-wrap">
       <Badge variant={getStatusVariant()} className="flex items-center gap-1">
         {getStatusIcon()}
         {getStatusText()}
@@ -83,9 +96,20 @@ const BatchJobStatusIndicator = ({
         </Badge>
       )}
       
+      {isStalled && (
+        <Badge variant="destructive" className="text-xs">
+          <AlertTriangle className="h-2 w-2 mr-1" />
+          Needs Action
+        </Badge>
+      )}
+      
+      <span className="text-xs text-muted-foreground">
+        Created {getElapsedTime()}
+      </span>
+      
       {lastChecked && (
         <span className="text-xs text-muted-foreground">
-          Last checked {formatDistanceToNow(lastChecked)} ago
+          • Last checked {formatDistanceToNow(lastChecked)} ago
         </span>
       )}
     </div>

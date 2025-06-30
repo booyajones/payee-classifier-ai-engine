@@ -81,7 +81,7 @@ export const useBatchJobActions = ({
     }
   };
 
-  const { refreshingJobs, handleRefreshJob: baseHandleRefreshJob } = useBatchJobRefresh(safeOnJobUpdate);
+  const { refreshingJobs, handleRefreshJob: baseHandleRefreshJob, detectStalledJob } = useBatchJobRefresh(safeOnJobUpdate);
   const { pollingStates, refreshSpecificJob } = useBatchJobPolling(jobs, safeOnJobUpdate);
   const { handleCancelJob } = useBatchJobCancellation(safeOnJobUpdate);
   
@@ -90,7 +90,7 @@ export const useBatchJobActions = ({
     onJobComplete: safeOnJobComplete
   });
 
-  // Enhanced manual refresh with comprehensive validation and error handling
+  // Enhanced manual refresh with stall detection
   const handleRefreshJob = async (jobId: string, silent: boolean = false) => {
     try {
       console.log(`[BATCH ACTIONS] Starting enhanced refresh for job ${jobId}${silent ? ' (silent)' : ''}`);
@@ -108,6 +108,17 @@ export const useBatchJobActions = ({
       const job = jobs.find(j => j.id === jobId);
       if (!job) {
         console.warn(`[BATCH ACTIONS] Job ${jobId} not found in current jobs list, proceeding with refresh anyway`);
+      } else {
+        // Pre-check for stalled jobs before refresh
+        if (detectStalledJob(job)) {
+          console.warn(`[BATCH ACTIONS] Job ${jobId} appears stalled before refresh`);
+          toast({
+            title: "Potentially Stalled Job",
+            description: `Job ${jobId.substring(0, 8)}... may be stalled. Refreshing to verify status...`,
+            variant: "destructive",
+            duration: 6000,
+          });
+        }
       }
       
       // Call refresh with proper error handling
@@ -182,7 +193,7 @@ export const useBatchJobActions = ({
     }
   };
 
-  // Enhanced cancel job with validation
+  // Enhanced cancel job with validation and stall handling
   const handleCancelJobWithValidation = async (jobId: string) => {
     try {
       console.log(`[BATCH ACTIONS] Starting enhanced cancellation for job ${jobId}`);
@@ -200,6 +211,16 @@ export const useBatchJobActions = ({
       
       if (!['validating', 'in_progress', 'finalizing'].includes(job.status)) {
         throw new Error(`Job ${jobId} cannot be cancelled in current state: ${job.status}`);
+      }
+
+      // Special handling for stalled jobs
+      if (detectStalledJob(job)) {
+        console.log(`[BATCH ACTIONS] Cancelling stalled job ${jobId}`);
+        toast({
+          title: "Cancelling Stalled Job",
+          description: `Cancelling job ${jobId.substring(0, 8)}... that appears to be stalled. You can retry with a new batch.`,
+          duration: 6000,
+        });
       }
       
       await handleCancelJob(jobId);
@@ -221,6 +242,23 @@ export const useBatchJobActions = ({
     }
   };
 
+  // New function to provide stall recovery suggestions
+  const getStalledJobActions = (job: BatchJob) => {
+    if (!detectStalledJob(job)) return null;
+    
+    return {
+      isStalled: true,
+      suggestions: [
+        'Try refreshing the job status first',
+        'If still stalled, cancel and create a new batch job',
+        'Check your OpenAI API key and quota status',
+        'Consider using single classification as an alternative'
+      ],
+      canCancel: ['validating', 'in_progress', 'finalizing'].includes(job.status),
+      payeeCount: payeeRowDataMap[job.id]?.uniquePayeeNames?.length || 0
+    };
+  };
+
   return {
     // State
     refreshingJobs,
@@ -229,6 +267,10 @@ export const useBatchJobActions = ({
     // Enhanced actions with comprehensive error handling
     handleRefreshJob,
     handleDownloadResults,
-    handleCancelJob: handleCancelJobWithValidation
+    handleCancelJob: handleCancelJobWithValidation,
+    
+    // New stall detection utilities
+    getStalledJobActions,
+    detectStalledJob
   };
 };

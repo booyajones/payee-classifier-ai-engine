@@ -12,6 +12,7 @@ interface BatchJobContainerProps {
   payeeRowDataMap: Record<string, PayeeRowData>;
   refreshingJobs: Set<string>;
   pollingStates: Record<string, any>;
+  stalledJobActions?: Record<string, any>;
   onRefresh: (jobId: string, silent?: boolean) => Promise<void>;
   onDownload: (job: BatchJob) => Promise<void>;
   onCancel: (jobId: string) => void;
@@ -23,6 +24,7 @@ const BatchJobContainer = ({
   payeeRowDataMap,
   refreshingJobs,
   pollingStates,
+  stalledJobActions = {},
   onRefresh,
   onDownload,
   onCancel,
@@ -49,6 +51,8 @@ const BatchJobContainer = ({
     ['validating', 'in_progress', 'finalizing'].includes(job.status)
   );
 
+  const stalledJobs = jobs.filter(job => stalledJobActions[job.id]?.isStalled);
+
   if (jobs.length === 0) {
     return (
       <Card>
@@ -67,11 +71,16 @@ const BatchJobContainer = ({
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <h3 className="text-lg font-semibold">Batch Jobs ({jobs.length})</h3>
-          {activeJobs.length > 0 && (
-            <p className="text-sm text-muted-foreground">
-              {activeJobs.length} active job{activeJobs.length !== 1 ? 's' : ''} running
-            </p>
-          )}
+          <div className="flex gap-4 text-sm text-muted-foreground">
+            {activeJobs.length > 0 && (
+              <span>{activeJobs.length} active job{activeJobs.length !== 1 ? 's' : ''}</span>
+            )}
+            {stalledJobs.length > 0 && (
+              <span className="text-yellow-600 font-medium">
+                {stalledJobs.length} stalled job{stalledJobs.length !== 1 ? 's' : ''} ⚠️
+              </span>
+            )}
+          </div>
         </div>
         <Button
           variant="outline"
@@ -84,11 +93,23 @@ const BatchJobContainer = ({
         </Button>
       </div>
 
+      {stalledJobs.length > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 bg-yellow-500 rounded-full animate-pulse"></div>
+            <p className="text-sm text-yellow-800 font-medium">
+              {stalledJobs.length} job{stalledJobs.length !== 1 ? 's' : ''} may be stalled and need attention
+            </p>
+          </div>
+        </div>
+      )}
+
       <BatchJobList
         jobs={jobs}
         payeeRowDataMap={payeeRowDataMap}
         refreshingJobs={refreshingJobs}
         pollingStates={pollingStates}
+        stalledJobActions={stalledJobActions}
         onRefresh={onRefresh}
         onDownload={onDownload}
         onCancel={onCancel}
