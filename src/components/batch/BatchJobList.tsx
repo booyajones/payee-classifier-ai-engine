@@ -10,6 +10,7 @@ interface BatchJobListProps {
   payeeRowDataMap: Record<string, PayeeRowData>;
   refreshingJobs: Set<string>;
   pollingStates: Record<string, { isPolling: boolean }>;
+  stalledJobActions?: Record<string, any>;
   onRefresh: (jobId: string) => Promise<void>;
   onDownload: (job: BatchJob) => Promise<void>;
   onCancel: (jobId: string) => void;
@@ -21,6 +22,7 @@ const BatchJobList = ({
   payeeRowDataMap,
   refreshingJobs,
   pollingStates,
+  stalledJobActions = {},
   onRefresh,
   onDownload,
   onCancel,
@@ -43,6 +45,7 @@ const BatchJobList = ({
         const isRefreshing = refreshingJobs.has(job.id);
         const isPolling = pollingStates[job.id]?.isPolling || false;
         const pollingState = pollingStates[job.id];
+        const stalledJobAction = stalledJobActions[job.id];
         
         // Check if job is effectively complete (completed OR 100% done in finalizing)
         const isEffectivelyComplete = job.status === 'completed' || 
@@ -58,6 +61,7 @@ const BatchJobList = ({
               isRefreshing={isRefreshing}
               isPolling={isPolling}
               pollingState={pollingState}
+              stalledJobActions={stalledJobAction}
               onRefresh={() => onRefresh(job.id)}
               onCancel={() => onCancel(job.id)}
               onDelete={() => onJobDelete(job.id)}
