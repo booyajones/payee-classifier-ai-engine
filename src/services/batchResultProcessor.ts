@@ -19,7 +19,6 @@ export function processBatchResults(
   for (let i = 0; i < rawResults.length; i++) {
     const rawResult = rawResults[i];
     const payeeName = uniquePayeeNames[i];
-    const originalData = payeeData.originalFileData?.[i] || null;
 
     try {
       // Parse the classification result from OpenAI
@@ -75,7 +74,7 @@ export function processBatchResults(
           }
         },
         timestamp: new Date(),
-        originalData,
+        originalData: null, // Will be set during mapping
         rowIndex: i
       };
 
@@ -103,7 +102,7 @@ export function processBatchResults(
           }
         },
         timestamp: new Date(),
-        originalData,
+        originalData: null, // Will be set during mapping
         rowIndex: i
       };
 
@@ -112,17 +111,18 @@ export function processBatchResults(
     }
   }
 
-  // Create summary with enhanced SIC statistics
+  // Create summary - NOTE: This is for unique payees, not original rows
   const businessCount = finalClassifications.filter(r => r.result.classification === 'Business').length;
   const summary: BatchProcessingResult = {
-    results: finalClassifications,
+    results: finalClassifications, // These are unique payee results
     successCount,
     failureCount,
     originalFileData: payeeData.originalFileData || []
   };
 
   console.log(`[BATCH PROCESSOR] Processing complete:`, {
-    total: finalClassifications.length,
+    uniquePayees: finalClassifications.length,
+    originalRows: payeeData.originalFileData?.length || 0,
     success: successCount,
     failure: failureCount,
     businesses: businessCount,

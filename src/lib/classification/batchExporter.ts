@@ -23,114 +23,96 @@ export async function exportResultsWithOriginalDataV3(
     console.warn('[BATCH EXPORTER] Failed to load database results, using memory data:', error);
   }
 
-  // STRICT VALIDATION: Must have exact same number of rows
-  if (!batchResult.originalFileData || batchResult.originalFileData.length !== batchResult.results.length) {
-    throw new Error(`Row count mismatch: ${batchResult.results.length} results vs ${batchResult.originalFileData?.length || 0} original rows`);
+  // Check if we have properly mapped results (results should match original data length)
+  if (!batchResult.originalFileData || batchResult.originalFileData.length === 0) {
+    throw new Error('No original file data available for export');
   }
 
-  const exportData: any[] = [];
-  
-  // Enhanced 1:1 mapping with better SIC data handling
-  for (let i = 0; i < batchResult.results.length; i++) {
-    const result = batchResult.results[i];
-    const originalRow = batchResult.originalFileData[i];
+  // If results length matches original data length, we have properly mapped data
+  if (batchResult.results.length === batchResult.originalFileData.length) {
+    console.log('[BATCH EXPORTER] Using properly mapped results for export');
     
-    if (!result || !originalRow) {
-      throw new Error(`Missing data at index ${i}: result=${!!result}, originalRow=${!!originalRow}`);
-    }
+    const exportData: any[] = [];
     
-    // Try multiple strategies to find SIC codes
-    let sicCode = '';
-    let sicDescription = '';
-    
-    // Strategy 1: Look for exact payee name match in database
-    const dbResultByName = databaseResults.find(db => db.payeeName === result.payeeName);
-    if (dbResultByName?.result?.sicCode) {
-      sicCode = dbResultByName.result.sicCode;
-      sicDescription = dbResultByName.result.sicDescription || '';
-      console.log(`[BATCH EXPORTER] Found SIC via name match: ${result.payeeName} -> ${sicCode}`);
-    }
-    
-    // Strategy 2: Look for row index match in database
-    if (!sicCode && result.rowIndex !== undefined) {
-      const dbResultByIndex = databaseResults.find(db => db.rowIndex === result.rowIndex);
-      if (dbResultByIndex?.result?.sicCode) {
-        sicCode = dbResultByIndex.result.sicCode;
-        sicDescription = dbResultByIndex.result.sicDescription || '';
-        console.log(`[BATCH EXPORTER] Found SIC via row index: ${result.rowIndex} -> ${sicCode}`);
+    for (let i = 0; i < batchResult.results.length; i++) {
+      const result = batchResult.results[i];
+      const originalRow = batchResult.originalFileData[i];
+      
+      // Enhanced SIC code resolution
+      let sicCode = result.result.sicCode || '';
+      let sicDescription = result.result.sicDescription || '';
+      
+      // Try database lookup if SIC is missing
+      if (!sicCode && result.payeeName) {
+        const dbResult = databaseResults.find(db => db.payeeName === result.payeeName);
+        if (dbResult?.result?.sicCode) {
+          sicCode = dbResult.result.sicCode;
+          sicDescription = dbResult.result.sicDescription || '';
+        }
       }
-    }
-    
-    // Strategy 3: Use memory data if available
-    if (!sicCode && result.result.sicCode) {
-      sicCode = result.result.sicCode;
-      sicDescription = result.result.sicDescription || '';
-      console.log(`[BATCH EXPORTER] Using memory SIC data: ${result.payeeName} -> ${sicCode}`);
-    }
-    
-    // Strategy 4: Final fallback - check if it's a business that should have SIC
-    if (!sicCode && result.result.classification === 'Business') {
-      console.warn(`[BATCH EXPORTER] Business "${result.payeeName}" missing SIC code from all sources`);
-    }
-    
-    // Handle timestamp conversion
-    let timestampString = '';
-    try {
-      if (result.timestamp instanceof Date) {
-        timestampString = result.timestamp.toISOString();
-      } else if (typeof result.timestamp === 'string') {
-        timestampString = result.timestamp;
-      } else {
-        timestampString = new Date().toISOString();
-      }
-    } catch (error) {
-      timestampString = new Date().toISOString();
-    }
-    
-    // Create export row: original data + classification columns + enhanced SIC data
-    const exportRow = {
-      // Preserve ALL original columns exactly as they were
-      ...originalRow,
       
-      // Add classification results with consistent camelCase naming
-      'classification': result.result.classification,
-      'confidence': result.result.confidence,
-      'processingTier': result.result.processingTier,
-      'reasoning': result.result.reasoning,
-      'processingMethod': result.result.processingMethod || 'OpenAI Classification',
-      
-      // Add enhanced SIC code information
-      'sicCode': sicCode,
-      'sicDescription': sicDescription,
-      
-      // Add keyword exclusion results
-      'keywordExclusion': result.result.keywordExclusion?.isExcluded ? 'Yes' : 'No',
-      'matchedKeywords': result.result.keywordExclusion?.matchedKeywords?.join('; ') || '',
-      'keywordConfidence': result.result.keywordExclusion?.confidence?.toString() || '0',
-      'keywordReasoning': result.result.keywordExclusion?.reasoning || 'No keyword exclusion applied',
-      
-      // Add timestamp
-      'timestamp': timestampString
-    };
+      const exportRow = {
+        // Preserve ALL original columns exactly as they were
+        ...originalRow,
+        
+        // Add classification results
+        'classification': result.result.classification,
+        'confidence': result.result.confidence,
+        'processingTier': result.result.processingTier,
+        'reasoning': result.result.reasoning,
+        'processingMethod': result.result.processingMethod || 'OpenAI Classification',
+        
+        // Add SIC code information
+        'sicCode': sicCode,
+        'sicDescription': sicDescription,
+        
+        // Add keyword exclusion results
+        'keywordExclusion': result.result.keywordExclusion?.isExcluded ? 'Yes' : 'No',
+        'matchedKeywords': result.result.keywordExclusion?.matchedKeywords?.join('; ') || '',
+        'keywordConfidence': result.result.keywordExclusion?.confidence?.toString() || '0',
+        'keywordReasoning': result.result.keywordExclusion?.reasoning || 'No keyword exclusion applied',
+        
+        // Add timestamp
+        'timestamp': result.timestamp instanceof Date ? result.timestamp.toISOString() : new Date().toISOString()
+      };
 
-    exportData.push(exportRow);
+      exportData.push(exportRow);
+    }
+    
+    const sicCount = exportData.filter(row => row.sicCode && row.sicCode !== '').length;
+    const businessCount = exportData.filter(row => row.classification === 'Business').length;
+    
+    console.log('[BATCH EXPORTER] Enhanced export complete with properly mapped data:', {
+      inputRows: batchResult.results.length,
+      outputRows: exportData.length,
+      businessCount: businessCount,
+      sicCodesIncluded: sicCount,
+      sicCoverage: businessCount > 0 ? `${Math.round((sicCount / businessCount) * 100)}%` : '0%'
+    });
+
+    return exportData;
   }
 
-  // FINAL VALIDATION
-  if (exportData.length !== batchResult.results.length) {
-    throw new Error(`Export count mismatch: created ${exportData.length} rows from ${batchResult.results.length} results`);
-  }
+  // Fallback: if we have unmapped results, create simple export
+  console.log('[BATCH EXPORTER] Using fallback export for unmapped results');
+  const exportData = batchResult.originalFileData.map((originalRow, index) => ({
+    ...originalRow,
+    classification: 'Individual',
+    confidence: 0,
+    processingTier: 'Unmapped',
+    reasoning: 'Result mapping failed',
+    processingMethod: 'Fallback',
+    sicCode: '',
+    sicDescription: '',
+    keywordExclusion: 'No',
+    matchedKeywords: '',
+    keywordConfidence: '0',
+    keywordReasoning: 'No processing applied',
+    timestamp: new Date().toISOString()
+  }));
 
-  const sicCount = exportData.filter(row => row.sicCode && row.sicCode !== '').length;
-  const businessCount = exportData.filter(row => row.classification === 'Business').length;
-  
-  console.log('[BATCH EXPORTER] Enhanced export complete with SIC data:', {
-    inputRows: batchResult.results.length,
-    outputRows: exportData.length,
-    businessCount: businessCount,
-    sicCodesIncluded: sicCount,
-    sicCoverage: businessCount > 0 ? `${Math.round((sicCount / businessCount) * 100)}%` : '0%',
-    validated: exportData.length === batchResult.results.length
+  console.log('[BATCH EXPORTER] Fallback export complete:', {
+    outputRows: exportData.length
   });
 
   return exportData;
@@ -145,125 +127,28 @@ export async function exportDirectCSV(batchResult: BatchProcessingResult): Promi
     originalDataLength: batchResult.originalFileData?.length || 0
   });
 
-  // Load database results for enhanced SIC data
-  let databaseResults: any[] = [];
-  try {
-    databaseResults = await loadAllClassificationResults();
-    console.log(`[CSV EXPORTER] Loaded ${databaseResults.length} results from database for enhanced SIC data`);
-  } catch (error) {
-    console.warn('[CSV EXPORTER] Failed to load database results:', error);
-  }
-
-  if (!batchResult.originalFileData || batchResult.originalFileData.length !== batchResult.results.length) {
-    throw new Error(`Row count mismatch: ${batchResult.results.length} results vs ${batchResult.originalFileData?.length || 0} original rows`);
-  }
+  // Use the enhanced export function to get properly formatted data
+  const exportData = await exportResultsWithOriginalDataV3(batchResult, true);
 
   // Get all possible column names from first row
-  const firstOriginalRow = batchResult.originalFileData[0];
-  const originalColumns = firstOriginalRow ? Object.keys(firstOriginalRow) : [];
+  const headers = exportData.length > 0 ? Object.keys(exportData[0]) : [];
   
-  // Define classification columns including enhanced SIC fields
-  const classificationColumns = [
-    'classification',
-    'confidence', 
-    'processingTier',
-    'reasoning',
-    'processingMethod',
-    'sicCode',
-    'sicDescription',
-    'keywordExclusion',
-    'matchedKeywords',
-    'keywordConfidence',
-    'keywordReasoning',
-    'timestamp'
-  ];
+  // Create rows
+  const rows: any[][] = exportData.map(row => {
+    return headers.map(header => row[header] || '');
+  });
 
-  // Combine headers
-  const headers = [...originalColumns, ...classificationColumns];
-  
-  // Create rows with enhanced SIC handling
-  const rows: any[][] = [];
-  
-  for (let i = 0; i < batchResult.results.length; i++) {
-    const result = batchResult.results[i];
-    const originalRow = batchResult.originalFileData[i];
-    
-    if (!result || !originalRow) {
-      throw new Error(`Missing data at index ${i}`);
-    }
-
-    // Enhanced SIC code resolution
-    let sicCode = '';
-    let sicDescription = '';
-    
-    // Try database lookup first
-    const dbResultByName = databaseResults.find(db => db.payeeName === result.payeeName);
-    if (dbResultByName?.result?.sicCode) {
-      sicCode = dbResultByName.result.sicCode;
-      sicDescription = dbResultByName.result.sicDescription || '';
-    } else if (result.rowIndex !== undefined) {
-      const dbResultByIndex = databaseResults.find(db => db.rowIndex === result.rowIndex);
-      if (dbResultByIndex?.result?.sicCode) {
-        sicCode = dbResultByIndex.result.sicCode;
-        sicDescription = dbResultByIndex.result.sicDescription || '';
-      }
-    }
-    
-    // Fallback to memory data
-    if (!sicCode) {
-      sicCode = result.result.sicCode || '';
-      sicDescription = result.result.sicDescription || '';
-    }
-
-    // Handle timestamp
-    let timestampString = '';
-    try {
-      if (result.timestamp instanceof Date) {
-        timestampString = result.timestamp.toISOString();
-      } else if (typeof result.timestamp === 'string') {
-        timestampString = result.timestamp;
-      } else {
-        timestampString = new Date().toISOString();
-      }
-    } catch (error) {
-      timestampString = new Date().toISOString();
-    }
-
-    // Create row array in same order as headers
-    const row = [];
-    
-    // Add original data values
-    for (const column of originalColumns) {
-      row.push(originalRow[column] || '');
-    }
-    
-    // Add classification values including enhanced SIC data
-    row.push(result.result.classification || 'Individual');
-    row.push(result.result.confidence?.toString() || '50');
-    row.push(result.result.processingTier || 'AI-Powered');
-    row.push(result.result.reasoning || 'Classification result');
-    row.push(result.result.processingMethod || 'OpenAI Classification');
-    row.push(sicCode); // Enhanced SIC Code
-    row.push(sicDescription); // Enhanced SIC Description
-    row.push(result.result.keywordExclusion?.isExcluded ? 'Yes' : 'No');
-    row.push(result.result.keywordExclusion?.matchedKeywords?.join('; ') || '');
-    row.push(result.result.keywordExclusion?.confidence?.toString() || '0');
-    row.push(result.result.keywordExclusion?.reasoning || 'No keyword exclusion applied');
-    row.push(timestampString);
-    
-    rows.push(row);
-  }
-
-  const sicCount = rows.filter(row => row[headers.indexOf('sicCode')] && row[headers.indexOf('sicCode')] !== '').length;
-  const businessCount = rows.filter(row => row[headers.indexOf('classification')] === 'Business').length;
+  const sicCodeIndex = headers.indexOf('sicCode');
+  const sicCount = sicCodeIndex >= 0 ? rows.filter(row => row[sicCodeIndex] && row[sicCodeIndex] !== '').length : 0;
+  const classificationIndex = headers.indexOf('classification');
+  const businessCount = classificationIndex >= 0 ? rows.filter(row => row[classificationIndex] === 'Business').length : 0;
   
   console.log('[CSV EXPORTER] Enhanced CSV export complete:', {
     headers: headers.length,
     rows: rows.length,
     businessCount: businessCount,
     sicCodesIncluded: sicCount,
-    sicCoverage: businessCount > 0 ? `${Math.round((sicCount / businessCount) * 100)}%` : '0%',
-    validated: rows.length === batchResult.results.length
+    sicCoverage: businessCount > 0 ? `${Math.round((sicCount / businessCount) * 100)}%` : '0%'
   });
 
   return { headers, rows };

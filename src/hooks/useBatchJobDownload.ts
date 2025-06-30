@@ -1,6 +1,6 @@
 
 import { BatchJob, getBatchJobResults } from "@/lib/openai/trueBatchAPI";
-import { PayeeRowData } from "@/lib/rowMapping";
+import { PayeeRowData, mapResultsToOriginalRows } from "@/lib/rowMapping";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { processBatchResults } from "@/services/batchResultProcessor";
 import { saveClassificationResults } from "@/lib/database/classificationService";
@@ -59,7 +59,7 @@ export const useBatchJobDownload = ({
       const rawResults = await getBatchJobResults(job, uniquePayeeNames);
       console.log(`[BATCH DOWNLOAD] Downloaded ${rawResults.length} raw results from OpenAI`);
 
-      // Process results into proper format
+      // Process results into proper format (unique payee results)
       const { finalClassifications, summary } = processBatchResults(
         rawResults,
         uniquePayeeNames,
@@ -67,21 +67,57 @@ export const useBatchJobDownload = ({
         job
       );
 
-      console.log(`[BATCH DOWNLOAD] Processed ${finalClassifications.length} classifications`);
+      console.log(`[BATCH DOWNLOAD] Processed ${finalClassifications.length} unique classifications`);
       
-      // Log SIC code statistics before saving
+      // Log SIC code statistics before mapping
       const businessCount = finalClassifications.filter(r => r.result.classification === 'Business').length;
       const sicCount = finalClassifications.filter(r => r.result.sicCode).length;
       console.log(`[BATCH DOWNLOAD] SIC Statistics: ${sicCount}/${businessCount} businesses have SIC codes`);
 
-      // CRITICAL: Save results to database immediately to ensure SIC codes are persisted
+      // CRITICAL: Map unique results back to original rows (227 rows from 211 unique payees)
+      console.log(`[BATCH DOWNLOAD] Mapping ${finalClassifications.length} unique results to ${payeeData.originalFileData.length} original rows`);
+      const mappedResults = mapResultsToOriginalRows(finalClassifications, payeeData);
+      console.log(`[BATCH DOWNLOAD] Successfully mapped to ${mappedResults.length} original rows`);
+
+      // Create PayeeClassification objects for each original row
+      const fullResults: PayeeClassification[] = mappedResults.map((row, index) => ({
+        id: `${job.id}-${index}`,
+        payeeName: row.original_payee_name || row.payeeName || `Unknown_${index}`,
+        result: {
+          classification: row.classification,
+          confidence: row.confidence,
+          reasoning: row.reasoning,
+          processingTier: row.processingTier,
+          processingMethod: row.processingMethod,
+          sicCode: row.sicCode,
+          sicDescription: row.sicDescription,
+          matchingRules: [],
+          keywordExclusion: {
+            isExcluded: row.keywordExclusion === 'Yes',
+            matchedKeywords: row.matchedKeywords ? row.matchedKeywords.split('; ') : [],
+            confidence: parseFloat(row.keywordConfidence) || 0,
+            reasoning: row.keywordReasoning
+          }
+        },
+        timestamp: new Date(row.timestamp),
+        originalData: row,
+        rowIndex: index
+      }));
+
+      // Update summary with full results
+      const updatedSummary: BatchProcessingResult = {
+        ...summary,
+        results: fullResults,
+        originalFileData: payeeData.originalFileData
+      };
+
+      // Save unique results to database (not all mapped results to avoid duplicates)
       try {
-        console.log(`[BATCH DOWNLOAD] Saving ${finalClassifications.length} results to database with SIC codes`);
+        console.log(`[BATCH DOWNLOAD] Saving ${finalClassifications.length} unique results to database with SIC codes`);
         await saveClassificationResults(finalClassifications, job.id);
         console.log(`[BATCH DOWNLOAD] Successfully saved results to database`);
       } catch (dbError) {
         console.error('[BATCH DOWNLOAD] Database save failed:', dbError);
-        // Continue with download even if database save fails
         toast({
           title: "Database Save Warning",
           description: "Results processed but database save failed. Downloads may not include all SIC codes.",
@@ -89,14 +125,15 @@ export const useBatchJobDownload = ({
         });
       }
 
-      // Call the completion callback
-      console.log(`[BATCH DOWNLOAD] About to call onJobComplete with ${finalClassifications.length} results`);
-      onJobComplete(finalClassifications, summary, job.id);
+      // Call the completion callback with full mapped results
+      console.log(`[BATCH DOWNLOAD] About to call onJobComplete with ${fullResults.length} results`);
+      onJobComplete(fullResults, updatedSummary, job.id);
       console.log(`[BATCH DOWNLOAD] onJobComplete called successfully`);
 
+      const finalSicCount = fullResults.filter(r => r.result.sicCode).length;
       toast({
         title: "Results Ready",
-        description: `Successfully processed ${finalClassifications.length} results with ${sicCount} SIC codes.`,
+        description: `Successfully processed ${fullResults.length} results with ${finalSicCount} SIC codes.`,
       });
 
     } catch (error) {
