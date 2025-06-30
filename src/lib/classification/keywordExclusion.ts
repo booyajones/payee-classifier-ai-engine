@@ -620,15 +620,16 @@ export function checkKeywordExclusion(
   const normalizedName = payeeName.toUpperCase().trim();
   const matchedKeywords: string[] = [];
 
-  // Check each exclusion keyword using case-insensitive partial matching
+  // Check each exclusion keyword using whole word matching with regex
   for (const keyword of exclusionKeywords) {
     if (!keyword || typeof keyword !== 'string') continue;
     
     const normalizedKeyword = keyword.toUpperCase().trim();
     if (!normalizedKeyword) continue;
 
-    // Use contains matching for better coverage
-    if (normalizedName.includes(normalizedKeyword)) {
+    // Use whole word matching with regex instead of simple includes
+    const pattern = new RegExp(`\\b${normalizedKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    if (pattern.test(normalizedName)) {
       matchedKeywords.push(keyword);
     }
   }
