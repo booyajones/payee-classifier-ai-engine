@@ -9,7 +9,7 @@ export async function exportResultsWithOriginalDataV3(
   batchResult: BatchProcessingResult,
   includeAllColumns: boolean = true
 ): Promise<any[]> {
-  console.log('[BATCH EXPORTER] Starting export with database SIC data validation:', {
+  console.log('[BATCH EXPORTER] Starting enhanced export with SIC data validation:', {
     resultsLength: batchResult.results.length,
     originalDataLength: batchResult.originalFileData?.length || 0
   });
@@ -30,7 +30,7 @@ export async function exportResultsWithOriginalDataV3(
 
   const exportData: any[] = [];
   
-  // Simple 1:1 mapping with enhanced SIC data from database
+  // Enhanced 1:1 mapping with better SIC data handling
   for (let i = 0; i < batchResult.results.length; i++) {
     const result = batchResult.results[i];
     const originalRow = batchResult.originalFileData[i];
@@ -39,17 +39,39 @@ export async function exportResultsWithOriginalDataV3(
       throw new Error(`Missing data at index ${i}: result=${!!result}, originalRow=${!!originalRow}`);
     }
     
-    // Try to find matching database result for enhanced SIC data
-    const dbResult = databaseResults.find(db => 
-      db.payeeName === result.payeeName || 
-      (db.rowIndex === result.rowIndex && db.rowIndex !== undefined)
-    );
+    // Try multiple strategies to find SIC codes
+    let sicCode = '';
+    let sicDescription = '';
     
-    // Use database SIC data if available, otherwise fall back to memory data
-    const sicCode = dbResult?.result?.sicCode || result.result.sicCode || '';
-    const sicDescription = dbResult?.result?.sicDescription || result.result.sicDescription || '';
+    // Strategy 1: Look for exact payee name match in database
+    const dbResultByName = databaseResults.find(db => db.payeeName === result.payeeName);
+    if (dbResultByName?.result?.sicCode) {
+      sicCode = dbResultByName.result.sicCode;
+      sicDescription = dbResultByName.result.sicDescription || '';
+      console.log(`[BATCH EXPORTER] Found SIC via name match: ${result.payeeName} -> ${sicCode}`);
+    }
     
-    console.log(`[BATCH EXPORTER] Row ${i}: ${result.payeeName} - SIC: ${sicCode} (from ${dbResult ? 'database' : 'memory'})`);
+    // Strategy 2: Look for row index match in database
+    if (!sicCode && result.rowIndex !== undefined) {
+      const dbResultByIndex = databaseResults.find(db => db.rowIndex === result.rowIndex);
+      if (dbResultByIndex?.result?.sicCode) {
+        sicCode = dbResultByIndex.result.sicCode;
+        sicDescription = dbResultByIndex.result.sicDescription || '';
+        console.log(`[BATCH EXPORTER] Found SIC via row index: ${result.rowIndex} -> ${sicCode}`);
+      }
+    }
+    
+    // Strategy 3: Use memory data if available
+    if (!sicCode && result.result.sicCode) {
+      sicCode = result.result.sicCode;
+      sicDescription = result.result.sicDescription || '';
+      console.log(`[BATCH EXPORTER] Using memory SIC data: ${result.payeeName} -> ${sicCode}`);
+    }
+    
+    // Strategy 4: Final fallback - check if it's a business that should have SIC
+    if (!sicCode && result.result.classification === 'Business') {
+      console.warn(`[BATCH EXPORTER] Business "${result.payeeName}" missing SIC code from all sources`);
+    }
     
     // Handle timestamp conversion
     let timestampString = '';
@@ -65,7 +87,7 @@ export async function exportResultsWithOriginalDataV3(
       timestampString = new Date().toISOString();
     }
     
-    // Create export row: original data + classification columns + SIC data
+    // Create export row: original data + classification columns + enhanced SIC data
     const exportRow = {
       // Preserve ALL original columns exactly as they were
       ...originalRow,
@@ -77,7 +99,7 @@ export async function exportResultsWithOriginalDataV3(
       'reasoning': result.result.reasoning,
       'processingMethod': result.result.processingMethod || 'OpenAI Classification',
       
-      // Add SIC code information
+      // Add enhanced SIC code information
       'sicCode': sicCode,
       'sicDescription': sicDescription,
       
@@ -100,10 +122,14 @@ export async function exportResultsWithOriginalDataV3(
   }
 
   const sicCount = exportData.filter(row => row.sicCode && row.sicCode !== '').length;
-  console.log('[BATCH EXPORTER] Export complete with enhanced SIC data:', {
+  const businessCount = exportData.filter(row => row.classification === 'Business').length;
+  
+  console.log('[BATCH EXPORTER] Enhanced export complete with SIC data:', {
     inputRows: batchResult.results.length,
     outputRows: exportData.length,
+    businessCount: businessCount,
     sicCodesIncluded: sicCount,
+    sicCoverage: businessCount > 0 ? `${Math.round((sicCount / businessCount) * 100)}%` : '0%',
     validated: exportData.length === batchResult.results.length
   });
 
@@ -111,19 +137,19 @@ export async function exportResultsWithOriginalDataV3(
 }
 
 /**
- * Direct CSV export with SIC data from database
+ * Direct CSV export with enhanced SIC data handling
  */
 export async function exportDirectCSV(batchResult: BatchProcessingResult): Promise<{ headers: string[]; rows: any[][] }> {
-  console.log('[CSV EXPORTER] Starting direct CSV export with database SIC data:', {
+  console.log('[CSV EXPORTER] Starting enhanced CSV export with SIC data:', {
     resultsLength: batchResult.results.length,
     originalDataLength: batchResult.originalFileData?.length || 0
   });
 
-  // Load database results for SIC data
+  // Load database results for enhanced SIC data
   let databaseResults: any[] = [];
   try {
     databaseResults = await loadAllClassificationResults();
-    console.log(`[CSV EXPORTER] Loaded ${databaseResults.length} results from database for SIC data`);
+    console.log(`[CSV EXPORTER] Loaded ${databaseResults.length} results from database for enhanced SIC data`);
   } catch (error) {
     console.warn('[CSV EXPORTER] Failed to load database results:', error);
   }
@@ -136,7 +162,7 @@ export async function exportDirectCSV(batchResult: BatchProcessingResult): Promi
   const firstOriginalRow = batchResult.originalFileData[0];
   const originalColumns = firstOriginalRow ? Object.keys(firstOriginalRow) : [];
   
-  // Define classification columns including SIC fields
+  // Define classification columns including enhanced SIC fields
   const classificationColumns = [
     'classification',
     'confidence', 
@@ -155,7 +181,7 @@ export async function exportDirectCSV(batchResult: BatchProcessingResult): Promi
   // Combine headers
   const headers = [...originalColumns, ...classificationColumns];
   
-  // Create rows
+  // Create rows with enhanced SIC handling
   const rows: any[][] = [];
   
   for (let i = 0; i < batchResult.results.length; i++) {
@@ -166,15 +192,28 @@ export async function exportDirectCSV(batchResult: BatchProcessingResult): Promi
       throw new Error(`Missing data at index ${i}`);
     }
 
-    // Find matching database result for SIC data
-    const dbResult = databaseResults.find(db => 
-      db.payeeName === result.payeeName || 
-      (db.rowIndex === result.rowIndex && db.rowIndex !== undefined)
-    );
+    // Enhanced SIC code resolution
+    let sicCode = '';
+    let sicDescription = '';
     
-    // Use database SIC data if available
-    const sicCode = dbResult?.result?.sicCode || result.result.sicCode || '';
-    const sicDescription = dbResult?.result?.sicDescription || result.result.sicDescription || '';
+    // Try database lookup first
+    const dbResultByName = databaseResults.find(db => db.payeeName === result.payeeName);
+    if (dbResultByName?.result?.sicCode) {
+      sicCode = dbResultByName.result.sicCode;
+      sicDescription = dbResultByName.result.sicDescription || '';
+    } else if (result.rowIndex !== undefined) {
+      const dbResultByIndex = databaseResults.find(db => db.rowIndex === result.rowIndex);
+      if (dbResultByIndex?.result?.sicCode) {
+        sicCode = dbResultByIndex.result.sicCode;
+        sicDescription = dbResultByIndex.result.sicDescription || '';
+      }
+    }
+    
+    // Fallback to memory data
+    if (!sicCode) {
+      sicCode = result.result.sicCode || '';
+      sicDescription = result.result.sicDescription || '';
+    }
 
     // Handle timestamp
     let timestampString = '';
@@ -198,14 +237,14 @@ export async function exportDirectCSV(batchResult: BatchProcessingResult): Promi
       row.push(originalRow[column] || '');
     }
     
-    // Add classification values including SIC data
+    // Add classification values including enhanced SIC data
     row.push(result.result.classification || 'Individual');
     row.push(result.result.confidence?.toString() || '50');
     row.push(result.result.processingTier || 'AI-Powered');
     row.push(result.result.reasoning || 'Classification result');
     row.push(result.result.processingMethod || 'OpenAI Classification');
-    row.push(sicCode); // SIC Code from database
-    row.push(sicDescription); // SIC Description from database
+    row.push(sicCode); // Enhanced SIC Code
+    row.push(sicDescription); // Enhanced SIC Description
     row.push(result.result.keywordExclusion?.isExcluded ? 'Yes' : 'No');
     row.push(result.result.keywordExclusion?.matchedKeywords?.join('; ') || '');
     row.push(result.result.keywordExclusion?.confidence?.toString() || '0');
@@ -216,10 +255,14 @@ export async function exportDirectCSV(batchResult: BatchProcessingResult): Promi
   }
 
   const sicCount = rows.filter(row => row[headers.indexOf('sicCode')] && row[headers.indexOf('sicCode')] !== '').length;
-  console.log('[CSV EXPORTER] CSV export complete with SIC data:', {
+  const businessCount = rows.filter(row => row[headers.indexOf('classification')] === 'Business').length;
+  
+  console.log('[CSV EXPORTER] Enhanced CSV export complete:', {
     headers: headers.length,
     rows: rows.length,
+    businessCount: businessCount,
     sicCodesIncluded: sicCount,
+    sicCoverage: businessCount > 0 ? `${Math.round((sicCount / businessCount) * 100)}%` : '0%',
     validated: rows.length === batchResult.results.length
   });
 
