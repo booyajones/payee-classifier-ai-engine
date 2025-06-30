@@ -1,3 +1,4 @@
+
 import { toast } from "@/hooks/use-toast";
 
 export interface AppError {
@@ -225,6 +226,15 @@ export const handleError = (error: unknown, context?: string): AppError => {
 export const showErrorToast = (error: AppError, context?: string) => {
   const title = context ? `${context} Error` : 'Error';
   
+  // Add debug logging to track error toasts
+  console.log(`[ERROR TOAST DEBUG] Showing error toast:`, {
+    title,
+    message: error.message,
+    code: error.code,
+    context: error.context,
+    timestamp: new Date().toISOString()
+  });
+  
   // Prevent duplicate toasts by checking message content
   const isDuplicateMessage = error.message.length < 10 || error.message === 'An unexpected error occurred.';
   
@@ -233,11 +243,17 @@ export const showErrorToast = (error: AppError, context?: string) => {
     return;
   }
   
+  // Check for specific error patterns that might cause false positives
+  if (error.message.includes('MIME type') || error.message.includes('Unexpected MIME type')) {
+    console.warn('[ERROR HANDLER] Skipping MIME type warning toast:', error.message);
+    return;
+  }
+  
   toast({
     title,
     description: error.message,
     variant: "destructive",
-    duration: 6000, // Show for 6 seconds instead of default
+    duration: 4000, // Reduced from 6000 to 4000ms for less intrusive display
   });
 
   // Log detailed error for debugging

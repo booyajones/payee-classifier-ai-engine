@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { parseUploadedFile } from '@/lib/utils';
 import { createPayeeRowMapping, PayeeRowData } from '@/lib/rowMapping';
@@ -66,6 +65,8 @@ export const useSmartFileUpload = () => {
   };
 
   const handleFileSelect = async (file: File) => {
+    console.log(`[SMART UPLOAD DEBUG] Starting file selection process for: ${file.name}`);
+    
     setUploadState('processing');
     updateProgress(UPLOAD_ID, 'Analyzing file structure...', 10);
     setErrorMessage('');
@@ -74,6 +75,8 @@ export const useSmartFileUpload = () => {
     setProcessingInfo({});
 
     try {
+      console.log(`[SMART UPLOAD DEBUG] Beginning file validation for: ${file.name}, size: ${file.size} bytes`);
+      
       // Use enhanced file validation
       const validationResult = await validateFile(file, {
         maxFileSize: 100 * 1024 * 1024, // 100MB
@@ -83,7 +86,15 @@ export const useSmartFileUpload = () => {
         maxRows: 100000
       });
 
+      console.log(`[SMART UPLOAD DEBUG] Validation result:`, {
+        isValid: validationResult.isValid,
+        hasWarnings: !!validationResult.warnings,
+        warningCount: validationResult.warnings?.length || 0,
+        hasError: !!validationResult.error
+      });
+
       if (!validationResult.isValid) {
+        console.error(`[SMART UPLOAD DEBUG] File validation failed:`, validationResult.error);
         setUploadState('error');
         setErrorMessage(validationResult.error!.message);
         setSuggestions(getSuggestions(validationResult.error!.code));
@@ -91,18 +102,23 @@ export const useSmartFileUpload = () => {
         return;
       }
 
-      // Show warnings if any
-      if (validationResult.warnings) {
-        validationResult.warnings.forEach(warning => {
+      // Show warnings if any (but convert to info toasts, not error toasts)
+      if (validationResult.warnings && validationResult.warnings.length > 0) {
+        console.log(`[SMART UPLOAD DEBUG] File has ${validationResult.warnings.length} warnings:`, validationResult.warnings);
+        
+        validationResult.warnings.forEach((warning, index) => {
+          // Use regular toast (not error variant) for warnings
           toast({
-            title: "File Warning",
+            title: "File Analysis Note",
             description: warning,
-            variant: "destructive",
+            duration: 3000,
           });
         });
       }
 
       updateProgress(UPLOAD_ID, 'Reading file contents...', 30);
+
+      console.log(`[SMART UPLOAD DEBUG] Starting memory-aware file processing`);
 
       // Memory-aware file processing for large files
       const data = await processWithMemoryManagement(
@@ -118,7 +134,10 @@ export const useSmartFileUpload = () => {
         'file-parsing'
       );
 
+      console.log(`[SMART UPLOAD DEBUG] File parsing completed, rows found: ${data?.length || 0}`);
+
       if (!data || data.length === 0) {
+        console.error(`[SMART UPLOAD DEBUG] No data found in file`);
         setUploadState('error');
         setErrorMessage('No data found in the file. Please check if the file has content.');
         setSuggestions(['Ensure the file has data rows', 'Try a different file format']);
@@ -128,12 +147,19 @@ export const useSmartFileUpload = () => {
 
       const headers = Object.keys(data[0]);
       if (headers.length === 0) {
+        console.error(`[SMART UPLOAD DEBUG] No columns found in file`);
         setUploadState('error');
         setErrorMessage('No columns found in the file.');
         setSuggestions(['Ensure the file has a header row', 'Try a different file format']);
         clearProgress(UPLOAD_ID);
         return;
       }
+
+      console.log(`[SMART UPLOAD DEBUG] File processing successful:`, {
+        totalRows: data.length,
+        columnCount: headers.length,
+        columns: headers.slice(0, 5) // First 5 columns for debugging
+      });
 
       // Enhanced processing info with file validation details
       const enhancedProcessingInfo: FileProcessingInfo = {
@@ -156,14 +182,16 @@ export const useSmartFileUpload = () => {
       setUploadState('uploaded');
       completeProgress(UPLOAD_ID, 'File uploaded successfully!');
 
-      // Enhanced file info toast
+      // Enhanced file info toast (success, not error)
       toast({
         title: "File Analysis Complete",
         description: `Found ${data.length.toLocaleString()} rows with ${headers.length} columns. ${validationResult.fileInfo?.hasHeaders ? 'Headers detected.' : ''}`,
       });
 
+      console.log(`[SMART UPLOAD DEBUG] File upload process completed successfully`);
+
     } catch (error) {
-      console.error('[SMART UPLOAD] Upload failed:', error);
+      console.error('[SMART UPLOAD DEBUG] Upload failed with error:', error);
       setUploadState('error');
       setErrorMessage(error instanceof Error ? error.message : 'Upload failed');
       setSuggestions(['Try again with a different file', 'Check your internet connection']);

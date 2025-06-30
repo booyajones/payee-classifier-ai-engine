@@ -1,3 +1,4 @@
+
 import * as React from "react"
 
 import type {
@@ -6,7 +7,7 @@ import type {
 } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_REMOVE_DELAY = 5000 // Changed from 1000000 to 5000ms (5 seconds)
 
 type ToasterToast = ToastProps & {
   id: string
@@ -74,12 +75,20 @@ const addToRemoveQueue = (toastId: string) => {
 export const reducer = (state: State, action: Action): State => {
   switch (action.type) {
     case "ADD_TOAST":
+      console.log(`[TOAST DEBUG] Adding toast:`, {
+        id: action.toast.id,
+        title: action.toast.title,
+        description: action.toast.description,
+        variant: action.toast.variant,
+        timestamp: new Date().toISOString()
+      });
       return {
         ...state,
         toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
       }
 
     case "UPDATE_TOAST":
+      console.log(`[TOAST DEBUG] Updating toast:`, action.toast.id);
       return {
         ...state,
         toasts: state.toasts.map((t) =>
@@ -89,6 +98,7 @@ export const reducer = (state: State, action: Action): State => {
 
     case "DISMISS_TOAST": {
       const { toastId } = action
+      console.log(`[TOAST DEBUG] Dismissing toast:`, toastId);
 
       // ! Side effects ! - This could be extracted into a dismissToast() action,
       // but I'll keep it here for simplicity
@@ -113,6 +123,7 @@ export const reducer = (state: State, action: Action): State => {
       }
     }
     case "REMOVE_TOAST":
+      console.log(`[TOAST DEBUG] Removing toast:`, action.toastId);
       if (action.toastId === undefined) {
         return {
           ...state,
@@ -141,6 +152,16 @@ type Toast = Omit<ToasterToast, "id">
 
 function toast({ ...props }: Toast) {
   const id = genId()
+
+  // Add debug logging for toast creation
+  console.log(`[TOAST DEBUG] Creating toast:`, {
+    id,
+    title: props.title,
+    description: props.description,
+    variant: props.variant,
+    duration: props.duration,
+    timestamp: new Date().toISOString()
+  });
 
   const update = (props: ToasterToast) =>
     dispatch({
