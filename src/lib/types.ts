@@ -15,6 +15,7 @@ export interface ClassificationResult {
 export interface SimilarityScores {
   levenshtein: number;
   jaroWinkler: number;
+  jaro: number;
   dice: number;
   tokenSort: number;
   combined: number;

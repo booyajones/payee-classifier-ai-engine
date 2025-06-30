@@ -3,13 +3,15 @@ export interface SimilarityScores {
   levenshtein: number;
   jaro: number;
   jaroWinkler: number;
+  dice: number;
+  tokenSort: number;
   combined: number;
 }
 
 /**
  * Calculate Levenshtein distance between two strings
  */
-function levenshteinDistance(str1: string, str2: string): number {
+export function levenshteinDistance(str1: string, str2: string): number {
   const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
   
   for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
@@ -27,6 +29,15 @@ function levenshteinDistance(str1: string, str2: string): number {
   }
   
   return matrix[str2.length][str1.length];
+}
+
+/**
+ * Calculate Levenshtein similarity as a percentage
+ */
+export function levenshteinSimilarity(str1: string, str2: string): number {
+  const maxLength = Math.max(str1.length, str2.length);
+  if (maxLength === 0) return 100;
+  return ((maxLength - levenshteinDistance(str1, str2)) / maxLength) * 100;
 }
 
 /**
@@ -77,7 +88,7 @@ function jaroSimilarity(str1: string, str2: string): number {
 /**
  * Calculate Jaro-Winkler similarity between two strings
  */
-function jaroWinklerSimilarity(str1: string, str2: string): number {
+export function jaroWinklerSimilarity(str1: string, str2: string): number {
   const jaro = jaroSimilarity(str1, str2);
   
   if (jaro < 0.7) return jaro;
@@ -92,6 +103,38 @@ function jaroWinklerSimilarity(str1: string, str2: string): number {
 }
 
 /**
+ * Calculate Dice coefficient between two strings
+ */
+export function diceCoefficient(str1: string, str2: string): number {
+  if (str1 === str2) return 1;
+  if (str1.length < 2 || str2.length < 2) return 0;
+  
+  const bigrams1 = new Set<string>();
+  const bigrams2 = new Set<string>();
+  
+  for (let i = 0; i < str1.length - 1; i++) {
+    bigrams1.add(str1.substr(i, 2));
+  }
+  
+  for (let i = 0; i < str2.length - 1; i++) {
+    bigrams2.add(str2.substr(i, 2));
+  }
+  
+  const intersection = new Set([...bigrams1].filter(x => bigrams2.has(x)));
+  return (2.0 * intersection.size) / (bigrams1.size + bigrams2.size);
+}
+
+/**
+ * Calculate Token Sort Ratio between two strings
+ */
+export function tokenSortRatio(str1: string, str2: string): number {
+  const tokens1 = str1.toLowerCase().split(/\s+/).sort().join(' ');
+  const tokens2 = str2.toLowerCase().split(/\s+/).sort().join(' ');
+  
+  return levenshteinSimilarity(tokens1, tokens2);
+}
+
+/**
  * Calculate combined similarity score between two strings
  */
 export function calculateCombinedSimilarity(str1: string, str2: string): SimilarityScores {
@@ -99,12 +142,16 @@ export function calculateCombinedSimilarity(str1: string, str2: string): Similar
   const levenshtein = maxLength === 0 ? 100 : ((maxLength - levenshteinDistance(str1, str2)) / maxLength) * 100;
   const jaro = jaroSimilarity(str1, str2) * 100;
   const jaroWinkler = jaroWinklerSimilarity(str1, str2) * 100;
-  const combined = (levenshtein * 0.4 + jaro * 0.3 + jaroWinkler * 0.3);
+  const dice = diceCoefficient(str1, str2) * 100;
+  const tokenSort = tokenSortRatio(str1, str2);
+  const combined = (levenshtein * 0.3 + jaro * 0.2 + jaroWinkler * 0.2 + dice * 0.15 + tokenSort * 0.15);
   
   return {
     levenshtein,
     jaro,
     jaroWinkler,
+    dice,
+    tokenSort,
     combined
   };
 }
@@ -112,7 +159,12 @@ export function calculateCombinedSimilarity(str1: string, str2: string): Similar
 /**
  * Advanced text normalization for better matching
  */
-export function advancedNormalization(text: string): { normalized: string; tokens: string[] } {
+export function advancedNormalization(text: string): { 
+  normalized: string; 
+  tokens: string[];
+  businessIndicators: string[];
+  individualIndicators: string[];
+} {
   const normalized = text
     .toUpperCase()
     .trim()
@@ -123,5 +175,13 @@ export function advancedNormalization(text: string): { normalized: string; token
     .split(' ')
     .filter(token => token.length > 0);
   
-  return { normalized, tokens };
+  // Business indicators
+  const businessKeywords = ['LLC', 'INC', 'CORP', 'LTD', 'CO', 'COMPANY', 'CORPORATION', 'INCORPORATED', 'LIMITED', 'BANK', 'FINANCIAL', 'SERVICES', 'GROUP', 'HOLDINGS', 'ENTERPRISES', 'SOLUTIONS', 'SYSTEMS', 'TECHNOLOGIES', 'ASSOCIATES', 'PARTNERS'];
+  const businessIndicators = tokens.filter(token => businessKeywords.includes(token));
+  
+  // Individual indicators (common first/last names)
+  const nameKeywords = ['JOHN', 'JANE', 'MICHAEL', 'SARAH', 'DAVID', 'MARY', 'ROBERT', 'JENNIFER', 'WILLIAM', 'ELIZABETH', 'JAMES', 'PATRICIA', 'RICHARD', 'LINDA', 'JOSEPH', 'BARBARA', 'THOMAS', 'SUSAN', 'CHARLES', 'JESSICA', 'CHRISTOPHER', 'NANCY', 'DANIEL', 'KAREN', 'MATTHEW', 'BETTY', 'ANTHONY', 'HELEN', 'DONALD', 'SANDRA', 'MARK', 'DONNA', 'PAUL', 'CAROL', 'STEVEN', 'RUTH', 'ANDREW', 'SHARON', 'JOSHUA', 'MICHELLE', 'KENNETH', 'LAURA', 'KEVIN', 'SARAH', 'BRIAN', 'KIMBERLY', 'GEORGE', 'DEBORAH', 'EDWARD', 'DOROTHY', 'RONALD', 'LISA', 'TIMOTHY', 'NANCY', 'JASON', 'KAREN', 'JEFFREY', 'BETTY', 'RYAN', 'HELEN', 'JACOB', 'SANDRA', 'GARY', 'DONNA', 'NICHOLAS', 'CAROL', 'ERIC', 'RUTH', 'JONATHAN', 'SHARON', 'STEPHEN', 'MICHELLE', 'LARRY', 'LAURA', 'JUSTIN', 'SARAH', 'SCOTT', 'KIMBERLY', 'BRANDON', 'DEBORAH', 'BENJAMIN', 'DOROTHY', 'SAMUEL', 'LISA', 'GREGORY', 'NANCY', 'FRANK', 'KAREN', 'RAYMOND', 'BETTY', 'ALEXANDER', 'HELEN', 'PATRICK', 'SANDRA', 'JACK', 'DONNA', 'DENNIS', 'CAROL', 'JERRY', 'RUTH', 'TYLER', 'SHARON', 'AARON', 'MICHELLE', 'JOSE', 'LAURA', 'HENRY', 'SARAH', 'ADAM', 'KIMBERLY', 'DOUGLAS', 'DEBORAH', 'NATHAN', 'DOROTHY', 'PETER', 'LISA', 'ZACHARY', 'NANCY', 'KYLE', 'KAREN', 'NOAH', 'BETTY', 'ALAN', 'HELEN', 'ETHAN', 'SANDRA', 'JEREMY', 'DONNA', 'RUSSELL', 'CAROL', 'MASON', 'RUTH', 'CODY', 'SHARON', 'MIKE', 'MICHELLE', 'SMITH', 'JOHNSON', 'WILLIAMS', 'BROWN', 'JONES', 'GARCIA', 'MILLER', 'DAVIS', 'RODRIGUEZ', 'MARTINEZ', 'HERNANDEZ', 'LOPEZ', 'GONZALEZ', 'WILSON', 'ANDERSON', 'THOMAS', 'TAYLOR', 'MOORE', 'JACKSON', 'MARTIN', 'LEE', 'PEREZ', 'THOMPSON', 'WHITE', 'HARRIS', 'SANCHEZ', 'CLARK', 'RAMIREZ', 'LEWIS', 'ROBINSON', 'WALKER', 'YOUNG', 'ALLEN', 'KING', 'WRIGHT', 'SCOTT', 'TORRES', 'NGUYEN', 'HILL', 'FLORES', 'GREEN', 'ADAMS', 'NELSON', 'BAKER', 'HALL', 'RIVERA', 'CAMPBELL', 'MITCHELL', 'CARTER', 'ROBERTS'];
+  const individualIndicators = tokens.filter(token => nameKeywords.includes(token));
+  
+  return { normalized, tokens, businessIndicators, individualIndicators };
 }
