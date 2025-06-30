@@ -1,8 +1,8 @@
 
 import { KeywordExclusionResult, SimilarityScores } from '../types';
 import { calculateCombinedSimilarity, advancedNormalization } from './stringMatching';
-import { isWholeWordMatch, testRegexPatterns, testNormalization } from './patternMatching';
-import { getComprehensiveExclusionKeywords } from './keywordExclusion';
+import { isWholeWordMatch } from './patternMatching';
+import { getComprehensiveExclusionKeywords } from './exclusionUtils';
 
 /**
  * Enhanced keyword exclusion with similarity matching and detailed results
@@ -11,10 +11,6 @@ import { getComprehensiveExclusionKeywords } from './keywordExclusion';
 export function checkEnhancedKeywordExclusion(payeeName: string, customKeywords?: string[]): KeywordExclusionResult {
   console.log(`\n[ENHANCED KEYWORD EXCLUSION] === STARTING EXCLUSION CHECK FOR "${payeeName}" ===`);
   
-  // Run debug tests first
-  testRegexPatterns();
-  testNormalization();
-  
   // Use comprehensive keywords as default, allow custom override for testing
   const exclusionKeywords = customKeywords || getComprehensiveExclusionKeywords();
   
@@ -22,8 +18,12 @@ export function checkEnhancedKeywordExclusion(payeeName: string, customKeywords?
   console.log(`[ENHANCED KEYWORD EXCLUSION] Sample keywords: [${exclusionKeywords.slice(0, 10).join(', ')}]`);
   
   // Check if BANK is in keywords
-  const hasBankKeyword = exclusionKeywords.some(k => k.toUpperCase().includes('BANK'));
+  const hasBankKeyword = exclusionKeywords.some(k => k.toUpperCase() === 'BANK');
   console.log(`[ENHANCED KEYWORD EXCLUSION] Contains BANK keyword: ${hasBankKeyword}`);
+  
+  // Check if BANK OF AMERICA is in keywords
+  const hasBankOfAmericaKeyword = exclusionKeywords.some(k => k.toUpperCase() === 'BANK OF AMERICA');
+  console.log(`[ENHANCED KEYWORD EXCLUSION] Contains BANK OF AMERICA keyword: ${hasBankOfAmericaKeyword}`);
   
   if (exclusionKeywords.length === 0) {
     console.warn('[ENHANCED KEYWORD EXCLUSION] No exclusion keywords available');

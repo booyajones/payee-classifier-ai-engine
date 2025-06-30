@@ -3,12 +3,16 @@
  * Check if a keyword matches as a whole word in the text
  */
 export function isWholeWordMatch(text: string, keyword: string): boolean {
+  // Escape special regex characters in the keyword
+  const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  
   // Create a regex pattern with word boundaries
   // \b ensures the keyword is matched as a complete word, not part of another word
-  const pattern = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+  const pattern = new RegExp(`\\b${escapedKeyword}\\b`, 'i');
   const matches = pattern.test(text);
   
   console.log(`[WHOLE WORD MATCH DEBUG] Testing "${keyword}" in "${text}"`);
+  console.log(`[WHOLE WORD MATCH DEBUG] Escaped: "${escapedKeyword}"`);
   console.log(`[WHOLE WORD MATCH DEBUG] Pattern: ${pattern.toString()}`);
   console.log(`[WHOLE WORD MATCH DEBUG] Result: ${matches}`);
   
@@ -23,6 +27,7 @@ export function testRegexPatterns() {
   
   const testCases = [
     { text: "BANK OF AMERICA", keyword: "BANK", expected: true },
+    { text: "BANK OF AMERICA", keyword: "BANK OF AMERICA", expected: true },
     { text: "BANKRUPT CORP", keyword: "BANK", expected: false },
     { text: "CITIBANK", keyword: "BANK", expected: true },
     { text: "AMERICAN EXPRESS", keyword: "AMERICAN", expected: true },
@@ -53,8 +58,8 @@ export function testNormalization() {
   
   testCases.forEach(testCase => {
     const { advancedNormalization } = require('./stringMatching');
-    const { normalized, tokens } = advancedNormalization(testCase);
-    console.log(`[NORMALIZATION TEST] "${testCase}" -> "${normalized}"`);
-    console.log(`[NORMALIZATION TEST] Tokens: [${tokens.join(', ')}]`);
+    const result = advancedNormalization(testCase);
+    console.log(`[NORMALIZATION TEST] "${testCase}" -> "${result.normalized}"`);
+    console.log(`[NORMALIZATION TEST] Tokens: [${result.tokens.join(', ')}]`);
   });
 }
