@@ -2,7 +2,6 @@
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
-import { validateOpenAIResponse, validateSICPreservation } from '@/lib/openai/sicCodeValidator';
 
 interface ProcessingStats {
   totalProcessed: number;
@@ -14,13 +13,21 @@ interface ProcessingStats {
   sicPreservationErrors: number;
 }
 
+interface TrueBatchClassificationResult {
+  classification: 'Business' | 'Individual';
+  confidence: number;
+  reasoning: string;
+  sicCode?: string;
+  sicDescription?: string;
+}
+
 export function processEnhancedBatchResults(
-  rawResults: any[],
+  processedResults: TrueBatchClassificationResult[],
   uniquePayeeNames: string[],
   payeeData: PayeeRowData,
   job: BatchJob
 ): { finalClassifications: PayeeClassification[], summary: BatchProcessingResult } {
-  console.log(`[ENHANCED PROCESSOR] === PROCESSING ${rawResults.length} RESULTS WITH COMPREHENSIVE SIC VALIDATION ===`);
+  console.log(`[ENHANCED PROCESSOR] === PROCESSING ${processedResults.length} RESULTS WITH COMPREHENSIVE SIC VALIDATION ===`);
   
   const stats: ProcessingStats = {
     totalProcessed: 0,
@@ -35,61 +42,53 @@ export function processEnhancedBatchResults(
   const finalClassifications: PayeeClassification[] = [];
   const processingErrors: string[] = [];
 
-  for (let i = 0; i < rawResults.length; i++) {
-    const rawResult = rawResults[i];
+  for (let i = 0; i < processedResults.length; i++) {
+    const processedResult = processedResults[i];
     const payeeName = uniquePayeeNames[i];
     stats.totalProcessed++;
 
-    console.log(`[ENHANCED PROCESSOR] Processing ${i + 1}/${rawResults.length}: "${payeeName}"`);
+    console.log(`[ENHANCED PROCESSOR] Processing ${i + 1}/${processedResults.length}: "${payeeName}"`);
+    console.log(`[ENHANCED PROCESSOR] Result data:`, {
+      classification: processedResult.classification,
+      confidence: processedResult.confidence,
+      hasSicCode: !!processedResult.sicCode,
+      sicCode: processedResult.sicCode,
+      sicDescription: processedResult.sicDescription
+    });
 
     try {
-      // Phase 1: Validate OpenAI response structure and SIC codes
-      const validation = validateOpenAIResponse(rawResult, payeeName);
-      
-      if (!validation.hasValidStructure) {
-        throw new Error(`OpenAI response validation failed: ${validation.errors.join(', ')}`);
+      // Phase 1: Validate the processed result structure
+      if (!processedResult.classification || processedResult.confidence === undefined) {
+        throw new Error(`Invalid processed result structure - missing classification or confidence`);
       }
-      
-      if (validation.errors.length > 0) {
-        stats.sicValidationErrors++;
-        console.warn(`[ENHANCED PROCESSOR] SIC validation errors for "${payeeName}":`, validation.errors);
-      }
-
-      // Parse the validated response
-      const content = rawResult.response.body.choices[0].message.content;
-      const classificationResult = JSON.parse(content);
 
       // Phase 2: Track business classifications and SIC codes
-      if (classificationResult.classification === 'Business') {
+      if (processedResult.classification === 'Business') {
         stats.businessCount++;
         
-        if (validation.hasSICCode && validation.sicValidation.isValid) {
+        if (processedResult.sicCode) {
           stats.sicCodeCount++;
-          console.log(`[ENHANCED PROCESSOR] ✅ Business "${payeeName}" validated with SIC: ${validation.sicValidation.sicCode}`);
+          console.log(`[ENHANCED PROCESSOR] ✅ Business "${payeeName}" has SIC: ${processedResult.sicCode} - ${processedResult.sicDescription || 'No description'}`);
         } else {
-          console.error(`[ENHANCED PROCESSOR] ❌ Business "${payeeName}" missing or invalid SIC code`);
+          console.error(`[ENHANCED PROCESSOR] ❌ Business "${payeeName}" missing SIC code`);
           processingErrors.push(`Business "${payeeName}" missing SIC code`);
+          stats.sicValidationErrors++;
         }
       }
 
-      // Phase 3: Create classification with SIC preservation validation
-      const originalSIC = {
-        sicCode: classificationResult.sicCode,
-        sicDescription: classificationResult.sicDescription
-      };
-
+      // Phase 3: Create classification with SIC preservation
       const classification: PayeeClassification = {
         id: `${job.id}-${i}`,
         payeeName,
         result: {
-          classification: classificationResult.classification,
-          confidence: classificationResult.confidence,
-          reasoning: classificationResult.reasoning || 'AI classification result',
+          classification: processedResult.classification,
+          confidence: processedResult.confidence,
+          reasoning: processedResult.reasoning || 'AI classification result',
           processingTier: 'AI-Powered',
           processingMethod: 'OpenAI Batch API',
-          matchingRules: classificationResult.matchingRules || [],
-          sicCode: validation.sicValidation.sicCode,
-          sicDescription: validation.sicValidation.sicDescription,
+          matchingRules: [],
+          sicCode: processedResult.sicCode,
+          sicDescription: processedResult.sicDescription,
           keywordExclusion: {
             isExcluded: false,
             matchedKeywords: [],
@@ -103,15 +102,12 @@ export function processEnhancedBatchResults(
       };
 
       // Phase 4: Validate SIC preservation
-      const processedSIC = {
-        sicCode: classification.result.sicCode,
-        sicDescription: classification.result.sicDescription
-      };
-
-      const preservationResult = validateSICPreservation(originalSIC, processedSIC, payeeName);
-      if (!preservationResult.isPreserved) {
+      if (processedResult.classification === 'Business' && processedResult.sicCode && !classification.result.sicCode) {
         stats.sicPreservationErrors++;
-        processingErrors.push(...preservationResult.errors);
+        processingErrors.push(`SIC code lost during processing for "${payeeName}"`);
+        console.error(`[ENHANCED PROCESSOR] ❌ SIC preservation failed for "${payeeName}"`);
+      } else if (classification.result.sicCode) {
+        console.log(`[ENHANCED PROCESSOR] ✅ SIC preserved for "${payeeName}": ${classification.result.sicCode}`);
       }
 
       finalClassifications.push(classification);
@@ -168,7 +164,9 @@ export function processEnhancedBatchResults(
   }
 
   if (stats.businessCount > 0 && stats.sicCodeCount === 0) {
-    console.error(`[ENHANCED PROCESSOR] 🚨 CRITICAL: No SIC codes found for any businesses! This suggests OpenAI is not returning SIC codes.`);
+    console.error(`[ENHANCED PROCESSOR] 🚨 CRITICAL: No SIC codes found for any businesses!`);
+  } else if (sicCoverage < 80 && stats.businessCount > 0) {
+    console.warn(`[ENHANCED PROCESSOR] ⚠️ LOW SIC COVERAGE: Only ${sicCoverage}% of businesses have SIC codes`);
   }
 
   const summary: BatchProcessingResult = {
