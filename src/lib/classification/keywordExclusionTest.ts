@@ -5,9 +5,9 @@ import { quickSimilarityTest } from './stringMatching';
 /**
  * Quick test function for debugging
  */
-export function quickTest(payeeName: string): void {
+export async function quickTest(payeeName: string): Promise<void> {
   console.log(`\n[QUICK TEST] Running quick test for: "${payeeName}"\n`);
-  const result = checkKeywordExclusion(payeeName);
+  const result = await checkKeywordExclusion(payeeName);
   console.log(`Result: ${result.isExcluded ? '✅ EXCLUDED' : '❌ NOT EXCLUDED'}`);
   console.log(`Confidence: ${result.confidence}%`);
   console.log(`Matched Keywords: ${result.matchedKeywords.join(', ') || 'None'}`);
@@ -18,7 +18,7 @@ export function quickTest(payeeName: string): void {
 /**
  * Specific test for AT&T exclusion variants
  */
-export function testATTExclusion(): void {
+export async function testATTExclusion(): Promise<void> {
   console.log('\n[AT&T EXCLUSION TEST] Testing AT&T variant exclusions...\n');
   
   const attVariants = [
@@ -41,9 +41,10 @@ export function testATTExclusion(): void {
   ];
 
   console.log('Testing AT&T variants for exclusion:');
-  attVariants.forEach((variant, index) => {
+  for (let index = 0; index < attVariants.length; index++) {
+    const variant = attVariants[index];
     console.log(`\n--- Test ${index + 1}: "${variant}" ---`);
-    const result = checkKeywordExclusion(variant);
+    const result = await checkKeywordExclusion(variant);
     
     console.log(`Result: ${result.isExcluded ? '✅ EXCLUDED' : '❌ NOT EXCLUDED'}`);
     console.log(`Confidence: ${result.confidence}%`);
@@ -55,7 +56,7 @@ export function testATTExclusion(): void {
     } else {
       console.log(`✅ SUCCESS: "${variant}" properly excluded`);
     }
-  });
+  }
 
   // Test edge cases that should NOT be excluded
   const nonAttNames = [
@@ -67,9 +68,10 @@ export function testATTExclusion(): void {
   ];
 
   console.log('\n\nTesting names that should NOT be excluded (false positive check):');
-  nonAttNames.forEach((name, index) => {
+  for (let index = 0; index < nonAttNames.length; index++) {
+    const name = nonAttNames[index];
     console.log(`\n--- False Positive Test ${index + 1}: "${name}" ---`);
-    const result = checkKeywordExclusion(name);
+    const result = await checkKeywordExclusion(name);
     
     console.log(`Result: ${result.isExcluded ? '❌ EXCLUDED (should not be)' : '✅ NOT EXCLUDED'}`);
     if (result.isExcluded) {
@@ -78,7 +80,7 @@ export function testATTExclusion(): void {
     } else {
       console.log(`✅ CORRECT: "${name}" properly allowed through`);
     }
-  });
+  }
 
   console.log('\n[AT&T EXCLUSION TEST] Test complete - check results above\n');
 }
@@ -86,7 +88,7 @@ export function testATTExclusion(): void {
 /**
  * Test function to validate keyword exclusion logic
  */
-export function testKeywordExclusion(): void {
+export async function testKeywordExclusion(): Promise<void> {
   console.log('[KEYWORD EXCLUSION TEST] Running comprehensive test suite...\n');
 
   const testCases = [
@@ -101,9 +103,10 @@ export function testKeywordExclusion(): void {
     { name: 'Jane Smith', expected: false }
   ];
 
-  testCases.forEach((testCase, index) => {
+  for (let index = 0; index < testCases.length; index++) {
+    const testCase = testCases[index];
     console.log(`\n--- Test ${index + 1}: "${testCase.name}" ---`);
-    const result = checkKeywordExclusion(testCase.name);
+    const result = await checkKeywordExclusion(testCase.name);
     console.log(`Result: ${result.isExcluded ? '✅ EXCLUDED' : '❌ NOT EXCLUDED'}`);
     console.log(`Confidence: ${result.confidence}%`);
     console.log(`Matched Keywords: ${result.matchedKeywords.join(', ') || 'None'}`);
@@ -114,10 +117,10 @@ export function testKeywordExclusion(): void {
     } else {
       console.log(`✅ SUCCESS: "${testCase.name}" - Properly classified`);
     }
-  });
+  }
 
   // Add AT&T specific tests
-  testATTExclusion();
+  await testATTExclusion();
   
   console.log('\n[KEYWORD EXCLUSION TEST] All tests complete! Check console output for detailed results.');
 }

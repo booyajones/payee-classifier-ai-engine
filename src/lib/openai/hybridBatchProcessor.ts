@@ -1,7 +1,7 @@
 import { ClassificationConfig } from '@/lib/types';
 import { createBatchJob, BatchJob, getBatchJobResults, TrueBatchClassificationResult } from './trueBatchAPI';
 import { optimizedBatchClassification } from './optimizedBatchClassification';
-import { checkKeywordExclusion } from '@/lib/classification/enhancedKeywordExclusion';
+import { checkEnhancedKeywordExclusion as checkKeywordExclusion } from '@/lib/classification/enhancedExclusionLogic';
 import { KEYWORD_EXCLUSION_CONFIG } from '@/lib/classification/config';
 
 export interface HybridBatchResult {
@@ -35,13 +35,13 @@ export type ProgressCallback = (
 /**
  * Apply keyword exclusions - ALWAYS ENABLED with enhanced logging
  */
-function applyKeywordExclusions(payeeNames: string[]) {
+async function applyKeywordExclusions(payeeNames: string[]) {
   console.log(`[HYBRID BATCH] [KEYWORD EXCLUSION] Processing ${payeeNames.length} names - ALWAYS ENABLED`);
   console.log(`[HYBRID BATCH] [KEYWORD EXCLUSION] Config:`, KEYWORD_EXCLUSION_CONFIG);
   
-  const exclusionResults = payeeNames.map((name, index) => {
+  const exclusionResults = await Promise.all(payeeNames.map(async (name, index) => {
     console.log(`[HYBRID BATCH] [KEYWORD EXCLUSION] Processing ${index + 1}/${payeeNames.length}: "${name}"`);
-    const result = checkKeywordExclusion(name);
+    const result = await checkKeywordExclusion(name);
     
     if (KEYWORD_EXCLUSION_CONFIG.logMatches && result.isExcluded) {
       console.log(`[HYBRID BATCH] [KEYWORD EXCLUSION] ✓ EXCLUDED "${name}" - matched: ${result.matchedKeywords.join(', ')}`);
@@ -51,7 +51,7 @@ function applyKeywordExclusions(payeeNames: string[]) {
     }
     
     return result;
-  });
+  }));
   
   const excludedCount = exclusionResults.filter(r => r.isExcluded).length;
   console.log(`[HYBRID BATCH] [KEYWORD EXCLUSION] SUMMARY: Excluded ${excludedCount}/${payeeNames.length} names`);
@@ -88,7 +88,7 @@ export async function processWithHybridBatch(
   stats.phase = 'Applying keyword exclusions (ALWAYS ENABLED)';
   onProgress?.(0, payeeNames.length, 0, stats);
 
-  const exclusionResults = applyKeywordExclusions(payeeNames);
+  const exclusionResults = await applyKeywordExclusions(payeeNames);
   
   // Separate excluded vs. needs AI processing
   const needsAI: { name: string; index: number }[] = [];
@@ -197,7 +197,7 @@ export async function completeBatchJob(
   console.log(`[HYBRID BATCH] Completing batch job ${batchJob.id} for ${originalPayeeNames.length} payees`);
   
   // Re-apply keyword exclusions to get the same filtering - ALWAYS ENABLED
-  const exclusionResults = applyKeywordExclusions(originalPayeeNames);
+  const exclusionResults = await applyKeywordExclusions(originalPayeeNames);
   const needsAI: { name: string; index: number }[] = [];
   const finalResults: Array<{
     classification: 'Business' | 'Individual';

@@ -1,7 +1,6 @@
-
 import { ClassificationResult, ClassificationConfig, SimilarityScores } from '../types';
 import { DEFAULT_CLASSIFICATION_CONFIG } from './config';
-import { checkKeywordExclusion } from './enhancedKeywordExclusion';
+import { checkEnhancedKeywordExclusion as checkKeywordExclusion } from './enhancedExclusionLogic';
 import { calculateCombinedSimilarity, advancedNormalization } from './stringMatching';
 import { applyRuleBasedClassification } from './ruleBasedClassification';
 import { applyNLPClassification } from './nlpClassification';
@@ -28,7 +27,7 @@ export async function enhancedClassifyPayeeV2(
 
   try {
     // Step 1: Check keyword exclusion first
-    const keywordExclusion = checkKeywordExclusion(payeeName);
+    const keywordExclusion = await checkKeywordExclusion(payeeName);
     if (keywordExclusion.isExcluded) {
       return {
         classification: 'Business', // Default for excluded items

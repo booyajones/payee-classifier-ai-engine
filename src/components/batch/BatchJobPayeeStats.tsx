@@ -3,53 +3,69 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { BarChart3 } from 'lucide-react';
 import { PayeeRowData } from '@/lib/rowMapping';
-import { checkKeywordExclusion } from '@/lib/classification/enhancedKeywordExclusion';
+import { checkEnhancedKeywordExclusion as checkKeywordExclusion } from '@/lib/classification/enhancedExclusionLogic';
 
 interface BatchJobPayeeStatsProps {
   payeeData?: PayeeRowData;
 }
 
 const BatchJobPayeeStats = ({ payeeData }: BatchJobPayeeStatsProps) => {
-  const payeeStats = React.useMemo(() => {
-    if (!payeeData) return null;
+  const [payeeStats, setPayeeStats] = React.useState<{
+    total: number;
+    excluded: number;
+    business: number;
+    individual: number;
+    unknown: number;
+    excludedPayees: Array<{ name: string; exclusion: { isExcluded: boolean; matchedKeywords: string[] } }>;
+    hasMoreExcluded: boolean;
+  } | null>(null);
 
-    // Check which payees would be excluded by keywords
-    const exclusionResults = payeeData.uniquePayeeNames.map(name => ({
-      name,
-      exclusion: checkKeywordExclusion(name)
-    }));
+  React.useEffect(() => {
+    if (!payeeData) return;
 
-    const excludedPayees = exclusionResults.filter(r => r.exclusion.isExcluded);
-    const nonExcludedPayees = exclusionResults.filter(r => !r.exclusion.isExcluded);
+    const calculateStats = async () => {
+      // Check which payees would be excluded by keywords
+      const exclusionResults = await Promise.all(
+        payeeData.uniquePayeeNames.map(async (name) => ({
+          name,
+          exclusion: await checkKeywordExclusion(name)
+        }))
+      );
 
-    // Simple heuristic for business vs individual classification
-    // This is a preview - actual classification happens during processing
-    const businessIndicators = ['LLC', 'INC', 'CORP', 'LTD', 'CO', 'COMPANY', 'CORPORATION', 'LIMITED'];
-    const individualIndicators = ['MR', 'MRS', 'MS', 'DR', 'MISS'];
+      const excludedPayees = exclusionResults.filter(r => r.exclusion.isExcluded);
+      const nonExcludedPayees = exclusionResults.filter(r => !r.exclusion.isExcluded);
 
-    const businessCount = nonExcludedPayees.filter(p => {
-      const upperName = p.name.toUpperCase();
-      return businessIndicators.some(indicator => upperName.includes(indicator));
-    }).length;
+      // Simple heuristic for business vs individual classification
+      // This is a preview - actual classification happens during processing
+      const businessIndicators = ['LLC', 'INC', 'CORP', 'LTD', 'CO', 'COMPANY', 'CORPORATION', 'LIMITED'];
+      const individualIndicators = ['MR', 'MRS', 'MS', 'DR', 'MISS'];
 
-    const individualCount = nonExcludedPayees.filter(p => {
-      const upperName = p.name.toUpperCase();
-      return individualIndicators.some(indicator => upperName.includes(indicator)) ||
-             (!businessIndicators.some(indicator => upperName.includes(indicator)) && 
-              upperName.split(' ').length >= 2);
-    }).length;
+      const businessCount = nonExcludedPayees.filter(p => {
+        const upperName = p.name.toUpperCase();
+        return businessIndicators.some(indicator => upperName.includes(indicator));
+      }).length;
 
-    const unknownCount = nonExcludedPayees.length - businessCount - individualCount;
+      const individualCount = nonExcludedPayees.filter(p => {
+        const upperName = p.name.toUpperCase();
+        return individualIndicators.some(indicator => upperName.includes(indicator)) ||
+               (!businessIndicators.some(indicator => upperName.includes(indicator)) && 
+                upperName.split(' ').length >= 2);
+      }).length;
 
-    return {
-      total: payeeData.uniquePayeeNames.length,
-      excluded: excludedPayees.length,
-      business: businessCount,
-      individual: individualCount,
-      unknown: unknownCount,
-      excludedPayees: excludedPayees.slice(0, 5), // Show first 5 excluded payees
-      hasMoreExcluded: excludedPayees.length > 5
+      const unknownCount = nonExcludedPayees.length - businessCount - individualCount;
+
+      setPayeeStats({
+        total: payeeData.uniquePayeeNames.length,
+        excluded: excludedPayees.length,
+        business: businessCount,
+        individual: individualCount,
+        unknown: unknownCount,
+        excludedPayees: excludedPayees.slice(0, 5), // Show first 5 excluded payees
+        hasMoreExcluded: excludedPayees.length > 5
+      });
     };
+
+    calculateStats();
   }, [payeeData]);
 
   if (!payeeStats) return null;
