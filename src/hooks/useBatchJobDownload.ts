@@ -1,7 +1,7 @@
 import { BatchJob, getBatchJobResults } from "@/lib/openai/trueBatchAPI";
 import { PayeeRowData } from "@/lib/rowMapping";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
-import { processEnhancedBatchResults } from "@/services/enhancedBatchResultProcessor";
+import { processEnhancedBatchResults } from "@/services/batchProcessor";
 import { saveClassificationResultsWithValidation } from "@/lib/database/enhancedClassificationService";
 import { useToast } from "@/components/ui/use-toast";
 import { testSicCodePipeline } from "@/lib/testing/sicCodeTest";
@@ -79,13 +79,13 @@ export const useBatchJobDownload = ({
         }
       };
 
-      const { finalClassifications, summary } = await processEnhancedBatchResults(
+      const { finalClassifications, summary } = await processEnhancedBatchResults({
         rawResults,
         uniquePayeeNames,
         payeeData,
         job,
         onProgress
-      );
+      });
 
       console.log(`[BATCH DOWNLOAD] Enhanced processing complete: ${finalClassifications.length} unique classifications`);
       

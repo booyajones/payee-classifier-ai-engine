@@ -2,7 +2,7 @@
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
-import { processEnhancedBatchResults } from './enhancedBatchResultProcessor';
+import { processEnhancedBatchResults } from './batchProcessor';
 
 interface TrueBatchClassificationResult {
   classification: 'Business' | 'Individual';
@@ -32,5 +32,10 @@ export async function processBatchResults(
   }
   
   // Use the enhanced processor with the correct data format
-  return await processEnhancedBatchResults(processedResults, uniquePayeeNames, payeeData, job);
+  return await processEnhancedBatchResults({
+    rawResults: processedResults,
+    uniquePayeeNames,
+    payeeData,
+    job
+  });
 }
