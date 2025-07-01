@@ -9,6 +9,7 @@ import SmartFileUploadHeader from './upload/SmartFileUploadHeader';
 import SmartFileUploadContent from './upload/SmartFileUploadContent';
 import SmartFileUploadStatusDisplay from './upload/SmartFileUploadStatusDisplay';
 import { useSmartFileUploadCore } from './upload/SmartFileUploadCore';
+import { productionLogger } from '@/lib/logging';
 
 interface SmartFileUploadProps {
   onBatchJobCreated: (batchJob: BatchJob | null, payeeRowData: PayeeRowData) => void;
@@ -49,7 +50,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
   });
 
   // Debug logging for main component
-  console.log('[SMART UPLOAD DEBUG] Main component rendering:', {
+  productionLogger.debug('Smart upload component rendering', {
     uploadState,
     hasFileData: !!fileData,
     fileDataLength: fileData?.length || 0,
@@ -57,43 +58,44 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
     fileHeadersCount: fileHeaders.length,
     selectedColumn: selectedPayeeColumn,
     isProcessing: uploadState === 'processing'
-  });
+  }, 'SMART_UPLOAD');
 
   const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
-      console.log('[SMART UPLOAD DEBUG] No file selected');
+      productionLogger.debug('No file selected', null, 'SMART_UPLOAD');
       return;
     }
-    console.log('[SMART UPLOAD DEBUG] File selected for processing:', file.name);
+    productionLogger.info('File selected for processing', { fileName: file.name, size: file.size }, 'SMART_UPLOAD');
     await handleFileSelect(file);
   };
 
   const handleColumnSelect = async () => {
-    console.log('[SMART UPLOAD DEBUG] Column selection initiated', {
+    productionLogger.debug('Column selection initiated', {
       selectedColumn: selectedPayeeColumn,
       hasFileData: !!fileData,
       fileDataLength: fileData?.length || 0
-    });
+    }, 'SMART_UPLOAD');
 
     if (!selectedPayeeColumn) {
-      console.error('[SMART UPLOAD DEBUG] No column selected - cannot proceed');
+      productionLogger.error('No column selected - cannot proceed', null, 'SMART_UPLOAD');
       return;
     }
 
     if (!fileData || fileData.length === 0) {
-      console.error('[SMART UPLOAD DEBUG] No file data available - cannot proceed');
+      productionLogger.error('No file data available - cannot proceed', null, 'SMART_UPLOAD');
       return;
     }
 
     // Validate the payee column first
     const payeeRowData = await validatePayeeColumn();
     if (!payeeRowData) {
-      console.error('[SMART UPLOAD DEBUG] Payee column validation failed');
+      productionLogger.error('Payee column validation failed', null, 'SMART_UPLOAD');
       return;
     }
 
-    console.log('[SMART UPLOAD DEBUG] Payee column validated successfully, proceeding with batch creation');
+    productionLogger.info('Payee column validated successfully, proceeding with batch creation', 
+      { uniquePayees: payeeRowData.uniquePayeeNames.length }, 'SMART_UPLOAD');
     await coreHandleColumnSelect(payeeRowData, validatePayeeColumn);
   };
 

@@ -6,6 +6,7 @@ import EnhancedUploadProgressDisplay from './EnhancedUploadProgressDisplay';
 import PerformanceMonitoringDashboard from '../performance/PerformanceMonitoringDashboard';
 import UploadSuccessDisplay from './UploadSuccessDisplay';
 import UploadErrorDisplay from './UploadErrorDisplay';
+import ProgressIndicator from '../ui/progress-indicator';
 
 interface SmartFileUploadContentProps {
   uploadState: UploadState;
@@ -70,7 +71,14 @@ const SmartFileUploadContent = ({
       )}
 
       {uploadState === 'processing' && (
-        <>
+        <div className="space-y-4">
+          <ProgressIndicator 
+            progress={0}
+            status="loading"
+            message="Processing your file..."
+            className="mb-4"
+          />
+          
           <EnhancedUploadProgressDisplay
             uploadState={uploadState}
             uploadId={UPLOAD_ID}
@@ -87,7 +95,7 @@ const SmartFileUploadContent = ({
               />
             </div>
           )}
-        </>
+        </div>
       )}
 
       {uploadState === 'complete' && (
