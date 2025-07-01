@@ -3,7 +3,7 @@ import { UploadState, FileProcessingInfo } from '@/hooks/useSmartFileUpload';
 import FileSelectionArea from './FileSelectionArea';
 import ColumnSelectionArea from './ColumnSelectionArea';
 import EnhancedUploadProgressDisplay from './EnhancedUploadProgressDisplay';
-import PerformanceMonitoringDashboard from '../performance/PerformanceMonitoringDashboard';
+
 import UploadSuccessDisplay from './UploadSuccessDisplay';
 import UploadErrorDisplay from './UploadErrorDisplay';
 import ProgressIndicator from '../ui/progress-indicator';
@@ -86,15 +86,6 @@ const SmartFileUploadContent = ({
             showProgressHistory={false}
           />
           
-          {/* Performance monitoring for large files */}
-          {(fileData?.length || 0) > 10000 && (
-            <div className="mt-4">
-              <PerformanceMonitoringDashboard 
-                isVisible={true}
-                compact={true}
-              />
-            </div>
-          )}
         </div>
       )}
 

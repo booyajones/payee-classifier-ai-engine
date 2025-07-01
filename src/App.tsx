@@ -6,7 +6,7 @@ import Index from '@/pages/Index';
 import About from '@/pages/About';
 import NotFound from '@/pages/NotFound';
 import ErrorBoundaryEnhanced from '@/components/ErrorBoundaryEnhanced';
-import DeveloperTools from '@/components/dev/DeveloperTools';
+
 import './App.css';
 
 const queryClient = new QueryClient();
@@ -24,7 +24,7 @@ function App() {
             </Routes>
           </div>
           <Toaster />
-          <DeveloperTools />
+          
         </Router>
       </ErrorBoundaryEnhanced>
     </QueryClientProvider>

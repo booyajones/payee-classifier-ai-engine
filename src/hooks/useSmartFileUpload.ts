@@ -4,7 +4,7 @@ import { parseUploadedFile } from '@/lib/utils';
 import { createPayeeRowMapping, PayeeRowData } from '@/lib/rowMapping';
 import { useUnifiedProgress } from '@/contexts/UnifiedProgressContext';
 import { useEnhancedFileValidation } from './useEnhancedFileValidation';
-import { useMemoryAwareFileProcessor } from './useMemoryAwareFileProcessor';
+
 import { useToast } from '@/hooks/use-toast';
 
 export type UploadState = 'idle' | 'uploaded' | 'processing' | 'complete' | 'error';
@@ -38,11 +38,6 @@ export const useSmartFileUpload = () => {
 
   const { updateProgress, completeProgress, clearProgress } = useUnifiedProgress();
   const { validateFile } = useEnhancedFileValidation();
-  const { processWithMemoryManagement, getMemoryStatus } = useMemoryAwareFileProcessor({
-    enableMonitoring: true,
-    maxChunkSize: 2000,
-    memoryThreshold: 0.8
-  });
   const { toast } = useToast();
 
   const UPLOAD_ID = 'file-upload';
@@ -133,19 +128,8 @@ export const useSmartFileUpload = () => {
 
       debugLog('Starting memory-aware file processing');
 
-      // Memory-aware file processing for large files
-      const data = await processWithMemoryManagement(
-        [file],
-        async (files) => {
-          const results = [];
-          for (const f of files) {
-            const parsed = await parseUploadedFile(f);
-            results.push(...(parsed || []));
-          }
-          return results;
-        },
-        'file-parsing'
-      );
+      // Direct file processing without memory management
+      const data = await parseUploadedFile(file);
 
       debugLog('File parsing completed', {
         rowsFound: data?.length || 0
@@ -182,11 +166,6 @@ export const useSmartFileUpload = () => {
         fileInfo: validationResult.fileInfo
       };
 
-      // Check memory status
-      const memoryStatus = getMemoryStatus();
-      if (memoryStatus.memoryPressure === 'high') {
-        enhancedProcessingInfo.sizeWarning = 'High memory usage detected. Processing may be slower.';
-      }
 
       setProcessingInfo(enhancedProcessingInfo);
 
@@ -236,30 +215,17 @@ export const useSmartFileUpload = () => {
     updateProgress(UPLOAD_ID, 'Validating payee data...', 10);
 
     try {
-      // Memory-aware payee validation processing
-      const validationResult = await processWithMemoryManagement(
-        [{ data: fileData, column: selectedPayeeColumn }],
-        async (chunks) => {
-          const results = [];
-          for (const chunk of chunks) {
-            // Extract and validate payee names
-            const payeeNames = chunk.data
-              .map((row: any) => {
-                const value = row[chunk.column];
-                return typeof value === 'string' ? value.trim() : String(value || '').trim();
-              })
-              .filter((name: string) => name.length > 0);
+      // Direct payee validation processing
+      const payeeNames = fileData
+        .map((row: any) => {
+          const value = row[selectedPayeeColumn];
+          return typeof value === 'string' ? value.trim() : String(value || '').trim();
+        })
+        .filter((name: string) => name.length > 0);
 
-            if (payeeNames.length === 0) {
-              throw new Error(`No valid payee names found in the "${chunk.column}" column. Please check your data and column selection.`);
-            }
-
-            results.push(...payeeNames);
-          }
-          return results;
-        },
-        'payee-validation'
-      );
+      if (payeeNames.length === 0) {
+        throw new Error(`No valid payee names found in the "${selectedPayeeColumn}" column. Please check your data and column selection.`);
+      }
 
       updateProgress(UPLOAD_ID, 'Creating payee mappings and analyzing duplicates...', 30);
       const payeeRowData = createPayeeRowMapping(fileData, selectedPayeeColumn);
