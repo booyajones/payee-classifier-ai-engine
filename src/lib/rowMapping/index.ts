@@ -1,14 +1,19 @@
 
 // Main exports for row mapping functionality
 export * from './types';
-export * from './mappingCreator';
+export * from './asyncMappingCreator';
+export * from './syncMappingCreator';
+export * from './validationUtils';
 export * from './resultMapper';
 
 // Legacy exports for backward compatibility
 export { 
-  createPayeeRowMapping,
+  createPayeeRowMapping
+} from './syncMappingCreator';
+
+export {
   createPayeeRowMappingAsync
-} from './mappingCreator';
+} from './asyncMappingCreator';
 
 export {
   mapResultsToOriginalRows,
