@@ -40,8 +40,29 @@ export async function enhancedClassifyPayeeV2(
       };
     }
 
-    // Step 2: Advanced normalization and analysis
-    const { normalized, businessIndicators, individualIndicators } = advancedNormalization(payeeName);
+    // Step 2: Normalize the payee name for analysis
+    const normalized = advancedNormalization(payeeName);
+    
+    // Simple business/individual indicators based on normalized text
+    const businessIndicators: string[] = [];
+    const individualIndicators: string[] = [];
+    
+    // Check for business indicators
+    if (normalized.includes('CORP') || normalized.includes('INC') || normalized.includes('LLC')) {
+      businessIndicators.push('Corporate suffix');
+    }
+    if (normalized.includes('AND') || normalized.includes('&')) {
+      businessIndicators.push('Conjunction');
+    }
+    if (/\d/.test(normalized)) {
+      businessIndicators.push('Contains numbers');
+    }
+    
+    // Check for individual indicators
+    const words = normalized.split(/\s+/).filter(w => w.length > 0);
+    if (words.length === 2 && !businessIndicators.length) {
+      individualIndicators.push('Two word name');
+    }
     
     // Step 3: Ultra-fast rule gate with enhanced detection
     const businessCheck = detectBusinessByExtendedRules(payeeName);

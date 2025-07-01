@@ -156,6 +156,13 @@ export function calculateCombinedSimilarity(str1: string, str2: string): Similar
 }
 
 /**
+ * Quick similarity test function for debugging
+ */
+export function quickSimilarityTest(str1: string, str2: string): SimilarityScores {
+  return calculateCombinedSimilarity(str1, str2);
+}
+
+/**
  * Advanced text normalization for better matching
  */
 export function advancedNormalization(text: string): string {
