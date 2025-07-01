@@ -1,7 +1,7 @@
 import { BatchJob, getBatchJobResults } from "@/lib/openai/trueBatchAPI";
-import { PayeeRowData, mapResultsToOriginalRows } from "@/lib/rowMapping";
+import { PayeeRowData } from "@/lib/rowMapping";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
-import { processBatchResults } from "@/services/batchResultProcessor";
+import { processEnhancedBatchResults } from "@/services/enhancedBatchResultProcessor";
 import { saveClassificationResultsWithValidation } from "@/lib/database/enhancedClassificationService";
 import { useToast } from "@/components/ui/use-toast";
 import { testSicCodePipeline } from "@/lib/testing/sicCodeTest";
