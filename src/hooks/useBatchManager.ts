@@ -9,6 +9,7 @@ import { useBatchJobCreation } from './batch/useBatchJobCreation';
 import { useBatchJobDeletion } from './batch/useBatchJobDeletion';
 import { useBatchJobRefresh } from './batch/useBatchJobRefresh';
 import { useBatchJobEventHandling } from './batch/useBatchJobEventHandling';
+import { useAutomaticFileGeneration } from './useAutomaticFileGeneration';
 import { handleError } from '@/lib/errorHandler';
 
 interface BatchCreationOptions {
@@ -39,6 +40,9 @@ export const useBatchManager = () => {
   
   // Set up event handling for job updates
   useBatchJobEventHandling(refreshJobs, setError);
+  
+  // Enable automatic file generation for completed jobs
+  useAutomaticFileGeneration(true);
 
   // Update job function with error handling
   const updateJobInManager = useCallback((job: BatchJob) => {

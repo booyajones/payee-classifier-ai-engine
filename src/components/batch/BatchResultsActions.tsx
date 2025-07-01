@@ -1,13 +1,14 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { RotateCcw, Download, Clock, FileText } from "lucide-react";
+import { RotateCcw, Download, Clock } from "lucide-react";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { PreGeneratedFileService } from "@/lib/storage/preGeneratedFileService";
 import { useEnhancedDownload } from "@/hooks/useEnhancedDownload";
 import { useDownloadProgress } from "@/contexts/DownloadProgressContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { AutomaticFileGenerationService } from "@/lib/services/automaticFileGenerationService";
 
 interface BatchResultsActionsProps {
   batchResults: PayeeClassification[];
@@ -41,11 +42,11 @@ const BatchResultsActions = ({
   }>({});
 
   const [isCheckingFiles, setIsCheckingFiles] = React.useState(false);
+  const [isGeneratingFiles, setIsGeneratingFiles] = React.useState(false);
 
   React.useEffect(() => {
     if (jobId) {
       setIsCheckingFiles(true);
-      // Check for pre-generated files
       const checkPreGeneratedFiles = async () => {
         try {
           const { data, error } = await supabase
@@ -73,126 +74,161 @@ const BatchResultsActions = ({
     }
   }, [jobId]);
 
-  const handleInstantDownload = async (format: 'csv' | 'excel') => {
+  const handleDownload = async (format: 'csv' | 'excel') => {
     const url = format === 'csv' ? preGeneratedFiles.csvUrl : preGeneratedFiles.excelUrl;
     
-    if (!url) {
-      toast({
-        title: "File Not Available",
-        description: "Pre-generated file not found. Use the fallback download option.",
-        variant: "destructive",
-      });
-      return;
+    // If pre-generated files exist, download instantly
+    if (url) {
+      try {
+        const timestamp = new Date().toISOString().split('T')[0];
+        const filename = `payee_results_${timestamp}.${format === 'csv' ? 'csv' : 'xlsx'}`;
+        
+        await PreGeneratedFileService.downloadFileFromStorage(url, filename);
+        
+        toast({
+          title: "Download Complete",
+          description: `${filename} downloaded successfully`,
+        });
+        return;
+      } catch (error) {
+        console.error('Instant download failed, falling back to generation:', error);
+      }
     }
 
-    try {
-      const timestamp = new Date().toISOString().split('T')[0];
-      const filename = `payee_results_${timestamp}.${format === 'csv' ? 'csv' : 'xlsx'}`;
-      
-      await PreGeneratedFileService.downloadFileFromStorage(url, filename);
-      
-      toast({
-        title: "Download Complete",
-        description: `${filename} downloaded successfully`,
-      });
-    } catch (error) {
-      console.error('Instant download failed:', error);
-      toast({
-        title: "Download Failed",
-        description: "Failed to download pre-generated file. Please try the standard download.",
-        variant: "destructive",
-      });
-    }
-  };
+    // If no pre-generated files, generate them and then download
+    if (jobId && !isGeneratingFiles) {
+      setIsGeneratingFiles(true);
+      try {
+        toast({
+          title: "Preparing Download",
+          description: "Generating files for download...",
+        });
 
-  const handleFallbackDownload = async (format: 'csv' | 'excel') => {
-    if (!processingSummary || batchResults.length === 0) return;
-    await downloadFile(processingSummary, format);
+        // Get the batch job data for file generation
+        const { data: jobData, error } = await supabase
+          .from('batch_jobs')
+          .select('*')
+          .eq('id', jobId)
+          .single();
+
+        if (error || !jobData) {
+          throw new Error('Failed to fetch job data');
+        }
+
+        const batchJob = {
+          id: jobData.id,
+          status: jobData.status,
+          created_at: jobData.created_at_timestamp,
+          request_counts: {
+            total: jobData.request_counts_total,
+            completed: jobData.request_counts_completed,
+            failed: jobData.request_counts_failed
+          },
+          in_progress_at: jobData.in_progress_at_timestamp,
+          finalizing_at: jobData.finalizing_at_timestamp,
+          completed_at: jobData.completed_at_timestamp,
+          failed_at: jobData.failed_at_timestamp,
+          expired_at: jobData.expired_at_timestamp,
+          cancelled_at: jobData.cancelled_at_timestamp,
+          metadata: jobData.metadata,
+          errors: jobData.errors,
+          output_file_id: jobData.output_file_id
+        };
+
+        // Generate files
+        await AutomaticFileGenerationService.processCompletedJob(batchJob);
+
+        // Refresh file status
+        const { data: updatedData } = await supabase
+          .from('batch_jobs')
+          .select('csv_file_url, excel_file_url')
+          .eq('id', jobId)
+          .single();
+
+        if (updatedData) {
+          const newUrl = format === 'csv' ? updatedData.csv_file_url : updatedData.excel_file_url;
+          if (newUrl) {
+            const timestamp = new Date().toISOString().split('T')[0];
+            const filename = `payee_results_${timestamp}.${format === 'csv' ? 'csv' : 'xlsx'}`;
+            await PreGeneratedFileService.downloadFileFromStorage(newUrl, filename);
+            
+            toast({
+              title: "Download Complete",
+              description: `${filename} downloaded successfully`,
+            });
+            
+            // Update local state
+            setPreGeneratedFiles(prev => ({
+              ...prev,
+              csvUrl: updatedData.csv_file_url || prev.csvUrl,
+              excelUrl: updatedData.excel_file_url || prev.excelUrl
+            }));
+          } else {
+            throw new Error('File generation completed but no URL available');
+          }
+        }
+      } catch (error) {
+        console.error('File generation and download failed:', error);
+        
+        // Fallback to standard download
+        if (processingSummary) {
+          await downloadFile(processingSummary, format);
+        } else {
+          toast({
+            title: "Download Failed",
+            description: "Unable to download file. Please try again.",
+            variant: "destructive",
+          });
+        }
+      } finally {
+        setIsGeneratingFiles(false);
+      }
+    }
   };
 
   const isDownloadDisabled = isProcessing || !processingSummary || batchResults.length === 0;
-
-  const formatFileSize = (bytes?: number) => {
-    if (!bytes) return '';
-    const mb = bytes / (1024 * 1024);
-    return mb > 1 ? `${mb.toFixed(1)}MB` : `${Math.round(bytes / 1024)}KB`;
-  };
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '';
-    return new Date(dateString).toLocaleString();
-  };
-
   const hasPreGeneratedFiles = preGeneratedFiles.csvUrl && preGeneratedFiles.excelUrl;
 
   return (
     <>
       <div className="flex gap-2 flex-wrap">
-        {hasPreGeneratedFiles ? (
-          <>
-            {/* Instant Download Buttons */}
-            <Button
-              variant="default"
-              onClick={() => handleInstantDownload('csv')}
-              disabled={isDownloadDisabled}
-              className="flex-1 min-w-[120px] bg-green-600 hover:bg-green-700"
-            >
+        <Button
+          variant="default"
+          onClick={() => handleDownload('csv')}
+          disabled={isDownloadDisabled || isGeneratingFiles}
+          className="flex-1 min-w-[120px]"
+        >
+          {isCheckingFiles || isGeneratingFiles ? (
+            <>
+              <Clock className="h-4 w-4 mr-2 animate-spin" />
+              {isGeneratingFiles ? 'Generating...' : 'Checking...'}
+            </>
+          ) : (
+            <>
               <Download className="h-4 w-4 mr-2" />
-              Download CSV (Instant)
-            </Button>
-            
-            <Button
-              variant="outline"
-              onClick={() => handleInstantDownload('excel')}
-              disabled={isDownloadDisabled}
-              className="flex-1 min-w-[120px] border-green-200 text-green-700 hover:bg-green-50"
-            >
+              Download CSV
+            </>
+          )}
+        </Button>
+        
+        <Button
+          variant="outline"
+          onClick={() => handleDownload('excel')}
+          disabled={isDownloadDisabled || isGeneratingFiles}
+          className="flex-1 min-w-[120px]"
+        >
+          {isCheckingFiles || isGeneratingFiles ? (
+            <>
+              <Clock className="h-4 w-4 mr-2 animate-spin" />
+              {isGeneratingFiles ? 'Generating...' : 'Checking...'}
+            </>
+          ) : (
+            <>
               <Download className="h-4 w-4 mr-2" />
-              Download Excel (Instant)
-            </Button>
-          </>
-        ) : (
-          <>
-            {/* Standard Download Buttons */}
-            <Button
-              variant="default"
-              onClick={() => handleFallbackDownload('csv')}
-              disabled={isDownloadDisabled}
-              className="flex-1 min-w-[120px]"
-            >
-              {isCheckingFiles ? (
-                <>
-                  <Clock className="h-4 w-4 mr-2 animate-spin" />
-                  Checking...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download CSV
-                </>
-              )}
-            </Button>
-            
-            <Button
-              variant="outline"
-              onClick={() => handleFallbackDownload('excel')}
-              disabled={isDownloadDisabled}
-              className="flex-1 min-w-[120px]"
-            >
-              {isCheckingFiles ? (
-                <>
-                  <Clock className="h-4 w-4 mr-2 animate-spin" />
-                  Checking...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Excel
-                </>
-              )}
-            </Button>
-          </>
-        )}
+              Download Excel
+            </>
+          )}
+        </Button>
         
         <Button
           variant="outline"
@@ -210,19 +246,13 @@ const BatchResultsActions = ({
         {hasPreGeneratedFiles && (
           <div className="flex items-center gap-2 text-green-600 font-medium">
             <Clock className="h-3 w-3" />
-            <span>
-              ⚡ Instant download ready • {formatFileSize(preGeneratedFiles.fileSizeBytes)} • 
-              Generated {formatDate(preGeneratedFiles.fileGeneratedAt)}
-            </span>
+            <span>⚡ Files ready for instant download</span>
           </div>
         )}
 
-        {!hasPreGeneratedFiles && !isCheckingFiles && jobId && (
+        {!hasPreGeneratedFiles && !isCheckingFiles && (
           <div className="flex items-center gap-2 text-blue-600">
-            <FileText className="h-3 w-3" />
-            <span>
-              Standard download • Files generated on-demand • May take 30+ seconds for large datasets
-            </span>
+            <span>Files will be generated automatically on first download</span>
           </div>
         )}
         

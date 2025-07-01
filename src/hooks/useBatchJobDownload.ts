@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
-import { PreGeneratedFileService } from '@/lib/storage/preGeneratedFileService';
+import { AutomaticFileGenerationService } from '@/lib/services/automaticFileGenerationService';
 import { processDownloadResults, saveProcessedResults } from '@/hooks/batch/downloadProcessor';
 import { useToast } from '@/hooks/use-toast';
 
@@ -52,22 +52,9 @@ export const useBatchJobDownload = ({
         });
       }
 
-      // Generate pre-generated files for future downloads
-      const batchResult: BatchProcessingResult = {
-        results: finalClassifications,
-        successCount: finalClassifications.length,
-        failureCount: 0,
-        originalFileData: payeeData.originalFileData
-      };
-
-      console.log(`[BATCH DOWNLOAD] Generating pre-generated files for future downloads`);
-      const fileResult = await PreGeneratedFileService.generateAndStoreFiles(job.id, batchResult);
-      
-      if (fileResult.error) {
-        console.warn('[BATCH DOWNLOAD] File generation failed:', fileResult.error);
-      } else {
-        console.log(`[BATCH DOWNLOAD] Pre-generated files created successfully`);
-      }
+      // Automatically generate pre-generated files for future downloads
+      console.log(`[BATCH DOWNLOAD] Auto-generating files for job ${job.id}`);
+      await AutomaticFileGenerationService.processCompletedJob(job);
 
       // Complete the job
       onJobComplete(finalClassifications, summary, job.id);

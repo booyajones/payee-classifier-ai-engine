@@ -1,13 +1,14 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
+import { AutomaticFileGenerationService } from '@/lib/services/automaticFileGenerationService';
 
 /**
  * Service for updating batch job status and properties
  */
 export class BatchJobUpdater {
   /**
-   * Update batch job status with retry logic
+   * Update batch job status with retry logic and automatic file generation
    */
   static async updateBatchJobStatus(batchJob: BatchJob): Promise<void> {
     console.log(`[BATCH JOB UPDATER] Updating batch job ${batchJob.id} status to ${batchJob.status}`);
@@ -43,6 +44,16 @@ export class BatchJobUpdater {
         }
         
         console.log(`[BATCH JOB UPDATER] Successfully updated batch job ${batchJob.id} status to ${batchJob.status}`);
+        
+        // Automatically generate files when job completes
+        if (batchJob.status === 'completed' && batchJob.request_counts.completed > 0) {
+          console.log(`[BATCH JOB UPDATER] Job ${batchJob.id} completed, triggering automatic file generation`);
+          // Don't await this - let it run in background
+          AutomaticFileGenerationService.processCompletedJob(batchJob).catch(error => {
+            console.error(`[BATCH JOB UPDATER] Background file generation failed for ${batchJob.id}:`, error);
+          });
+        }
+        
         return;
         
       } catch (error) {
