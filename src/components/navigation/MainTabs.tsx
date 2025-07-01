@@ -19,12 +19,21 @@ interface MainTabsProps {
 }
 
 const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: MainTabsProps) => {
+  // Generate original columns from results data
+  const getOriginalColumns = () => {
+    if (allResults.length === 0) {
+      return ['payeeName'];
+    }
+    const firstResult = allResults[0];
+    return firstResult.originalData ? Object.keys(firstResult.originalData) : ['payeeName'];
+  };
+
   const {
     sortField,
     sortDirection,
     handleSort,
     sortedResults
-  } = useTableSorting(allResults);
+  } = useTableSorting(allResults, getOriginalColumns());
 
   // Handler for single classification results
   const handleSingleClassify = (result: PayeeClassification) => {
