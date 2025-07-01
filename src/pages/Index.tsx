@@ -1,11 +1,13 @@
 
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { UnifiedProgressProvider } from "@/contexts/UnifiedProgressContext";
+import { DownloadProgressProvider } from "@/contexts/DownloadProgressContext";
 import { useIndexState } from "@/hooks/useIndexState";
 import AppHeader from "@/components/layout/AppHeader";
 import AppFooter from "@/components/layout/AppFooter";
 import MainTabs from "@/components/navigation/MainTabs";
 import ApiKeySetupPage from "@/components/setup/ApiKeySetupPage";
+import DownloadProgressDisplay from "@/components/download/DownloadProgressDisplay";
 
 const Index = () => {
   const {
@@ -20,9 +22,11 @@ const Index = () => {
   if (!hasApiKey) {
     return (
       <UnifiedProgressProvider>
-        <ErrorBoundary>
-          <ApiKeySetupPage onKeySet={handleKeySet} />
-        </ErrorBoundary>
+        <DownloadProgressProvider>
+          <ErrorBoundary>
+            <ApiKeySetupPage onKeySet={handleKeySet} />
+          </ErrorBoundary>
+        </DownloadProgressProvider>
       </UnifiedProgressProvider>
     );
   }
@@ -36,27 +40,32 @@ const Index = () => {
 
   return (
     <UnifiedProgressProvider>
-      <ErrorBoundary>
-        <div className="min-h-screen bg-background">
-          <AppHeader 
-            title="Payee Classification System"
-            description="File-based payee classification processing with CSV download"
-          />
+      <DownloadProgressProvider>
+        <ErrorBoundary>
+          <div className="min-h-screen bg-background">
+            <AppHeader 
+              title="Payee Classification System"
+              description="File-based payee classification processing with CSV download"
+            />
 
-          <main className="container px-4 pb-8">
-            <ErrorBoundary>
-              <MainTabs
-                allResults={batchResults}
-                onBatchClassify={handleBatchClassify}
-                onComplete={handleBatchComplete}
-                onJobDelete={handleJobDelete}
-              />
-            </ErrorBoundary>
-          </main>
+            <main className="container px-4 pb-8">
+              <ErrorBoundary>
+                <MainTabs
+                  allResults={batchResults}
+                  onBatchClassify={handleBatchClassify}
+                  onComplete={handleBatchComplete}
+                  onJobDelete={handleJobDelete}
+                />
+              </ErrorBoundary>
+            </main>
 
-          <AppFooter />
-        </div>
-      </ErrorBoundary>
+            <AppFooter />
+            
+            {/* Download Progress Overlay */}
+            <DownloadProgressDisplay />
+          </div>
+        </ErrorBoundary>
+      </DownloadProgressProvider>
     </UnifiedProgressProvider>
   );
 };
