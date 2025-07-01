@@ -2,10 +2,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { BatchJob, checkBatchJobStatus, createBatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
-import { enhancedProcessBatchV3 } from '@/lib/classification/enhancedBatchProcessorV3';
+import { processBatch } from '@/lib/classification/finalBatchProcessor';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
 import { DEFAULT_CLASSIFICATION_CONFIG } from '@/lib/classification/config';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logging';
 
 interface AutoRecoveryState {
   isRecovering: boolean;
@@ -55,7 +56,7 @@ export const useAutoRecovery = () => {
       return false;
     }
 
-    console.log(`[AUTO-RECOVERY] Starting recovery for job ${jobId} (attempt ${state.recoveryAttempts + 1})`);
+    logger.info(`Starting recovery for job ${jobId} (attempt ${state.recoveryAttempts + 1})`, { jobId, attempt: state.recoveryAttempts + 1 }, 'AUTO_RECOVERY');
 
     setRecoveryStates(prev => ({
       ...prev,
@@ -90,14 +91,14 @@ export const useAutoRecovery = () => {
 
           return true;
         } catch (batchError) {
-          console.warn(`[AUTO-RECOVERY] Batch recreation failed for ${jobId}:`, batchError);
+          logger.warn(`Batch recreation failed for ${jobId}`, batchError, 'AUTO_RECOVERY');
         }
       }
 
       // Strategy 2: Fallback to local enhanced processing
-      console.log(`[AUTO-RECOVERY] Falling back to local processing for job ${jobId}`);
+      logger.info(`Falling back to local processing for job ${jobId}`, { jobId }, 'AUTO_RECOVERY');
       
-      const localResults = await enhancedProcessBatchV3(
+      const localResults = await processBatch(
         payeeRowData.uniquePayeeNames,
         { 
           ...DEFAULT_CLASSIFICATION_CONFIG,
@@ -135,7 +136,7 @@ export const useAutoRecovery = () => {
       return true;
 
     } catch (error) {
-      console.error(`[AUTO-RECOVERY] Recovery failed for job ${jobId}:`, error);
+      logger.error(`Recovery failed for job ${jobId}`, error, 'AUTO_RECOVERY');
       
       setRecoveryStates(prev => ({
         ...prev,

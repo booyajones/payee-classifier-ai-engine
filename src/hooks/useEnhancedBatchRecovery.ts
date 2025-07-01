@@ -3,9 +3,10 @@ import { useCallback } from 'react';
 import { BatchJob, cancelBatchJob, createBatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
-import { enhancedProcessBatchV3 } from '@/lib/classification/enhancedBatchProcessorV3';
+import { processBatch } from '@/lib/classification/finalBatchProcessor';
 import { mapResultsToOriginalRows } from '@/lib/rowMapping';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logging';
 
 export const useEnhancedBatchRecovery = () => {
   const { toast } = useToast();
@@ -15,7 +16,7 @@ export const useEnhancedBatchRecovery = () => {
     payeeRowData: PayeeRowData,
     onJobComplete: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void
   ): Promise<boolean> => {
-    console.log(`[RECOVERY] Starting enhanced recovery for stuck job ${job.id}`);
+    logger.info(`Starting enhanced recovery for stuck job ${job.id}`, { jobId: job.id }, 'ENHANCED_RECOVERY');
 
     try {
       // Strategy 1: Try to cancel and recreate the batch job
@@ -25,13 +26,13 @@ export const useEnhancedBatchRecovery = () => {
       });
 
       try {
-        console.log(`[RECOVERY] Attempting to cancel stuck job ${job.id}`);
+        logger.info(`Attempting to cancel stuck job ${job.id}`, { jobId: job.id }, 'ENHANCED_RECOVERY');
         await cancelBatchJob(job.id);
         
         // Wait a moment for cancellation to process
         await new Promise(resolve => setTimeout(resolve, 2000));
         
-        console.log(`[RECOVERY] Creating replacement batch job`);
+        logger.info(`Creating replacement batch job`, null, 'ENHANCED_RECOVERY');
         const newJob = await createBatchJob(
           payeeRowData.uniquePayeeNames,
           `Recovery: ${job.metadata?.description || 'Payee classification'}`
@@ -45,17 +46,17 @@ export const useEnhancedBatchRecovery = () => {
         return true; // New job created, let normal processing continue
 
       } catch (batchError) {
-        console.warn(`[RECOVERY] Batch recreation failed:`, batchError);
+        logger.warn(`Batch recreation failed`, batchError, 'ENHANCED_RECOVERY');
         
         // Strategy 2: Fallback to enhanced local processing
-        console.log(`[RECOVERY] Falling back to enhanced local processing`);
+        logger.info(`Falling back to enhanced local processing`, null, 'ENHANCED_RECOVERY');
         
         toast({
           title: "Using Local Processing",
           description: "Batch API unavailable, processing locally with enhanced classification...",
         });
 
-        const localResults = await enhancedProcessBatchV3(
+        const localResults = await processBatch(
           payeeRowData.uniquePayeeNames,
           { 
             offlineMode: true, 
@@ -109,7 +110,7 @@ export const useEnhancedBatchRecovery = () => {
       }
 
     } catch (error) {
-      console.error(`[RECOVERY] Recovery failed for job ${job.id}:`, error);
+      logger.error(`Recovery failed for job ${job.id}`, error, 'ENHANCED_RECOVERY');
       
       toast({
         title: "Recovery Failed",

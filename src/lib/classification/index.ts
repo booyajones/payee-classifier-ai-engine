@@ -1,11 +1,10 @@
 
-// Consolidated classification module - V3 final version only
+// Final consolidated classification module
 export * from './config';
 export * from './ruleBasedClassification';
 export * from './nlpClassification';
 export * from './aiClassification';
 export * from './batchProcessing';
-export * from './utils';
 
 // Export specific functions from enhancedRules to avoid conflicts
 export { 

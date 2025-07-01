@@ -1,6 +1,7 @@
 
 import { PayeeClassification } from '../types';
-import { enhancedClassifyPayeeV3 } from './enhancedClassificationV3';
+import { classifyPayee } from './finalClassification';
+import { logger } from '../logging';
 
 /**
  * Handle retry logic for failed batch items
@@ -10,14 +11,14 @@ export async function handleBatchRetries(
 ): Promise<PayeeClassification[]> {
   if (retryQueue.length === 0) return [];
 
-  console.log(`[V3 Batch] Retrying ${retryQueue.length} failed items with enhanced fallback`);
+  logger.info(`Retrying ${retryQueue.length} failed items with enhanced fallback`, { count: retryQueue.length }, 'BATCH_RETRY');
 
   const retryPromises = retryQueue.map(async (item, index) => {
     try {
       // Add delay for retry
       await new Promise(resolve => setTimeout(resolve, index * 200));
 
-      const result = await enhancedClassifyPayeeV3(item.name, { 
+      const result = await classifyPayee(item.name, { 
         aiThreshold: 75,
         bypassRuleNLP: true,
         offlineMode: true 
@@ -36,7 +37,7 @@ export async function handleBatchRetries(
       };
 
     } catch (error) {
-      console.error(`[V3 Batch] Retry failed for "${item.name}":`, error);
+      logger.error(`Retry failed for "${item.name}"`, error, 'BATCH_RETRY');
 
       // ABSOLUTE FALLBACK - Create a basic classification with proper typing
       const classification = item.name.split(/\s+/).length <= 2 ? 'Individual' as const : 'Business' as const;

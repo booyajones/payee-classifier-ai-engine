@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { enhancedClassifyPayeeV3 } from "@/lib/classification/enhancedClassificationV3";
+import { classifyPayee } from "@/lib/classification/finalClassification";
 import { createPayeeClassification } from "@/lib/utils";
 import ClassificationResultCard from "./ClassificationResultCard";
 import { PayeeClassification, ClassificationConfig } from "@/lib/types";
 import { useToast } from "@/components/ui/use-toast";
 import { RotateCcw } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { logger } from "@/lib/logging";
 
 interface SingleClassificationFormProps {
   onClassify: (result: PayeeClassification) => void;
@@ -54,13 +55,13 @@ const SingleClassificationForm = ({ onClassify }: SingleClassificationFormProps)
     setIsProcessing(true);
     
     try {
-      console.log(`Starting V3 classification for: ${payeeName}`);
+      logger.info(`Starting classification for: ${payeeName}`, { payeeName, config }, 'SINGLE_CLASSIFICATION');
       
-      // Use V3 classification with intelligent escalation
-      const result = await enhancedClassifyPayeeV3(payeeName, config);
+      // Use final classification with intelligent escalation
+      const result = await classifyPayee(payeeName, config);
       const classification = createPayeeClassification(payeeName, result);
       
-      console.log(`V3 Classification result:`, result);
+      logger.info(`Classification result:`, { result, payeeName }, 'SINGLE_CLASSIFICATION');
       
       setCurrentResult(classification);
       onClassify(classification);
@@ -70,7 +71,7 @@ const SingleClassificationForm = ({ onClassify }: SingleClassificationFormProps)
         description: `${payeeName} classified as ${result.classification} with ${result.confidence}% confidence using V3 intelligent escalation.`,
       });
     } catch (error) {
-      console.error("V3 Classification error:", error);
+      logger.error("Classification error", error, 'SINGLE_CLASSIFICATION');
       toast({
         title: "Classification Error",
         description: error instanceof Error ? error.message : "An error occurred while processing your request.",
