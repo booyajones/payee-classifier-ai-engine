@@ -1,50 +1,43 @@
 
-import { ClassificationResult, ClassificationConfig } from '../types';
-import { DEFAULT_CLASSIFICATION_CONFIG } from './config';
-import { enhancedProcessBatchV3 } from './enhancedBatchProcessorV3';
+import { ClassificationResult, ClassificationConfig } from '@/lib/types/unified';
+import { createUnifiedEngine } from './unifiedEngine';
+import { logger } from '@/lib/logging/logger';
+import { errorHandler } from '@/lib/errors/errorHandler';
 
 /**
- * FIXED: Simple batch processing entry point with guaranteed 1:1 row mapping
+ * Main entry point for batch processing using the unified classification engine
  */
 export async function processBatch(
   payeeNames: string[], 
   onProgress?: (current: number, total: number, percentage: number, stats?: any) => void,
-  config: ClassificationConfig = DEFAULT_CLASSIFICATION_CONFIG
+  config?: Partial<ClassificationConfig>
 ): Promise<ClassificationResult[]> {
-  console.log(`[BATCH PROCESSING] FIXED: Processing ${payeeNames.length} payees with simple sequential approach`);
+  const context = 'BATCH_PROCESSING';
   
-  // Use the FIXED simple processor
-  const batchResult = await enhancedProcessBatchV3(payeeNames, config);
-  
-  // VALIDATION: Ensure perfect alignment
-  if (batchResult.results.length !== payeeNames.length) {
-    throw new Error(`Batch processing alignment error: expected ${payeeNames.length} results, got ${batchResult.results.length}`);
-  }
-  
-  // Convert to ClassificationResult array while maintaining order
-  const classificationResults = batchResult.results.map((result, index) => {
-    // VALIDATION: Ensure row index matches
-    if (result.rowIndex !== index) {
-      console.error(`Row index mismatch at position ${index}: expected ${index}, got ${result.rowIndex}`);
-    }
+  try {
+    logger.info(`Starting batch processing of ${payeeNames.length} payees`, { config }, context);
     
-    return {
-      payeeName: result.payeeName,
-      classification: result.result.classification,
-      confidence: result.result.confidence,
-      reasoning: result.result.reasoning,
-      processingTier: result.result.processingTier,
-      processingMethod: result.result.processingMethod,
-      keywordExclusion: result.result.keywordExclusion,
-      matchingRules: result.result.matchingRules,
-      similarityScores: result.result.similarityScores
-    };
-  });
-  
-  console.log(`[BATCH PROCESSING] FIXED: Converted ${classificationResults.length} results with perfect alignment`);
-  
-  return classificationResults;
+    // Create unified engine with configuration
+    const engine = createUnifiedEngine(config);
+    
+    // Process batch using unified engine
+    const results = await engine.processBatch(payeeNames, onProgress);
+    
+    // Convert to ClassificationResult format for backward compatibility
+    const classificationResults = results.map(result => result.result);
+    
+    logger.info(`Batch processing completed successfully`, { 
+      processed: classificationResults.length,
+      total: payeeNames.length 
+    }, context);
+    
+    return classificationResults;
+  } catch (error) {
+    const appError = errorHandler.handleClassificationError(error as Error);
+    logger.error('Batch processing failed', { error: appError }, context);
+    throw appError;
+  }
 }
 
-// Export the FIXED enhanced processor
-export { enhancedProcessBatchV3 };
+// Export the unified engine for direct use
+export { createUnifiedEngine } from './unifiedEngine';
