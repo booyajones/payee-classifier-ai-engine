@@ -3,10 +3,10 @@ import React, { useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Upload, Play, TestTube, Users, Eye } from "lucide-react";
 import SingleClassificationForm from "@/components/SingleClassificationForm";
-import BatchClassificationForm from "@/components/BatchClassificationForm";
+
 import SmartFileUpload from "@/components/SmartFileUpload";
 import KeywordExclusionManager from "@/components/KeywordExclusionManager";
-import SICCodeTester from "@/components/SICCodeTester";
+
 import OptimizedVirtualizedTable from "@/components/table/OptimizedVirtualizedTable";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { useTableSorting } from "@/hooks/useTableSorting";
@@ -79,14 +79,10 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
   
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-      <TabsList className="grid w-full grid-cols-6">
+      <TabsList className="grid w-full grid-cols-4">
         <TabsTrigger value="single" className="flex items-center gap-2">
           <Play className="h-4 w-4" />
           Single
-        </TabsTrigger>
-        <TabsTrigger value="batch" className="flex items-center gap-2">
-          <Users className="h-4 w-4" />
-          Batch
         </TabsTrigger>
         <TabsTrigger value="upload" className="flex items-center gap-2">
           <Upload className="h-4 w-4" />
@@ -100,23 +96,12 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
           <FileText className="h-4 w-4" />
           Keywords
         </TabsTrigger>
-        <TabsTrigger value="sic-test" className="flex items-center gap-2">
-          <TestTube className="h-4 w-4" />
-          SIC Test
-        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="single" className="mt-6">
         <SingleClassificationForm onClassify={handleSingleClassify} />
       </TabsContent>
 
-      <TabsContent value="batch" className="mt-6">
-        <BatchClassificationForm 
-          onBatchClassify={onBatchClassify}
-          onComplete={onComplete}
-          onJobDelete={onJobDelete}
-        />
-      </TabsContent>
 
       <TabsContent value="upload" className="mt-6">
         <SmartFileUpload 
@@ -147,9 +132,6 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
         <KeywordExclusionManager />
       </TabsContent>
 
-      <TabsContent value="sic-test" className="mt-6">
-        <SICCodeTester />
-      </TabsContent>
     </Tabs>
   );
 };

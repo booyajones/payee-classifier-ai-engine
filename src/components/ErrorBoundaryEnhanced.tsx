@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { AlertTriangle, RefreshCw, Bug, ChevronDown } from 'lucide-react';
-import { logger } from '@/lib/logging';
+
 
 interface Props {
   children: ReactNode;
@@ -47,14 +47,14 @@ export class ErrorBoundaryEnhanced extends Component<Props, State> {
       errorId
     });
 
-    // Log to our centralized logging system
-    logger.error('React Error Boundary caught error', {
+    // Log error to console
+    console.error('React Error Boundary caught error:', {
       error: error.message,
       stack: error.stack,
       componentStack: errorInfo.componentStack,
       errorId,
       timestamp: new Date().toISOString()
-    }, 'ERROR_BOUNDARY');
+    });
 
     // Call the optional onError callback
     this.props.onError?.(error, errorInfo);
@@ -84,7 +84,7 @@ export class ErrorBoundaryEnhanced extends Component<Props, State> {
     // Copy error report to clipboard
     navigator.clipboard.writeText(JSON.stringify(errorReport, null, 2));
     
-    logger.info('Error report copied to clipboard', { errorId }, 'ERROR_BOUNDARY');
+    console.log('Error report copied to clipboard:', { errorId });
   };
 
   render() {
