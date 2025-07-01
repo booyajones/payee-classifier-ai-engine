@@ -1,9 +1,10 @@
 
 import { PayeeClassification, BatchProcessingResult, ClassificationConfig } from '../types';
-import { enhancedProcessBatchV3 } from '../classification/enhancedBatchProcessorV3';
+import { processBatch } from '../classification/finalBatchProcessor';
 import { DEFAULT_CLASSIFICATION_CONFIG } from '../classification/config';
 import { PayeeRowData } from '../rowMapping';
 import { batchValidationService } from './batchValidationService';
+import { logger } from '../logging';
 
 /**
  * Unified batch processing service - consolidates all batch processing logic with SIC codes
@@ -21,9 +22,11 @@ export class BatchProcessingService {
   async processBatch(
     payeeNames: string[],
     config: ClassificationConfig = DEFAULT_CLASSIFICATION_CONFIG,
-    originalFileData?: any[]
+    originalFileData?: any[],
+    jobId?: string
   ): Promise<BatchProcessingResult> {
-    console.log(`[BATCH SERVICE] Processing ${payeeNames.length} payees with SIC code support`);
+    logger.info(`Processing ${payeeNames.length} payees with SIC code support`, 
+      { count: payeeNames.length, jobId }, 'BATCH_SERVICE');
     
     // Ensure SIC codes are enabled in config
     const enhancedConfig = {
@@ -32,16 +35,17 @@ export class BatchProcessingService {
       includeSicCodes: true
     };
     
-    console.log(`[BATCH SERVICE] Using enhanced config with SIC codes:`, enhancedConfig);
+    logger.debug(`Using enhanced config with SIC codes`, enhancedConfig, 'BATCH_SERVICE');
     
-    // Use the proven V3 processor with SIC code support
-    const result = await enhancedProcessBatchV3(payeeNames, enhancedConfig, originalFileData);
+    // Use the final consolidated processor with SIC code support
+    const result = await processBatch(payeeNames, enhancedConfig, originalFileData, jobId);
     
     // Log SIC code statistics
     const businessCount = result.results.filter(r => r.result.classification === 'Business').length;
     const sicCodeCount = result.results.filter(r => r.result.sicCode).length;
     
-    console.log(`[BATCH SERVICE] SIC Code Results: ${sicCodeCount}/${businessCount} businesses have SIC codes`);
+    logger.info(`SIC Code Results: ${sicCodeCount}/${businessCount} businesses have SIC codes`,
+      { sicCodeCount, businessCount }, 'BATCH_SERVICE');
     
     return result;
   }

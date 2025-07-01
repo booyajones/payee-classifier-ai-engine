@@ -1,6 +1,5 @@
 
-// Main export file for the classification module
-// Re-exports all functionality from the individual modules
+// Consolidated classification module - V3 final version only
 export * from './config';
 export * from './ruleBasedClassification';
 export * from './nlpClassification';
@@ -24,18 +23,11 @@ export {
   advancedNormalization
 } from './stringMatching';
 
-// Export specific functions from enhancedClassification but exclude enhancedProcessBatch to avoid conflict
-export { enhancedClassifyPayee } from './enhancedClassification';
+// Export final consolidated classification functions
+export { classifyPayee } from './finalClassification';
+export { processBatch, exportResultsWithOriginalDataV3 } from './finalBatchProcessor';
 
-// Export enhanced V2 functions
-export { enhancedClassifyPayeeV2 } from './enhancedClassificationV2';
-export { enhancedProcessBatchV2, exportResultsWithOriginalData } from './enhancedBatchProcessorV2';
-
-// Export new V3 functions (no failures, intelligent escalation)
-export { enhancedClassifyPayeeV3 } from './enhancedClassificationV3';
-export { enhancedProcessBatchV3, exportResultsWithOriginalDataV3 } from './enhancedBatchProcessorV3';
-
-// Export new enhanced keyword exclusion (avoid conflict with old one)
+// Export enhanced keyword exclusion
 export { 
   checkKeywordExclusion as checkEnhancedKeywordExclusion,
   bulkKeywordExclusion 
@@ -44,7 +36,7 @@ export {
 // Export name processing
 export * from './nameProcessing';
 
-// Export new batch utility modules
+// Export batch utility modules
 export * from './batchStatistics';
 export * from './batchDeduplication';
 export * from './batchRetryHandler';
