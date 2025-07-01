@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
-import { AutomaticFileGenerationService } from '@/lib/services/automaticFileGenerationService';
+import { EnhancedFileGenerationService } from '@/lib/services/enhancedFileGenerationService';
 import { processDownloadResults, saveProcessedResults } from '@/hooks/batch/downloadProcessor';
 import { useToast } from '@/hooks/use-toast';
 
@@ -52,16 +52,22 @@ export const useBatchJobDownload = ({
         });
       }
 
-      // Automatically generate pre-generated files for future downloads
-      console.log(`[BATCH DOWNLOAD] Auto-generating files for job ${job.id}`);
-      await AutomaticFileGenerationService.processCompletedJob(job);
+      // Enhanced automatic file generation for instant future downloads
+      console.log(`[BATCH DOWNLOAD] Triggering enhanced file generation for job ${job.id}`);
+      const fileGenResult = await EnhancedFileGenerationService.processCompletedJob(job);
+      
+      if (fileGenResult.success) {
+        console.log(`[BATCH DOWNLOAD] Files generated successfully for job ${job.id}`);
+      } else {
+        console.warn(`[BATCH DOWNLOAD] File generation failed for job ${job.id}:`, fileGenResult.error);
+      }
 
       // Complete the job
       onJobComplete(finalClassifications, summary, job.id);
 
       toast({
         title: "Download Complete",
-        description: `Successfully processed ${finalClassifications.length} results. Files are now ready for instant download.`,
+        description: `Successfully processed ${finalClassifications.length} results. Files are ready for instant download.`,
       });
 
     } catch (error) {

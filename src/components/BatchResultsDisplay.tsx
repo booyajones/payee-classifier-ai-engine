@@ -1,7 +1,7 @@
 
 import BatchProcessingSummary from "./BatchProcessingSummary";
 import BatchResultsContent from "./batch/BatchResultsContent";
-import BatchResultsActions from "./batch/BatchResultsActions";
+import FastDownloadActions from "./batch/FastDownloadActions";
 import BatchResultsEmpty from "./batch/BatchResultsEmpty";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 
@@ -21,9 +21,6 @@ const BatchResultsDisplay = ({
   processingSummary, 
   onReset, 
   isProcessing,
-  isDownloading = false,
-  downloadProgress,
-  onCancelDownload,
   jobId
 }: BatchResultsDisplayProps) => {
   return (
@@ -37,12 +34,11 @@ const BatchResultsDisplay = ({
       {batchResults.length > 0 ? (
         <div>
           <BatchResultsContent batchResults={batchResults} />
-          <BatchResultsActions 
+          <FastDownloadActions 
             batchResults={batchResults}
             processingSummary={processingSummary}
             onReset={onReset}
             isProcessing={isProcessing}
-            isDownloading={isDownloading}
             jobId={jobId}
           />
         </div>
