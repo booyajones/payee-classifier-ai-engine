@@ -182,9 +182,9 @@ function validateAndCreatePayeeRowData(
   }, {} as Record<string, number>);
   
   const mostCommonSteps = Object.entries(stepCounts)
-    .sort(([, a], [, b]) => b - a)
+    .sort(([, a], [, b]) => (b as number) - (a as number))
     .slice(0, 10)
-    .map(([step, count]) => ({ step, count }));
+    .map(([step, count]) => ({ step, count: count as number }));
 
   const standardizationStats = {
     totalProcessed: standardizationResults.length,
@@ -195,7 +195,7 @@ function validateAndCreatePayeeRowData(
 
   console.log(`[ROW MAPPING ${mode}] === MAPPING COMPLETE WITH ${mode} STANDARDIZATION ===`);
   console.log(`[ROW MAPPING ${mode}] ${originalFileData.length} original rows → ${uniquePayeeNames.length} unique payees → ${rowMappings.length} mappings`);
-  console.log(`[ROW MAPPING ${mode}] Standardization: ${changesDetected}/${standardizationResults.length} names cleaned (${(changesDetected/standardizationResults.length*100).toFixed(1)}%)`);
+  console.log(`[ROW MAPPING ${mode}] Standardization: ${changesDetected}/${standardizationResults.length} names cleaned (${((changesDetected / standardizationResults.length) * 100).toFixed(1)}%)`);
   
   if (mode === 'SYNC') {
     console.log(`[ROW MAPPING] Most common cleaning steps:`, mostCommonSteps.slice(0, 3).map(s => s.step));

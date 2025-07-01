@@ -1,3 +1,4 @@
+
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
 import { checkKeywordExclusion } from '@/lib/classification/enhancedKeywordExclusion';
 import { processInChunks } from '@/lib/performance/chunkProcessor';
@@ -78,13 +79,10 @@ export async function processEnhancedBatchResults(
   processedResults.push(...results);
 
   const summary: BatchProcessingResult = {
-    totalResults: processedResults.length,
-    businessCount,
-    individualCount,
-    excludedByKeywords: excludedCount,
-    sicCodeCount,
-    processingTimeMs: 0,
     results: processedResults,
+    successCount: businessCount + individualCount,
+    failureCount: 0,
+    processingTime: 0,
     originalFileData: payeeData.originalFileData || []
   };
 
