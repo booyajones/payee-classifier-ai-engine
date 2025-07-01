@@ -11,7 +11,6 @@ import OptimizedVirtualizedTable from "@/components/table/OptimizedVirtualizedTa
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { useTableSorting } from "@/hooks/useTableSorting";
 import { useAppStore } from "@/stores/appStore";
-// import { productionLogger } from "@/lib/logging/productionLogger";
 
 interface MainTabsProps {
   allResults: PayeeClassification[];
@@ -21,7 +20,9 @@ interface MainTabsProps {
 }
 
 const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: MainTabsProps) => {
+  console.log('MainTabs rendering, props:', { allResultsLength: allResults.length });
   const { activeTab, setActiveTab } = useAppStore();
+  console.log('MainTabs activeTab:', activeTab);
 
   // Generate original columns from results data - memoized to prevent rerenders
   const getOriginalColumns = useMemo(() => {
@@ -41,23 +42,18 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
 
   // Handler for tab changes
   const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-    // productionLogger.info('Tab changed', { tab }, 'MAIN_TABS');
     console.log('Tab changed:', tab);
+    setActiveTab(tab);
   };
 
   // Handler for single classification results
   const handleSingleClassify = (result: PayeeClassification) => {
-    // productionLogger.info('Single classification result', { payeeName: result.payeeName }, 'MAIN_TABS');
     console.log('Single classification result:', result.payeeName);
-    // Add to results if needed - for now just log
   };
 
   // Handler for viewing result details
   const handleViewDetails = (result: PayeeClassification) => {
-    // productionLogger.info('View details for payee', { payeeName: result.payeeName }, 'MAIN_TABS');
     console.log('View details for payee:', result.payeeName);
-    // Could open a modal or navigate to details page
   };
 
   // Generate columns from results data - memoized to prevent rerenders
@@ -79,6 +75,8 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
     return originalColumns;
   }, [allResults.length]);
 
+  console.log('MainTabs about to render tabs with activeTab:', activeTab);
+  
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
       <TabsList className="grid w-full grid-cols-6">
@@ -123,16 +121,12 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
       <TabsContent value="upload" className="mt-6">
         <SmartFileUpload 
           onBatchJobCreated={(batchJob, payeeRowData) => {
-            // productionLogger.info('Batch job created from upload', { jobId: batchJob?.id }, 'MAIN_TABS');
             console.log('Batch job created from upload:', batchJob?.id);
-            // Switch to batch tab when job is created
             setActiveTab('batch');
           }}
           onProcessingComplete={(results, summary, jobId) => {
-            // productionLogger.info('Processing complete', { resultsCount: results.length, jobId }, 'MAIN_TABS');
             console.log('Processing complete:', results.length, jobId);
             onComplete(results, summary);
-            // Switch to results tab when processing is complete
             setActiveTab('results');
           }}
         />

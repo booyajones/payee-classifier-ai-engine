@@ -10,6 +10,7 @@ import ApiKeySetupPage from "@/components/setup/ApiKeySetupPage";
 import DownloadProgressDisplay from "@/components/download/DownloadProgressDisplay";
 
 const Index = () => {
+  console.log('Index component rendering');
   const {
     batchResults,
     batchSummary,
@@ -18,6 +19,8 @@ const Index = () => {
     handleJobDelete,
     handleKeySet
   } = useIndexState();
+  
+  console.log('Index state:', { hasApiKey, batchResultsLength: batchResults.length });
 
   if (!hasApiKey) {
     return (

@@ -6,13 +6,12 @@ import { logMemoryUsage } from "@/lib/openai/apiUtils";
 import { useToast } from "@/components/ui/use-toast";
 
 export const useIndexState = () => {
-  const [activeTab, setActiveTab] = useState("batch");
   const [batchResults, setBatchResults] = useState<PayeeClassification[]>([]);
   const [batchSummary, setBatchSummary] = useState<BatchProcessingResult | null>(null);
   const [hasApiKey, setHasApiKey] = useState(false);
   const { toast } = useToast();
 
-  console.log('[INDEX DEBUG] Component rendering, activeTab:', activeTab);
+  console.log('[INDEX DEBUG] Component rendering');
 
   useEffect(() => {
     const initializeComponent = async () => {
@@ -32,14 +31,14 @@ export const useIndexState = () => {
     initializeComponent();
   }, []);
 
-  // Log memory usage on tab changes
+  // Memory logging on initialization only
   useEffect(() => {
     try {
-      logMemoryUsage(`Tab change to ${activeTab}`);
+      logMemoryUsage('Index state initialized');
     } catch (error) {
       console.error('[INDEX ERROR] Memory logging failed:', error);
     }
-  }, [activeTab]);
+  }, []);
 
   // Handle batch completion
   const handleBatchComplete = async (
@@ -93,8 +92,6 @@ export const useIndexState = () => {
   };
 
   return {
-    activeTab,
-    setActiveTab,
     batchResults,
     batchSummary,
     hasApiKey,
