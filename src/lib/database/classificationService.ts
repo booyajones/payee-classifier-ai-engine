@@ -35,26 +35,44 @@ export const saveClassificationResults = async (
 
   console.log(`[DB SERVICE] Saving ${results.length} classification results with SIC codes to database`);
   
-  // Enhanced SIC code statistics
-  const sicCodeStats = {
+  // Enhanced SIC code and classification statistics
+  const stats = {
     totalResults: results.length,
     businessResults: results.filter(r => r.result.classification === 'Business').length,
+    individualResults: results.filter(r => r.result.classification === 'Individual').length,
     resultsWithSicCode: results.filter(r => r.result.sicCode).length,
-    resultsWithSicDescription: results.filter(r => r.result.sicDescription).length,
-    individualResults: results.filter(r => r.result.classification === 'Individual').length
+    resultsWithSicDescription: results.filter(r => r.result.sicDescription).length
   };
-  console.log('[DB SERVICE] Enhanced SIC Code Statistics:', sicCodeStats);
+  console.log('[DB SERVICE] Complete Classification Statistics:', stats);
 
-  // Log sample SIC codes for debugging
+  // Log sample classifications for debugging
+  const sampleClassifications = results.slice(0, 3).map(r => ({
+    payee: r.payeeName,
+    classification: r.result.classification,
+    confidence: r.result.confidence,
+    sicCode: r.result.sicCode,
+    sicDescription: r.result.sicDescription?.substring(0, 50) + '...'
+  }));
+  console.log('[DB SERVICE] Sample classification data:', sampleClassifications);
+
+  // Log businesses with SIC codes
   const businessesWithSic = results.filter(r => r.result.classification === 'Business' && r.result.sicCode);
   if (businessesWithSic.length > 0) {
     console.log('[DB SERVICE] Sample businesses with SIC codes:', businessesWithSic.slice(0, 3).map(r => ({
       payee: r.payeeName,
+      classification: r.result.classification,
       sicCode: r.result.sicCode,
       sicDescription: r.result.sicDescription?.substring(0, 50) + '...'
     })));
   } else {
-    console.warn('[DB SERVICE] NO BUSINESSES WITH SIC CODES FOUND! This indicates a problem with SIC code generation.');
+    console.warn('[DB SERVICE] NO BUSINESSES WITH SIC CODES FOUND! Checking classification data...');
+    const businesses = results.filter(r => r.result.classification === 'Business');
+    console.log('[DB SERVICE] Business results without SIC:', businesses.slice(0, 3).map(r => ({
+      payee: r.payeeName,
+      classification: r.result.classification,
+      sicCode: r.result.sicCode || 'MISSING',
+      reasoning: r.result.reasoning?.substring(0, 100)
+    })));
   }
 
   const dbRecords = results.map((result, index) => {
@@ -76,38 +94,37 @@ export const saveClassificationResults = async (
     };
     
     // Enhanced debugging for each record
-    if (result.result.classification === 'Business') {
-      if (record.sic_code) {
-        console.log(`[DB SERVICE] ✅ Business "${result.payeeName}" has SIC Code: ${record.sic_code}`);
-      } else {
-        console.warn(`[DB SERVICE] ❌ Business "${result.payeeName}" missing SIC code! Raw result:`, {
-          sicCode: result.result.sicCode,
-          sicDescription: result.result.sicDescription,
-          classification: result.result.classification
-        });
-      }
-    }
+    console.log(`[DB SERVICE] Preparing record ${index + 1}/${results.length}: "${result.payeeName}" -> ${record.classification}${record.sic_code ? ` (SIC: ${record.sic_code})` : ''}`);
     
     return record;
   });
 
   console.log(`[DB SERVICE] Prepared ${dbRecords.length} database records for saving`);
 
-  // Use upsert to handle conflicts based on unique constraint
-  const { error } = await supabase
+  // CRITICAL FIX: Use constraint name instead of column names for onConflict
+  const { error, count } = await supabase
     .from('payee_classifications')
     .upsert(dbRecords, {
-      onConflict: 'payee_name,row_index,batch_id',
-      ignoreDuplicates: false
+      onConflict: 'idx_payee_classifications_unique',
+      ignoreDuplicates: false,
+      count: 'exact'
     });
 
   if (error) {
-    console.error('[DB SERVICE] Error saving classification results:', error);
+    console.error('[DB SERVICE] Database save failed:', error);
+    console.error('[DB SERVICE] Error details:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code
+    });
     throw new Error(`Failed to save classification results: ${error.message}`);
   }
 
-  console.log(`[DB SERVICE] ✅ Successfully saved ${results.length} classification results with SIC codes`);
-  console.log(`[DB SERVICE] Final SIC Summary: ${sicCodeStats.resultsWithSicCode}/${sicCodeStats.businessResults} businesses have SIC codes (${sicCodeStats.businessResults > 0 ? Math.round((sicCodeStats.resultsWithSicCode / sicCodeStats.businessResults) * 100) : 0}%)`);
+  const savedCount = count || dbRecords.length;
+  console.log(`[DB SERVICE] ✅ Successfully saved ${savedCount} classification results to database`);
+  console.log(`[DB SERVICE] Final Summary: ${stats.resultsWithSicCode}/${stats.businessResults} businesses have SIC codes (${stats.businessResults > 0 ? Math.round((stats.resultsWithSicCode / stats.businessResults) * 100) : 0}%)`);
+  console.log(`[DB SERVICE] Classification Summary: ${stats.businessResults} businesses, ${stats.individualResults} individuals`);
 };
 
 /**

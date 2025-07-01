@@ -5,6 +5,7 @@ import { PayeeClassification } from '@/lib/types';
 interface SICValidationStats {
   totalSaved: number;
   businessCount: number;
+  individualCount: number;
   sicCodeCount: number;
   sicValidationErrors: string[];
 }
@@ -16,11 +17,12 @@ export const saveClassificationResultsWithValidation = async (
   results: PayeeClassification[],
   batchId?: string
 ): Promise<SICValidationStats> => {
-  console.log(`[ENHANCED DB SERVICE] Saving ${results.length} results with comprehensive SIC validation`);
+  console.log(`[ENHANCED DB SERVICE] Saving ${results.length} results with comprehensive SIC and classification validation`);
   
   const stats: SICValidationStats = {
     totalSaved: 0,
     businessCount: 0,
+    individualCount: 0,
     sicCodeCount: 0,
     sicValidationErrors: []
   };
@@ -30,20 +32,29 @@ export const saveClassificationResultsWithValidation = async (
     return stats;
   }
 
-  // Phase 3: Pre-save SIC validation
+  // Enhanced pre-save validation for both classification types
   const validatedResults = results.map((result, index) => {
     const isBusiness = result.result.classification === 'Business';
+    const isIndividual = result.result.classification === 'Individual';
+    
     if (isBusiness) {
       stats.businessCount++;
       
       if (result.result.sicCode) {
         stats.sicCodeCount++;
-        console.log(`[ENHANCED DB SERVICE] ✅ Pre-save validation: "${result.payeeName}" has SIC: ${result.result.sicCode}`);
+        console.log(`[ENHANCED DB SERVICE] ✅ Business validation: "${result.payeeName}" has SIC: ${result.result.sicCode}`);
       } else {
         const error = `Business "${result.payeeName}" missing SIC code before database save`;
         stats.sicValidationErrors.push(error);
         console.error(`[ENHANCED DB SERVICE] ❌ ${error}`);
       }
+    } else if (isIndividual) {
+      stats.individualCount++;
+      console.log(`[ENHANCED DB SERVICE] ✅ Individual validation: "${result.payeeName}" classified as Individual`);
+    } else {
+      const error = `Unknown classification "${result.result.classification}" for "${result.payeeName}"`;
+      stats.sicValidationErrors.push(error);
+      console.error(`[ENHANCED DB SERVICE] ❌ ${error}`);
     }
 
     return {
@@ -64,23 +75,31 @@ export const saveClassificationResultsWithValidation = async (
     };
   });
 
-  // Save to database
+  console.log(`[ENHANCED DB SERVICE] Validation complete: ${stats.businessCount} businesses, ${stats.individualCount} individuals, ${stats.sicCodeCount} with SIC codes`);
+
+  // CRITICAL FIX: Use constraint name instead of column names for onConflict
   const { error, count } = await supabase
     .from('payee_classifications')
     .upsert(validatedResults, {
-      onConflict: 'payee_name,row_index,batch_id',
+      onConflict: 'idx_payee_classifications_unique',
       ignoreDuplicates: false,
       count: 'exact'
     });
 
   if (error) {
     console.error('[ENHANCED DB SERVICE] Database save failed:', error);
+    console.error('[ENHANCED DB SERVICE] Error details:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code
+    });
     throw new Error(`Failed to save classification results: ${error.message}`);
   }
 
   stats.totalSaved = count || validatedResults.length;
 
-  // Phase 3: Post-save validation
+  // Post-save validation
   if (batchId) {
     const { data: savedData, error: fetchError } = await supabase
       .from('payee_classifications')
@@ -89,9 +108,11 @@ export const saveClassificationResultsWithValidation = async (
 
     if (!fetchError && savedData) {
       const savedBusinessCount = savedData.filter(r => r.classification === 'Business').length;
+      const savedIndividualCount = savedData.filter(r => r.classification === 'Individual').length;
       const savedSicCount = savedData.filter(r => r.sic_code).length;
       
       console.log(`[ENHANCED DB SERVICE] Post-save validation: ${savedSicCount}/${savedBusinessCount} businesses have SIC codes in database`);
+      console.log(`[ENHANCED DB SERVICE] Post-save validation: ${savedBusinessCount} businesses, ${savedIndividualCount} individuals saved`);
       
       if (savedSicCount !== stats.sicCodeCount) {
         const error = `SIC code count mismatch after save: expected ${stats.sicCodeCount}, found ${savedSicCount}`;
@@ -103,6 +124,7 @@ export const saveClassificationResultsWithValidation = async (
 
   const sicCoverage = stats.businessCount > 0 ? Math.round((stats.sicCodeCount / stats.businessCount) * 100) : 0;
   console.log(`[ENHANCED DB SERVICE] ✅ Save complete with validation: ${stats.sicCodeCount}/${stats.businessCount} businesses (${sicCoverage}%) have SIC codes`);
+  console.log(`[ENHANCED DB SERVICE] ✅ Classification summary: ${stats.businessCount} businesses, ${stats.individualCount} individuals saved successfully`);
 
   return stats;
 };
