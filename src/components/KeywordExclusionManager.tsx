@@ -1,17 +1,12 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash, Shield, TestTube, Loader2 } from "lucide-react";
+import { Shield, Loader2 } from "lucide-react";
 import {
   getBuiltInExclusionKeywords,
-  getCustomExclusionKeywords,
-  checkKeywordExclusion,
   clearCustomKeywordsCache
 } from "@/lib/classification/keywordExclusion";
 import { 
@@ -21,27 +16,18 @@ import {
   getAllCustomExclusionKeywords,
   type ExclusionKeyword
 } from "@/lib/database/exclusionKeywordService";
-import { checkKeywordExclusion as checkEnhancedKeywordExclusion } from "@/lib/classification/enhancedKeywordExclusion";
-import { testKeywordExclusion, quickTest } from "@/lib/classification/keywordExclusionTest";
 import { KEYWORD_EXCLUSION_CONFIG } from "@/lib/classification/config";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import KeywordTable from "./KeywordTable";
+import KeywordActions from "./KeywordActions";
+import KeywordStats from "./KeywordStats";
+import KeywordTester from "./KeywordTester";
 
 const KeywordExclusionManager = () => {
   const [comprehensiveKeywords, setComprehensiveKeywords] = useState<string[]>([]);
   const [customKeywords, setCustomKeywords] = useState<ExclusionKeyword[]>([]);
   const [allKeywords, setAllKeywords] = useState<string[]>([]);
-  const [newKeyword, setNewKeyword] = useState("");
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState("");
-  const [testPayeeName, setTestPayeeName] = useState("");
-  const [testResult, setTestResult] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
@@ -81,20 +67,9 @@ const KeywordExclusionManager = () => {
     loadKeywords();
   }, []);
 
-  const handleAddKeyword = async () => {
-    if (!newKeyword.trim()) {
-      toast({
-        title: "Invalid Keyword",
-        description: "Please enter a valid keyword",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const trimmedKeyword = newKeyword.trim();
-    
+  const handleAddKeyword = async (keyword: string) => {
     // Check if keyword already exists in either list
-    if (allKeywords.some(k => k.toLowerCase() === trimmedKeyword.toLowerCase())) {
+    if (allKeywords.some(k => k.toLowerCase() === keyword.toLowerCase())) {
       toast({
         title: "Duplicate Keyword",
         description: "This keyword already exists",
@@ -105,17 +80,16 @@ const KeywordExclusionManager = () => {
 
     try {
       setSaving(true);
-      const result = await addCustomExclusionKeyword(trimmedKeyword);
+      const result = await addCustomExclusionKeyword(keyword);
       
       if (result.success) {
         // Clear cache and reload keywords
         clearCustomKeywordsCache();
         await loadKeywords();
-        setNewKeyword("");
         
         toast({
           title: "Keyword Added",
-          description: `"${trimmedKeyword}" has been added to the exclusion list`,
+          description: `"${keyword}" has been added to the exclusion list`,
         });
       } else {
         toast({
@@ -280,30 +254,6 @@ const KeywordExclusionManager = () => {
     }
   };
 
-  const handleTestPayee = () => {
-    if (!testPayeeName.trim()) {
-      setTestResult(null);
-      return;
-    }
-
-    console.log(`[KEYWORD EXCLUSION MANAGER] Testing: "${testPayeeName}"`);
-    const result = checkKeywordExclusion(testPayeeName, allKeywords);
-    setTestResult(result);
-    
-    // Also run quick test for detailed logging
-    quickTest(testPayeeName);
-  };
-
-  const runFullTest = () => {
-    console.log('[KEYWORD EXCLUSION MANAGER] Running full test suite...');
-    testKeywordExclusion();
-    
-    toast({
-      title: "Test Suite Complete",
-      description: "Check console for detailed test results",
-    });
-  };
-
   const resetToDefaults = async () => {
     try {
       setSaving(true);
@@ -335,10 +285,6 @@ const KeywordExclusionManager = () => {
     }
   };
 
-  const isCustomKeyword = (keyword: string): boolean => {
-    return customKeywords.some(k => k.keyword === keyword && k.is_active);
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -365,7 +311,7 @@ const KeywordExclusionManager = () => {
             Custom keywords are stored in the cloud and synchronized across all sessions.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           <Alert className="border-green-200 bg-green-50">
             <Shield className="h-4 w-4" />
             <AlertDescription>
@@ -375,178 +321,44 @@ const KeywordExclusionManager = () => {
             </AlertDescription>
           </Alert>
 
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <Label htmlFor="new-keyword">Add New Custom Keyword</Label>
-              <Input
-                id="new-keyword"
-                placeholder="Enter keyword to exclude"
-                value={newKeyword}
-                onChange={(e) => setNewKeyword(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleAddKeyword()}
-                disabled={saving}
-              />
-            </div>
-            <div className="flex items-end">
-              <Button onClick={handleAddKeyword} disabled={saving}>
-                {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
-                Add
-              </Button>
-            </div>
-          </div>
+          <KeywordActions
+            saving={saving}
+            onAddKeyword={handleAddKeyword}
+            onResetToDefaults={resetToDefaults}
+          />
 
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" onClick={resetToDefaults} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              Clear All Custom Keywords
-            </Button>
-            <Button variant="outline" onClick={runFullTest}>
-              <TestTube className="h-4 w-4 mr-2" />
-              Run Test Suite
-            </Button>
-            <Badge variant="secondary">
-              {comprehensiveKeywords.length} built-in keywords
-            </Badge>
-            <Badge variant="outline">
-              {customKeywords.filter(k => k.is_active).length} custom keywords
-            </Badge>
-            <Badge variant="default">
-              {allKeywords.length} total keywords
-            </Badge>
-          </div>
+          <KeywordStats
+            comprehensiveKeywords={comprehensiveKeywords}
+            customKeywords={customKeywords}
+            allKeywords={allKeywords}
+          />
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Test Keyword Exclusion</CardTitle>
-          <CardDescription>
-            Test a payee name against the current exclusion keywords to see if it would be excluded.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <Label htmlFor="test-payee">Test Payee Name</Label>
-              <Input
-                id="test-payee"
-                placeholder="Enter payee name to test (e.g., 'Bank of America')"
-                value={testPayeeName}
-                onChange={(e) => {
-                  setTestPayeeName(e.target.value);
-                  handleTestPayee();
-                }}
-              />
-            </div>
-            <div className="flex items-end">
-              <Button onClick={handleTestPayee} variant="outline">
-                <TestTube className="h-4 w-4 mr-2" />
-                Test
-              </Button>
-            </div>
-          </div>
-          
-          {testResult && (
-            <Alert className={testResult.isExcluded ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}>
-              <AlertDescription>
-                <div className="space-y-2">
-                  <p>
-                    <strong>Result:</strong> {testResult.isExcluded ? "EXCLUDED" : "NOT EXCLUDED"}
-                  </p>
-                  {testResult.isExcluded && testResult.matchedKeywords.length > 0 && (
-                    <p>
-                      <strong>Matched Keywords:</strong> {testResult.matchedKeywords.join(", ")}
-                    </p>
-                  )}
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
+      <KeywordTester allKeywords={allKeywords} />
 
       <Card>
         <CardHeader>
           <CardTitle>Current Exclusion Keywords</CardTitle>
           <CardDescription>
             Built-in keywords cannot be edited or deleted. Custom keywords can be modified or removed.
-            Built-in keywords are marked with a green badge, custom keywords with a blue badge.
+            Use the search and filter options to find specific keywords quickly.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border max-h-96 overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Keyword</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="w-32">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {allKeywords.map((keyword, index) => {
-                  const isCustom = isCustomKeyword(keyword);
-                  return (
-                    <TableRow key={index}>
-                      <TableCell>
-                        {editingIndex === index ? (
-                          <div className="flex gap-2">
-                            <Input
-                              value={editingValue}
-                              onChange={(e) => setEditingValue(e.target.value)}
-                              onKeyPress={(e) => {
-                                if (e.key === 'Enter') handleSaveEdit();
-                                if (e.key === 'Escape') handleCancelEdit();
-                              }}
-                              autoFocus
-                              disabled={saving}
-                            />
-                            <Button size="sm" onClick={handleSaveEdit} disabled={saving}>
-                              {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={handleCancelEdit} disabled={saving}>
-                              Cancel
-                            </Button>
-                          </div>
-                        ) : (
-                          <span className="font-mono">{keyword}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={isCustom ? "default" : "secondary"}>
-                          {isCustom ? "Custom" : "Built-in"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {editingIndex !== index && (
-                          <div className="flex gap-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEditKeyword(index)}
-                              disabled={!isCustom || saving}
-                              title={!isCustom ? "Built-in keywords cannot be edited" : "Edit keyword"}
-                            >
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleDeleteKeyword(index)}
-                              disabled={!isCustom || saving}
-                              title={!isCustom ? "Built-in keywords cannot be deleted" : "Delete keyword"}
-                            >
-                              <Trash className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+          <KeywordTable
+            allKeywords={allKeywords}
+            comprehensiveKeywords={comprehensiveKeywords}
+            customKeywords={customKeywords}
+            editingIndex={editingIndex}
+            editingValue={editingValue}
+            saving={saving}
+            onEdit={handleEditKeyword}
+            onDelete={handleDeleteKeyword}
+            onSaveEdit={handleSaveEdit}
+            onCancelEdit={handleCancelEdit}
+            onEditingValueChange={setEditingValue}
+          />
         </CardContent>
       </Card>
     </div>
