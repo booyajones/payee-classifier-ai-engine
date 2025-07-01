@@ -1,5 +1,6 @@
 
 import { v4 as uuidv4 } from 'uuid';
+import { productionLogger } from '@/lib/logging';
 
 interface StoredApiKey {
   id: string;
@@ -39,7 +40,7 @@ export function storeApiKey(apiKey: string): string {
     
     return token;
   } catch (error) {
-    console.error('Failed to store API key:', error);
+    productionLogger.error('Failed to store API key', { error: error.message }, 'API_KEY_SERVICE');
     throw new Error('Failed to securely store API key');
   }
 }
@@ -56,14 +57,14 @@ export function getApiKey(token: string): string | null {
     const id = tokenMap[token];
     
     if (!id) {
-      console.warn('Token not found in token map');
+      productionLogger.warn('Token not found in token map', null, 'API_KEY_SERVICE');
       return null;
     }
     
     // Get the stored key entry
     const storedEntry = localStorage.getItem(`${STORAGE_PREFIX}${id}`);
     if (!storedEntry) {
-      console.warn('Stored API key entry not found');
+      productionLogger.warn('Stored API key entry not found', null, 'API_KEY_SERVICE');
       return null;
     }
     
@@ -71,7 +72,7 @@ export function getApiKey(token: string): string | null {
     
     // Verify the token matches
     if (entry.token !== token) {
-      console.warn('Token mismatch in stored entry');
+      productionLogger.warn('Token mismatch in stored entry', null, 'API_KEY_SERVICE');
       return null;
     }
     
@@ -81,7 +82,7 @@ export function getApiKey(token: string): string | null {
     
     return entry.apiKey;
   } catch (error) {
-    console.error('Failed to retrieve API key:', error);
+    productionLogger.error('Failed to retrieve API key', { error: error.message }, 'API_KEY_SERVICE');
     return null;
   }
 }
@@ -119,7 +120,7 @@ export function deleteApiKey(token: string): boolean {
     
     return true;
   } catch (error) {
-    console.error('Failed to delete API key:', error);
+    productionLogger.error('Failed to delete API key', { error: error.message }, 'API_KEY_SERVICE');
     return false;
   }
 }
@@ -140,7 +141,7 @@ export function getStoredApiKeyMetadata(): Array<{id: string, created: number, l
       };
     });
   } catch (error) {
-    console.error('Failed to get API key metadata:', error);
+    productionLogger.error('Failed to get API key metadata', { error: error.message }, 'API_KEY_SERVICE');
     return [];
   }
 }

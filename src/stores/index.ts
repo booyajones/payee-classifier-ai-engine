@@ -2,3 +2,4 @@
 export * from './appStore';
 export * from './batchJobStore';
 export * from './progressStore';
+export * from './productionStore';
