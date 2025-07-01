@@ -1,3 +1,4 @@
+
 import { useState, useRef } from 'react';
 import { parseUploadedFile } from '@/lib/utils';
 import { createPayeeRowMapping, PayeeRowData } from '@/lib/rowMapping';
@@ -46,6 +47,11 @@ export const useSmartFileUpload = () => {
 
   const UPLOAD_ID = 'file-upload';
 
+  // Debug logging utility
+  const debugLog = (message: string, data?: any) => {
+    console.log(`[SMART UPLOAD DEBUG] ${message}`, data || '');
+  };
+
   const getSuggestions = (errorCode: string): string[] => {
     switch (errorCode) {
       case 'FILE_TOO_LARGE':
@@ -65,7 +71,11 @@ export const useSmartFileUpload = () => {
   };
 
   const handleFileSelect = async (file: File) => {
-    console.log(`[SMART UPLOAD DEBUG] Starting file selection process for: ${file.name}`);
+    debugLog(`Starting file selection process for: ${file.name}`, {
+      size: file.size,
+      type: file.type,
+      lastModified: new Date(file.lastModified)
+    });
     
     setUploadState('processing');
     updateProgress(UPLOAD_ID, 'Analyzing file structure...', 10);
@@ -73,9 +83,12 @@ export const useSmartFileUpload = () => {
     setSuggestions([]);
     setFileName(file.name);
     setProcessingInfo({});
+    setFileData(null);
+    setFileHeaders([]);
+    setSelectedPayeeColumn('');
 
     try {
-      console.log(`[SMART UPLOAD DEBUG] Beginning file validation for: ${file.name}, size: ${file.size} bytes`);
+      debugLog('Beginning file validation');
       
       // Use enhanced file validation
       const validationResult = await validateFile(file, {
@@ -86,7 +99,7 @@ export const useSmartFileUpload = () => {
         maxRows: 100000
       });
 
-      console.log(`[SMART UPLOAD DEBUG] Validation result:`, {
+      debugLog('Validation result:', {
         isValid: validationResult.isValid,
         hasWarnings: !!validationResult.warnings,
         warningCount: validationResult.warnings?.length || 0,
@@ -94,7 +107,7 @@ export const useSmartFileUpload = () => {
       });
 
       if (!validationResult.isValid) {
-        console.error(`[SMART UPLOAD DEBUG] File validation failed:`, validationResult.error);
+        debugLog('File validation failed', validationResult.error);
         setUploadState('error');
         setErrorMessage(validationResult.error!.message);
         setSuggestions(getSuggestions(validationResult.error!.code));
@@ -104,7 +117,7 @@ export const useSmartFileUpload = () => {
 
       // Show warnings if any (but convert to info toasts, not error toasts)
       if (validationResult.warnings && validationResult.warnings.length > 0) {
-        console.log(`[SMART UPLOAD DEBUG] File has ${validationResult.warnings.length} warnings:`, validationResult.warnings);
+        debugLog(`File has ${validationResult.warnings.length} warnings`, validationResult.warnings);
         
         validationResult.warnings.forEach((warning, index) => {
           // Use regular toast (not error variant) for warnings
@@ -118,7 +131,7 @@ export const useSmartFileUpload = () => {
 
       updateProgress(UPLOAD_ID, 'Reading file contents...', 30);
 
-      console.log(`[SMART UPLOAD DEBUG] Starting memory-aware file processing`);
+      debugLog('Starting memory-aware file processing');
 
       // Memory-aware file processing for large files
       const data = await processWithMemoryManagement(
@@ -134,10 +147,12 @@ export const useSmartFileUpload = () => {
         'file-parsing'
       );
 
-      console.log(`[SMART UPLOAD DEBUG] File parsing completed, rows found: ${data?.length || 0}`);
+      debugLog('File parsing completed', {
+        rowsFound: data?.length || 0
+      });
 
       if (!data || data.length === 0) {
-        console.error(`[SMART UPLOAD DEBUG] No data found in file`);
+        debugLog('No data found in file');
         setUploadState('error');
         setErrorMessage('No data found in the file. Please check if the file has content.');
         setSuggestions(['Ensure the file has data rows', 'Try a different file format']);
@@ -147,7 +162,7 @@ export const useSmartFileUpload = () => {
 
       const headers = Object.keys(data[0]);
       if (headers.length === 0) {
-        console.error(`[SMART UPLOAD DEBUG] No columns found in file`);
+        debugLog('No columns found in file');
         setUploadState('error');
         setErrorMessage('No columns found in the file.');
         setSuggestions(['Ensure the file has a header row', 'Try a different file format']);
@@ -155,7 +170,7 @@ export const useSmartFileUpload = () => {
         return;
       }
 
-      console.log(`[SMART UPLOAD DEBUG] File processing successful:`, {
+      debugLog('File processing successful', {
         totalRows: data.length,
         columnCount: headers.length,
         columns: headers.slice(0, 5) // First 5 columns for debugging
@@ -179,8 +194,11 @@ export const useSmartFileUpload = () => {
       
       setFileData(data);
       setFileHeaders(headers);
+      
+      // CRITICAL FIX: Set state to 'uploaded' and wait for user column selection
+      debugLog('Setting upload state to uploaded - COLUMN SELECTION REQUIRED');
       setUploadState('uploaded');
-      completeProgress(UPLOAD_ID, 'File uploaded successfully!');
+      completeProgress(UPLOAD_ID, 'File uploaded successfully! Please select the payee column.');
 
       // Enhanced file info toast (success, not error)
       toast({
@@ -188,10 +206,10 @@ export const useSmartFileUpload = () => {
         description: `Found ${data.length.toLocaleString()} rows with ${headers.length} columns. ${validationResult.fileInfo?.hasHeaders ? 'Headers detected.' : ''}`,
       });
 
-      console.log(`[SMART UPLOAD DEBUG] File upload process completed successfully`);
+      debugLog('File upload process completed successfully - awaiting column selection');
 
     } catch (error) {
-      console.error('[SMART UPLOAD DEBUG] Upload failed with error:', error);
+      debugLog('Upload failed with error', error);
       setUploadState('error');
       setErrorMessage(error instanceof Error ? error.message : 'Upload failed');
       setSuggestions(['Try again with a different file', 'Check your internet connection']);
@@ -200,9 +218,21 @@ export const useSmartFileUpload = () => {
   };
 
   const validatePayeeColumn = async (): Promise<PayeeRowData | null> => {
-    if (!fileData || !selectedPayeeColumn) return null;
+    debugLog('Starting payee column validation', {
+      selectedColumn: selectedPayeeColumn,
+      hasFileData: !!fileData,
+      fileDataLength: fileData?.length || 0
+    });
 
-    setUploadState('processing');
+    if (!fileData || !selectedPayeeColumn) {
+      debugLog('Missing file data or selected column', {
+        hasFileData: !!fileData,
+        selectedColumn: selectedPayeeColumn
+      });
+      return null;
+    }
+
+    // IMPORTANT: Don't change uploadState here - let the caller handle it
     updateProgress(UPLOAD_ID, 'Validating payee data...', 10);
 
     try {
@@ -242,16 +272,22 @@ export const useSmartFileUpload = () => {
         duplicates
       }));
 
+      debugLog('Payee validation completed successfully', {
+        uniquePayees: payeeRowData.uniquePayeeNames.length,
+        totalRows: fileData.length,
+        duplicates
+      });
+
       // Enhanced toast with detailed information
       toast({
-        title: "Processing Started",
-        description: `Processing ${payeeRowData.uniquePayeeNames.length} unique payees from ${fileData.length} total rows (${duplicates} duplicates found).`,
+        title: "Column Validation Complete",
+        description: `Found ${payeeRowData.uniquePayeeNames.length} unique payees from ${fileData.length} total rows (${duplicates} duplicates detected).`,
       });
 
       return payeeRowData;
 
     } catch (error) {
-      console.error('[SMART UPLOAD] Processing failed:', error);
+      debugLog('Payee validation failed', error);
       setUploadState('error');
       setErrorMessage(error instanceof Error ? error.message : 'Processing failed');
       setSuggestions(['Try again', 'Check your data format']);
@@ -261,6 +297,7 @@ export const useSmartFileUpload = () => {
   };
 
   const resetUpload = () => {
+    debugLog('Resetting upload state');
     setUploadState('idle');
     setErrorMessage('');
     setSuggestions([]);
@@ -276,6 +313,7 @@ export const useSmartFileUpload = () => {
   };
 
   const triggerFileSelect = () => {
+    debugLog('Triggering file selection dialog');
     fileInputRef.current?.click();
   };
 

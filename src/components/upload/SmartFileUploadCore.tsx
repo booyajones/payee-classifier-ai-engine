@@ -3,7 +3,6 @@ import { useBatchManager, emitBatchJobUpdate } from '@/hooks/useBatchManager';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
 import { PayeeRowData } from '@/lib/rowMapping';
-import { useSmartFileUpload } from '@/hooks/useSmartFileUpload';
 import { useToast } from '@/hooks/use-toast';
 
 interface SmartFileUploadCoreProps {
@@ -32,21 +31,38 @@ export const useSmartFileUploadCore = ({
     payeeRowData: PayeeRowData,
     validatePayeeColumn: () => Promise<PayeeRowData | null>
   ) => {
-    const validatedData = await validatePayeeColumn();
-    if (!validatedData) return;
+    console.log('[SMART UPLOAD CORE DEBUG] Column select triggered', {
+      hasPayeeRowData: !!payeeRowData,
+      uniquePayeeCount: payeeRowData?.uniquePayeeNames?.length || 0
+    });
 
+    // CRITICAL: Only proceed if we have valid payee data
+    if (!payeeRowData) {
+      console.log('[SMART UPLOAD CORE DEBUG] No payee row data provided, validating column first');
+      const validatedData = await validatePayeeColumn();
+      if (!validatedData) {
+        console.error('[SMART UPLOAD CORE DEBUG] Column validation failed');
+        return;
+      }
+      payeeRowData = validatedData;
+    }
+
+    // Set processing state BEFORE starting batch creation
+    console.log('[SMART UPLOAD CORE DEBUG] Setting state to processing');
+    setUploadState('processing');
+    
     updateProgress(UPLOAD_ID, 'Creating OpenAI batch job...', 30);
 
     try {
-      const jobDescription = `Smart Upload: ${fileName} (${validatedData.uniquePayeeNames.length} unique payees)`;
+      const jobDescription = `Smart Upload: ${fileName} (${payeeRowData.uniquePayeeNames.length} unique payees)`;
 
-      console.log(`[SMART UPLOAD] Starting batch creation for ${validatedData.uniquePayeeNames.length} payees`);
+      console.log(`[SMART UPLOAD CORE DEBUG] Starting batch creation for ${payeeRowData.uniquePayeeNames.length} payees`);
 
       // Create batch job with enhanced error handling
-      const job = await createBatch(validatedData, {
+      const job = await createBatch(payeeRowData, {
         description: jobDescription,
         onJobUpdate: (updatedJob) => {
-          console.log(`[SMART UPLOAD] Job ${updatedJob.id} updated: ${updatedJob.status}`);
+          console.log(`[SMART UPLOAD CORE DEBUG] Job ${updatedJob.id} updated: ${updatedJob.status}`);
           updateProgress(
             UPLOAD_ID, 
             `Batch processing: ${updatedJob.status}`, 
@@ -56,7 +72,7 @@ export const useSmartFileUploadCore = ({
           );
         },
         onJobComplete: (results, summary, jobId) => {
-          console.log(`[SMART UPLOAD] Job ${jobId} completed with ${results.length} results`);
+          console.log(`[SMART UPLOAD CORE DEBUG] Job ${jobId} completed with ${results.length} results`);
           setUploadState('complete');
           completeProgress(UPLOAD_ID, `Successfully processed ${results.length} payees!`);
           onProcessingComplete(results, summary, jobId);
@@ -68,13 +84,12 @@ export const useSmartFileUploadCore = ({
         // OpenAI batch created successfully
         updateProgress(UPLOAD_ID, 'Batch job created successfully!', 70);
         
-        console.log(`[SMART UPLOAD] OpenAI batch created successfully: ${job.id}`);
-        onBatchJobCreated(job, validatedData);
+        console.log(`[SMART UPLOAD CORE DEBUG] OpenAI batch created successfully: ${job.id}`);
+        onBatchJobCreated(job, payeeRowData);
 
         // Emit batch job update to refresh UI
         emitBatchJobUpdate();
 
-        setUploadState('processing');
         updateProgress(
           UPLOAD_ID, 
           'OpenAI batch processing started! Processing in background...', 
@@ -86,7 +101,7 @@ export const useSmartFileUploadCore = ({
         // Show success message
         toast({
           title: "Batch Job Created",
-          description: `Processing ${validatedData.uniquePayeeNames.length} payees. You can monitor progress in the Batch Jobs tab.`,
+          description: `Processing ${payeeRowData.uniquePayeeNames.length} payees. You can monitor progress in the Batch Jobs tab.`,
         });
 
       } else {
@@ -94,23 +109,23 @@ export const useSmartFileUploadCore = ({
         const batchError = getError('create');
         const errorDetails = batchError || 'Unknown error occurred during batch creation';
         
-        console.error('[SMART UPLOAD] Batch creation failed:', errorDetails);
+        console.error('[SMART UPLOAD CORE DEBUG] Batch creation failed:', errorDetails);
         
         // Handle large files with local processing fallback
-        if (validatedData.uniquePayeeNames.length > 45000) {
-          console.log(`[SMART UPLOAD] Large file detected (${validatedData.uniquePayeeNames.length} payees), attempting local processing fallback`);
+        if (payeeRowData.uniquePayeeNames.length > 45000) {
+          console.log(`[SMART UPLOAD CORE DEBUG] Large file detected (${payeeRowData.uniquePayeeNames.length} payees), attempting local processing fallback`);
           
           updateProgress(UPLOAD_ID, 'Large file detected, switching to local processing...', 40);
           
           // Notify parent for local processing
-          onBatchJobCreated(null, validatedData);
+          onBatchJobCreated(null, payeeRowData);
           
           setUploadState('complete');
           completeProgress(UPLOAD_ID, 'Processing completed using enhanced local classification!');
           
           toast({
             title: "Local Processing",
-            description: `Large file processed locally with ${validatedData.uniquePayeeNames.length} payees.`,
+            description: `Large file processed locally with ${payeeRowData.uniquePayeeNames.length} payees.`,
           });
           
           return;
@@ -151,7 +166,7 @@ export const useSmartFileUploadCore = ({
       }
 
     } catch (error) {
-      console.error('[SMART UPLOAD] Unexpected error during processing:', error);
+      console.error('[SMART UPLOAD CORE DEBUG] Unexpected error during processing:', error);
       setUploadState('error');
       
       const errorMessage = error instanceof Error ? error.message : 'Unknown processing error';
