@@ -1,11 +1,15 @@
-import { ClassificationResult, ClassificationConfig, SimilarityScores } from '../types';
+
+import { ClassificationResult, ClassificationConfig } from '../types';
 import { DEFAULT_CLASSIFICATION_CONFIG } from './config';
 import { checkEnhancedKeywordExclusion as checkKeywordExclusion } from './enhancedExclusionLogic';
-import { calculateCombinedSimilarity, advancedNormalization } from './stringMatching';
+import { advancedNormalization } from './stringMatching';
 import { applyRuleBasedClassification } from './ruleBasedClassification';
 import { applyNLPClassification } from './nlpClassification';
 import { consensusClassification } from '../openai/enhancedClassification';
 import { detectBusinessByExtendedRules, detectIndividualByExtendedRules } from './enhancedRules';
+import { performFuzzyMatching } from './fuzzyMatching';
+import { performOfflineClassification } from './offlineClassification';
+import { performHeuristicClassification } from './heuristicClassification';
 
 /**
  * Enhanced classification with advanced string matching and comprehensive error handling
@@ -176,130 +180,4 @@ export async function enhancedClassifyPayeeV2(
       processingMethod: 'Error fallback'
     };
   }
-}
-
-/**
- * Perform fuzzy matching against cached results
- */
-async function performFuzzyMatching(payeeName: string, threshold: number): Promise<ClassificationResult | null> {
-  try {
-    // Get cached classifications from localStorage
-    const cachedClassifications = JSON.parse(localStorage.getItem('payeeClassifications') || '{}');
-    const cachedNames = Object.keys(cachedClassifications);
-    
-    if (cachedNames.length === 0) return null;
-    
-    // Find best matches using our string matching algorithms
-    const similarities = cachedNames.map(cachedName => ({
-      name: cachedName,
-      scores: calculateCombinedSimilarity(payeeName, cachedName),
-      result: cachedClassifications[cachedName]
-    })).filter(match => match.scores.combined >= threshold);
-    
-    if (similarities.length === 0) return null;
-    
-    // Get the best match
-    const bestMatch = similarities.sort((a, b) => b.scores.combined - a.scores.combined)[0];
-    
-    return {
-      classification: bestMatch.result.result.classification,
-      confidence: Math.min(bestMatch.scores.combined, 85), // Cap confidence for fuzzy matches
-      reasoning: `Fuzzy match with "${bestMatch.name}" (${bestMatch.scores.combined.toFixed(1)}% similarity)`,
-      processingTier: 'Rule-Based',
-      similarityScores: bestMatch.scores,
-      processingMethod: 'Fuzzy matching against cache'
-    };
-  } catch (error) {
-    console.warn('Fuzzy matching failed:', error);
-    return null;
-  }
-}
-
-/**
- * Offline classification using advanced heuristics
- */
-function performOfflineClassification(
-  payeeName: string, 
-  businessIndicators: string[], 
-  individualIndicators: string[]
-): ClassificationResult {
-  const words = payeeName.split(/\s+/);
-  const hasNumbers = /\d/.test(payeeName);
-  const hasSpecialChars = /[&@#$%]/.test(payeeName);
-  const isAllCaps = payeeName === payeeName.toUpperCase() && payeeName.length > 5;
-  
-  let businessScore = 0;
-  let individualScore = 0;
-  
-  // Scoring logic
-  businessScore += businessIndicators.length * 20;
-  businessScore += words.length > 3 ? 15 : 0;
-  businessScore += hasNumbers ? 10 : 0;
-  businessScore += hasSpecialChars ? 15 : 0;
-  businessScore += isAllCaps ? 10 : 0;
-  businessScore += payeeName.length > 25 ? 10 : 0;
-  
-  individualScore += individualIndicators.length * 25;
-  individualScore += words.length === 2 ? 20 : 0;
-  individualScore += words.length === 3 ? 15 : 0;
-  individualScore += !hasNumbers ? 10 : 0;
-  individualScore += !isAllCaps ? 5 : 0;
-  
-  const classification = businessScore > individualScore ? 'Business' : 'Individual';
-  const confidence = Math.min(85, Math.max(businessScore, individualScore));
-  
-  return {
-    classification,
-    confidence,
-    reasoning: `Offline heuristic classification (Business: ${businessScore}, Individual: ${individualScore})`,
-    processingTier: 'Rule-Based',
-    processingMethod: 'Offline heuristic analysis'
-  };
-}
-
-/**
- * Heuristic classification fallback when all else fails
- */
-function performHeuristicClassification(
-  payeeName: string, 
-  businessIndicators: string[], 
-  individualIndicators: string[],
-  originalError: any
-): ClassificationResult {
-  const words = payeeName.split(/\s+/);
-  
-  // Simple heuristics
-  const isLikelyBusiness = 
-    businessIndicators.length > 0 ||
-    words.length > 3 ||
-    /\d/.test(payeeName) ||
-    payeeName.length > 25 ||
-    /[&@#$%]/.test(payeeName);
-  
-  const isLikelyIndividual = 
-    individualIndicators.length > 0 ||
-    (words.length === 2 && !/\d/.test(payeeName));
-  
-  let classification: 'Business' | 'Individual';
-  let confidence: number;
-  
-  if (isLikelyBusiness && !isLikelyIndividual) {
-    classification = 'Business';
-    confidence = 60;
-  } else if (isLikelyIndividual && !isLikelyBusiness) {
-    classification = 'Individual';
-    confidence = 60;
-  } else {
-    // Default to individual for ambiguous cases
-    classification = 'Individual';
-    confidence = 51;
-  }
-  
-  return {
-    classification,
-    confidence,
-    reasoning: `Fallback heuristic classification due to service errors (Original error: ${originalError?.message || 'Unknown'})`,
-    processingTier: 'Rule-Based',
-    processingMethod: 'Final heuristic fallback'
-  };
 }
