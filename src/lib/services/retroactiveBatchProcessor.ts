@@ -1,0 +1,171 @@
+
+import { supabase } from '@/integrations/supabase/client';
+import { BatchJob, getBatchJobResults } from '@/lib/openai/trueBatchAPI';
+import { PayeeRowData } from '@/lib/rowMapping';
+import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
+import { processEnhancedBatchResults } from '@/services/batchProcessor';
+import { PreGeneratedFileService } from '@/lib/storage/preGeneratedFileService';
+import { saveClassificationResultsWithValidation } from '@/lib/database/enhancedClassificationService';
+import { logger } from '@/lib/logging/logger';
+
+export interface RetroactiveProcessingResult {
+  jobId: string;
+  success: boolean;
+  error?: string;
+  fileUrls?: {
+    csvUrl: string;
+    excelUrl: string;
+  };
+  processedCount?: number;
+  fileSizeBytes?: number;
+}
+
+export class RetroactiveBatchProcessor {
+  private static context = 'RETROACTIVE_PROCESSOR';
+
+  /**
+   * Process a completed batch job to generate pre-generated files
+   */
+  static async processCompletedJob(
+    job: BatchJob,
+    onProgress?: (processed: number, total: number, stage: string) => void
+  ): Promise<RetroactiveProcessingResult> {
+    logger.info(`Starting retroactive processing for job ${job.id}`, undefined, this.context);
+
+    try {
+      // Step 1: Reconstruct PayeeRowData from database
+      onProgress?.(0, 100, 'Reconstructing job data...');
+      const payeeRowData = await this.reconstructPayeeRowData(job.id);
+
+      if (!payeeRowData) {
+        throw new Error('Failed to reconstruct payee data from database');
+      }
+
+      // Step 2: Download results from OpenAI
+      onProgress?.(25, 100, 'Downloading OpenAI results...');
+      const rawResults = await getBatchJobResults(job, payeeRowData.uniquePayeeNames);
+
+      if (!rawResults || rawResults.length === 0) {
+        throw new Error('No results found from OpenAI batch job');
+      }
+
+      // Step 3: Process results through enhanced pipeline
+      onProgress?.(50, 100, 'Processing classifications...');
+      const { finalClassifications, summary } = await processEnhancedBatchResults({
+        rawResults,
+        uniquePayeeNames: payeeRowData.uniquePayeeNames,
+        payeeData: payeeRowData,
+        job,
+        onProgress: (processed, total) => {
+          const progressPercent = 50 + (processed / total) * 25;
+          onProgress?.(progressPercent, 100, `Processing ${processed}/${total} results...`);
+        }
+      });
+
+      // Step 4: Save to database
+      onProgress?.(75, 100, 'Saving to database...');
+      await saveClassificationResultsWithValidation(finalClassifications, job.id);
+
+      // Step 5: Generate pre-generated files
+      onProgress?.(85, 100, 'Generating downloadable files...');
+      const batchResult: BatchProcessingResult = {
+        results: finalClassifications,
+        successCount: finalClassifications.length,
+        failureCount: 0,
+        originalFileData: payeeRowData.originalFileData
+      };
+
+      const fileResult = await PreGeneratedFileService.generateAndStoreFiles(job.id, batchResult);
+
+      if (fileResult.error) {
+        throw new Error(`File generation failed: ${fileResult.error}`);
+      }
+
+      onProgress?.(100, 100, 'Complete!');
+
+      logger.info(`Successfully processed job ${job.id}`, {
+        processedCount: finalClassifications.length,
+        fileUrls: fileResult
+      }, this.context);
+
+      return {
+        jobId: job.id,
+        success: true,
+        fileUrls: {
+          csvUrl: fileResult.csvUrl!,
+          excelUrl: fileResult.excelUrl!
+        },
+        processedCount: finalClassifications.length,
+        fileSizeBytes: fileResult.fileSizeBytes
+      };
+
+    } catch (error) {
+      logger.error(`Failed to process job ${job.id}`, { error }, this.context);
+      return {
+        jobId: job.id,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Reconstruct PayeeRowData from database storage
+   */
+  private static async reconstructPayeeRowData(jobId: string): Promise<PayeeRowData | null> {
+    const { data, error } = await supabase
+      .from('batch_jobs')
+      .select('unique_payee_names, original_file_data, row_mappings, file_name, file_headers, selected_payee_column')
+      .eq('id', jobId)
+      .single();
+
+    if (error || !data) {
+      logger.error(`Failed to fetch job data for ${jobId}`, { error }, this.context);
+      return null;
+    }
+
+    return {
+      uniquePayeeNames: data.unique_payee_names || [],
+      uniqueNormalizedNames: data.unique_payee_names || [],
+      originalFileData: data.original_file_data || [],
+      rowMappings: data.row_mappings || [],
+      standardizationStats: {
+        totalProcessed: data.unique_payee_names?.length || 0,
+        changesDetected: 0,
+        averageStepsPerName: 0,
+        mostCommonSteps: []
+      },
+      fileName: data.file_name || undefined,
+      fileHeaders: data.file_headers || undefined,
+      selectedPayeeColumn: data.selected_payee_column || undefined
+    };
+  }
+
+  /**
+   * Process multiple completed jobs in sequence
+   */
+  static async processBulkJobs(
+    jobs: BatchJob[],
+    onJobProgress?: (jobIndex: number, jobId: string, processed: number, total: number, stage: string) => void
+  ): Promise<RetroactiveProcessingResult[]> {
+    const results: RetroactiveProcessingResult[] = [];
+
+    for (let i = 0; i < jobs.length; i++) {
+      const job = jobs[i];
+      logger.info(`Processing job ${i + 1}/${jobs.length}: ${job.id}`, undefined, this.context);
+
+      const result = await this.processCompletedJob(job, (processed, total, stage) => {
+        onJobProgress?.(i, job.id, processed, total, stage);
+      });
+
+      results.push(result);
+
+      // Small delay between jobs to prevent overwhelming the system
+      if (i < jobs.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    return results;
+  }
+}

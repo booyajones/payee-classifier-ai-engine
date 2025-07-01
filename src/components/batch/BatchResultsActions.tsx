@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { RotateCcw, Download, Clock } from "lucide-react";
+import { RotateCcw, Download, Clock, FileText } from "lucide-react";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { PreGeneratedFileService } from "@/lib/storage/preGeneratedFileService";
 import { useEnhancedDownload } from "@/hooks/useEnhancedDownload";
@@ -40,23 +40,32 @@ const BatchResultsActions = ({
     fileSizeBytes?: number;
   }>({});
 
+  const [isCheckingFiles, setIsCheckingFiles] = React.useState(false);
+
   React.useEffect(() => {
     if (jobId) {
+      setIsCheckingFiles(true);
       // Check for pre-generated files
       const checkPreGeneratedFiles = async () => {
-        const { data, error } = await supabase
-          .from('batch_jobs')
-          .select('csv_file_url, excel_file_url, file_generated_at, file_size_bytes')
-          .eq('id', jobId)
-          .single();
+        try {
+          const { data, error } = await supabase
+            .from('batch_jobs')
+            .select('csv_file_url, excel_file_url, file_generated_at, file_size_bytes')
+            .eq('id', jobId)
+            .single();
 
-        if (!error && data) {
-          setPreGeneratedFiles({
-            csvUrl: data.csv_file_url || undefined,
-            excelUrl: data.excel_file_url || undefined,
-            fileGeneratedAt: data.file_generated_at || undefined,
-            fileSizeBytes: data.file_size_bytes || undefined
-          });
+          if (!error && data) {
+            setPreGeneratedFiles({
+              csvUrl: data.csv_file_url || undefined,
+              excelUrl: data.excel_file_url || undefined,
+              fileGeneratedAt: data.file_generated_at || undefined,
+              fileSizeBytes: data.file_size_bytes || undefined
+            });
+          }
+        } catch (error) {
+          console.error('Error checking pre-generated files:', error);
+        } finally {
+          setIsCheckingFiles(false);
         }
       };
 
@@ -70,7 +79,7 @@ const BatchResultsActions = ({
     if (!url) {
       toast({
         title: "File Not Available",
-        description: "Pre-generated file not found. Generating new file...",
+        description: "Pre-generated file not found. Use the fallback download option.",
         variant: "destructive",
       });
       return;
@@ -90,7 +99,7 @@ const BatchResultsActions = ({
       console.error('Instant download failed:', error);
       toast({
         title: "Download Failed",
-        description: "Failed to download pre-generated file. Please try again.",
+        description: "Failed to download pre-generated file. Please try the standard download.",
         variant: "destructive",
       });
     }
@@ -126,7 +135,7 @@ const BatchResultsActions = ({
               variant="default"
               onClick={() => handleInstantDownload('csv')}
               disabled={isDownloadDisabled}
-              className="flex-1 min-w-[120px]"
+              className="flex-1 min-w-[120px] bg-green-600 hover:bg-green-700"
             >
               <Download className="h-4 w-4 mr-2" />
               Download CSV (Instant)
@@ -136,7 +145,7 @@ const BatchResultsActions = ({
               variant="outline"
               onClick={() => handleInstantDownload('excel')}
               disabled={isDownloadDisabled}
-              className="flex-1 min-w-[120px]"
+              className="flex-1 min-w-[120px] border-green-200 text-green-700 hover:bg-green-50"
             >
               <Download className="h-4 w-4 mr-2" />
               Download Excel (Instant)
@@ -144,15 +153,24 @@ const BatchResultsActions = ({
           </>
         ) : (
           <>
-            {/* Fallback to real-time generation */}
+            {/* Standard Download Buttons */}
             <Button
               variant="default"
               onClick={() => handleFallbackDownload('csv')}
               disabled={isDownloadDisabled}
               className="flex-1 min-w-[120px]"
             >
-              <Download className="h-4 w-4 mr-2" />
-              Download CSV
+              {isCheckingFiles ? (
+                <>
+                  <Clock className="h-4 w-4 mr-2 animate-spin" />
+                  Checking...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download CSV
+                </>
+              )}
             </Button>
             
             <Button
@@ -161,8 +179,17 @@ const BatchResultsActions = ({
               disabled={isDownloadDisabled}
               className="flex-1 min-w-[120px]"
             >
-              <Download className="h-4 w-4 mr-2" />
-              Download Excel
+              {isCheckingFiles ? (
+                <>
+                  <Clock className="h-4 w-4 mr-2 animate-spin" />
+                  Checking...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Excel
+                </>
+              )}
             </Button>
           </>
         )}
@@ -181,11 +208,20 @@ const BatchResultsActions = ({
         <p>CSV and Excel files include SIC codes and descriptions for business classifications.</p>
         
         {hasPreGeneratedFiles && (
-          <div className="flex items-center gap-2 text-green-600">
+          <div className="flex items-center gap-2 text-green-600 font-medium">
             <Clock className="h-3 w-3" />
             <span>
-              Instant download available • {formatFileSize(preGeneratedFiles.fileSizeBytes)} • 
+              ⚡ Instant download ready • {formatFileSize(preGeneratedFiles.fileSizeBytes)} • 
               Generated {formatDate(preGeneratedFiles.fileGeneratedAt)}
+            </span>
+          </div>
+        )}
+
+        {!hasPreGeneratedFiles && !isCheckingFiles && jobId && (
+          <div className="flex items-center gap-2 text-blue-600">
+            <FileText className="h-3 w-3" />
+            <span>
+              Standard download • Files generated on-demand • May take 30+ seconds for large datasets
             </span>
           </div>
         )}
