@@ -1,4 +1,3 @@
-
 export interface SimilarityScores {
   levenshtein: number;
   jaro: number;
@@ -159,29 +158,20 @@ export function calculateCombinedSimilarity(str1: string, str2: string): Similar
 /**
  * Advanced text normalization for better matching
  */
-export function advancedNormalization(text: string): { 
-  normalized: string; 
-  tokens: string[];
-  businessIndicators: string[];
-  individualIndicators: string[];
-} {
-  const normalized = text
+export function advancedNormalization(text: string): string {
+  if (!text || typeof text !== 'string') return '';
+  
+  return text
     .toUpperCase()
     .trim()
-    .replace(/[^\w\s]/g, ' ')
-    .replace(/\s+/g, ' ');
-  
-  const tokens = normalized
-    .split(' ')
-    .filter(token => token.length > 0);
-  
-  // Business indicators
-  const businessKeywords = ['LLC', 'INC', 'CORP', 'LTD', 'CO', 'COMPANY', 'CORPORATION', 'INCORPORATED', 'LIMITED', 'BANK', 'FINANCIAL', 'SERVICES', 'GROUP', 'HOLDINGS', 'ENTERPRISES', 'SOLUTIONS', 'SYSTEMS', 'TECHNOLOGIES', 'ASSOCIATES', 'PARTNERS'];
-  const businessIndicators = tokens.filter(token => businessKeywords.includes(token));
-  
-  // Individual indicators (common first/last names)
-  const nameKeywords = ['JOHN', 'JANE', 'MICHAEL', 'SARAH', 'DAVID', 'MARY', 'ROBERT', 'JENNIFER', 'WILLIAM', 'ELIZABETH', 'JAMES', 'PATRICIA', 'RICHARD', 'LINDA', 'JOSEPH', 'BARBARA', 'THOMAS', 'SUSAN', 'CHARLES', 'JESSICA', 'CHRISTOPHER', 'NANCY', 'DANIEL', 'KAREN', 'MATTHEW', 'BETTY', 'ANTHONY', 'HELEN', 'DONALD', 'SANDRA', 'MARK', 'DONNA', 'PAUL', 'CAROL', 'STEVEN', 'RUTH', 'ANDREW', 'SHARON', 'JOSHUA', 'MICHELLE', 'KENNETH', 'LAURA', 'KEVIN', 'SARAH', 'BRIAN', 'KIMBERLY', 'GEORGE', 'DEBORAH', 'EDWARD', 'DOROTHY', 'RONALD', 'LISA', 'TIMOTHY', 'NANCY', 'JASON', 'KAREN', 'JEFFREY', 'BETTY', 'RYAN', 'HELEN', 'JACOB', 'SANDRA', 'GARY', 'DONNA', 'NICHOLAS', 'CAROL', 'ERIC', 'RUTH', 'JONATHAN', 'SHARON', 'STEPHEN', 'MICHELLE', 'LARRY', 'LAURA', 'JUSTIN', 'SARAH', 'SCOTT', 'KIMBERLY', 'BRANDON', 'DEBORAH', 'BENJAMIN', 'DOROTHY', 'SAMUEL', 'LISA', 'GREGORY', 'NANCY', 'FRANK', 'KAREN', 'RAYMOND', 'BETTY', 'ALEXANDER', 'HELEN', 'PATRICK', 'SANDRA', 'JACK', 'DONNA', 'DENNIS', 'CAROL', 'JERRY', 'RUTH', 'TYLER', 'SHARON', 'AARON', 'MICHELLE', 'JOSE', 'LAURA', 'HENRY', 'SARAH', 'ADAM', 'KIMBERLY', 'DOUGLAS', 'DEBORAH', 'NATHAN', 'DOROTHY', 'PETER', 'LISA', 'ZACHARY', 'NANCY', 'KYLE', 'KAREN', 'NOAH', 'BETTY', 'ALAN', 'HELEN', 'ETHAN', 'SANDRA', 'JEREMY', 'DONNA', 'RUSSELL', 'CAROL', 'MASON', 'RUTH', 'CODY', 'SHARON', 'MIKE', 'MICHELLE', 'SMITH', 'JOHNSON', 'WILLIAMS', 'BROWN', 'JONES', 'GARCIA', 'MILLER', 'DAVIS', 'RODRIGUEZ', 'MARTINEZ', 'HERNANDEZ', 'LOPEZ', 'GONZALEZ', 'WILSON', 'ANDERSON', 'THOMAS', 'TAYLOR', 'MOORE', 'JACKSON', 'MARTIN', 'LEE', 'PEREZ', 'THOMPSON', 'WHITE', 'HARRIS', 'SANCHEZ', 'CLARK', 'RAMIREZ', 'LEWIS', 'ROBINSON', 'WALKER', 'YOUNG', 'ALLEN', 'KING', 'WRIGHT', 'SCOTT', 'TORRES', 'NGUYEN', 'HILL', 'FLORES', 'GREEN', 'ADAMS', 'NELSON', 'BAKER', 'HALL', 'RIVERA', 'CAMPBELL', 'MITCHELL', 'CARTER', 'ROBERTS'];
-  const individualIndicators = tokens.filter(token => nameKeywords.includes(token));
-  
-  return { normalized, tokens, businessIndicators, individualIndicators };
+    // Handle common business abbreviations and symbols
+    .replace(/\s*&\s*/g, ' AND ')  // Convert & to AND with proper spacing
+    .replace(/\s*\+\s*/g, ' PLUS ') // Convert + to PLUS
+    .replace(/\s*@\s*/g, ' AT ')    // Convert @ to AT
+    .replace(/\s*#\s*/g, ' NUMBER ') // Convert # to NUMBER
+    .replace(/\s*\*\s*/g, ' STAR ')  // Convert * to STAR
+    // Normalize punctuation
+    .replace(/[^\w\s]/g, ' ')       // Replace all non-word chars with space
+    .replace(/\s+/g, ' ')           // Normalize multiple spaces to single space
+    .trim();
 }

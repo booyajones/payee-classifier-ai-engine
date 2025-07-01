@@ -1,145 +1,236 @@
 
-import { KeywordExclusionResult, SimilarityScores } from '../types';
-import { calculateCombinedSimilarity, advancedNormalization } from './stringMatching';
-import { isWholeWordMatch } from './patternMatching';
-import { getComprehensiveExclusionKeywords } from './exclusionUtils';
+import { 
+  getComprehensiveExclusionKeywords, 
+  validateExclusionKeywords 
+} from './keywordExclusion';
+import { 
+  calculateCombinedSimilarity, 
+  advancedNormalization,
+  type SimilarityScores 
+} from './stringMatching';
+import { 
+  isWholeWordMatch, 
+  testRegexPatterns 
+} from './patternMatching';
+import { KEYWORD_EXCLUSION_CONFIG } from './config';
 
-/**
- * Enhanced keyword exclusion with similarity matching and detailed results
- * Always uses the comprehensive keyword list with WHOLE WORD matching only
- */
-export function checkEnhancedKeywordExclusion(payeeName: string, customKeywords?: string[]): KeywordExclusionResult {
-  console.log(`\n[ENHANCED KEYWORD EXCLUSION] === STARTING EXCLUSION CHECK FOR "${payeeName}" ===`);
-  
-  // Use comprehensive keywords as default, allow custom override for testing
-  const exclusionKeywords = customKeywords || getComprehensiveExclusionKeywords();
-  
-  console.log(`[ENHANCED KEYWORD EXCLUSION] Checking "${payeeName}" against ${exclusionKeywords.length} keywords (WHOLE WORD MATCHING)`);
-  console.log(`[ENHANCED KEYWORD EXCLUSION] Sample keywords: [${exclusionKeywords.slice(0, 10).join(', ')}]`);
-  
-  // Check if BANK is in keywords
-  const hasBankKeyword = exclusionKeywords.some(k => k.toUpperCase() === 'BANK');
-  console.log(`[ENHANCED KEYWORD EXCLUSION] Contains BANK keyword: ${hasBankKeyword}`);
-  
-  // Check if BANK OF AMERICA is in keywords
-  const hasBankOfAmericaKeyword = exclusionKeywords.some(k => k.toUpperCase() === 'BANK OF AMERICA');
-  console.log(`[ENHANCED KEYWORD EXCLUSION] Contains BANK OF AMERICA keyword: ${hasBankOfAmericaKeyword}`);
-  
-  if (exclusionKeywords.length === 0) {
-    console.warn('[ENHANCED KEYWORD EXCLUSION] No exclusion keywords available');
-    return {
-      isExcluded: false,
-      matchedKeywords: [],
-      confidence: 0,
-      reasoning: 'No exclusion keywords configured'
-    };
-  }
-  
-  const { normalized, tokens } = advancedNormalization(payeeName);
-  const matchedKeywords: string[] = [];
-  const similarities: Array<{ keyword: string; similarity: number; scores: SimilarityScores }> = [];
-  
-  console.log(`[ENHANCED KEYWORD EXCLUSION] Normalized: "${normalized}", Tokens: [${tokens.join(', ')}]`);
-  
-  // Check for exact WHOLE WORD matches first
-  for (const keyword of exclusionKeywords) {
-    const normalizedKeyword = keyword.toUpperCase().trim();
-    console.log(`[ENHANCED KEYWORD EXCLUSION] Testing keyword: "${normalizedKeyword}"`);
-    
-    // WHOLE WORD match in normalized name using word boundaries
-    if (isWholeWordMatch(normalized, normalizedKeyword)) {
-      matchedKeywords.push(keyword);
-      console.log(`[ENHANCED KEYWORD EXCLUSION] ✅ WHOLE WORD match found: "${keyword}" in "${payeeName}"`);
-      continue;
-    }
-    
-    // Token-level exact match (this was already correct - tokens are whole words)
-    const tokenMatch = tokens.some(token => {
-      const matches = token === normalizedKeyword;
-      if (matches) {
-        console.log(`[ENHANCED KEYWORD EXCLUSION] ✅ TOKEN exact match: "${normalizedKeyword}" matches token "${token}"`);
-      }
-      return matches;
-    });
-    
-    if (tokenMatch) {
-      matchedKeywords.push(keyword);
-      continue;
-    }
-    
-    // Fuzzy matching ONLY on individual tokens (not partial strings within words)
-    for (const token of tokens) {
-      const tokenSimilarity = calculateCombinedSimilarity(token, normalizedKeyword);
-      if (tokenSimilarity.combined >= 90) { // Very high threshold for token fuzzy matches
-        similarities.push({ keyword, similarity: tokenSimilarity.combined, scores: tokenSimilarity });
-        console.log(`[ENHANCED KEYWORD EXCLUSION] ✅ FUZZY TOKEN match: "${keyword}" vs token "${token}" (${tokenSimilarity.combined.toFixed(1)}%)`);
-        break; // Only match once per keyword
-      }
-    }
-  }
-  
-  // Add fuzzy matches to matched keywords
-  similarities.forEach(({ keyword }) => {
-    if (!matchedKeywords.includes(keyword)) {
-      matchedKeywords.push(keyword);
-    }
-  });
-  
-  const isExcluded = matchedKeywords.length > 0;
-  const confidence = isExcluded ? Math.max(
-    ...similarities.map(s => s.similarity),
-    matchedKeywords.length > similarities.length ? 100 : 0 // 100% for exact matches
-  ) : 0;
-  
-  let reasoning = '';
-  if (isExcluded) {
-    const exactMatches = matchedKeywords.filter(k => 
-      !similarities.some(s => s.keyword === k)
-    );
-    const fuzzyMatches = similarities.map(s => 
-      `${s.keyword} (${s.similarity.toFixed(1)}% similar)`
-    );
-    
-    const parts = [];
-    if (exactMatches.length > 0) {
-      parts.push(`Whole word matches: ${exactMatches.join(', ')}`);
-    }
-    if (fuzzyMatches.length > 0) {
-      parts.push(`Fuzzy token matches: ${fuzzyMatches.join(', ')}`);
-    }
-    
-    reasoning = `Excluded due to keyword matches - ${parts.join('; ')}`;
-  } else {
-    reasoning = 'No exclusion keywords matched (whole word matching)';
-  }
-  
-  console.log(`[ENHANCED KEYWORD EXCLUSION] === FINAL RESULT FOR "${payeeName}" ===`);
-  console.log(`[ENHANCED KEYWORD EXCLUSION] Result: ${isExcluded ? 'EXCLUDED' : 'NOT EXCLUDED'}`);
-  console.log(`[ENHANCED KEYWORD EXCLUSION] Matched Keywords: [${matchedKeywords.join(', ')}]`);
-  console.log(`[ENHANCED KEYWORD EXCLUSION] Confidence: ${confidence}%`);
-  console.log(`[ENHANCED KEYWORD EXCLUSION] Reasoning: ${reasoning}`);
-  
-  return {
-    isExcluded,
-    matchedKeywords,
-    confidence,
-    reasoning
-  };
+export interface KeywordExclusionResult {
+  isExcluded: boolean;
+  matchedKeywords: string[];
+  confidence: number;
+  reasoning: string;
+  similarityScores?: SimilarityScores;
+  normalizedInput?: string;
+  normalizedKeywords?: string[];
 }
 
 /**
- * Bulk keyword exclusion check for batch processing
+ * Normalize a keyword for consistent matching with payee names
  */
-export function bulkEnhancedKeywordExclusion(payeeNames: string[]): Map<string, KeywordExclusionResult> {
-  console.log(`[ENHANCED KEYWORD EXCLUSION] Bulk processing ${payeeNames.length} payees (WHOLE WORD MATCHING)`);
-  const results = new Map<string, KeywordExclusionResult>();
+function normalizeKeywordForMatching(keyword: string): string {
+  if (!keyword || typeof keyword !== 'string') return '';
   
-  for (const name of payeeNames) {
-    results.set(name, checkEnhancedKeywordExclusion(name));
+  // Apply the same normalization as used for payee names
+  let normalized = advancedNormalization(keyword);
+  
+  // Special handling for common business patterns
+  normalized = normalized
+    .replace(/\s*&\s*/g, ' AND ')  // Convert & to AND
+    .replace(/\s+AND\s+/g, ' AND ')  // Normalize AND spacing
+    .replace(/\s+/g, ' ')  // Normalize whitespace
+    .trim();
+  
+  return normalized;
+}
+
+/**
+ * Check if normalized tokens match against normalized keyword tokens
+ */
+function checkTokenMatch(normalizedPayee: string, normalizedKeyword: string): boolean {
+  if (!normalizedPayee || !normalizedKeyword) return false;
+  
+  const payeeTokens = normalizedPayee.split(/\s+/).filter(t => t.length > 0);
+  const keywordTokens = normalizedKeyword.split(/\s+/).filter(t => t.length > 0);
+  
+  // For compound names like AT&T -> ["AT", "T"], check if all keyword tokens are present
+  if (keywordTokens.length <= payeeTokens.length) {
+    const hasAllTokens = keywordTokens.every(kToken => 
+      payeeTokens.some(pToken => pToken === kToken)
+    );
+    if (hasAllTokens) return true;
   }
   
-  const excludedCount = Array.from(results.values()).filter(r => r.isExcluded).length;
-  console.log(`[ENHANCED KEYWORD EXCLUSION] Bulk result: ${excludedCount}/${payeeNames.length} excluded`);
+  // Also check if the full normalized strings match
+  return normalizedPayee.includes(normalizedKeyword) || normalizedKeyword.includes(normalizedPayee);
+}
+
+/**
+ * Enhanced keyword exclusion with improved special character handling
+ */
+export function checkEnhancedKeywordExclusion(
+  payeeName: string,
+  customKeywords?: string[]
+): KeywordExclusionResult {
+  console.log(`[ENHANCED EXCLUSION] Processing: "${payeeName}"`);
   
+  if (!payeeName || typeof payeeName !== 'string') {
+    console.log('[ENHANCED EXCLUSION] Invalid input - excluding by default');
+    return {
+      isExcluded: true,
+      matchedKeywords: ['invalid-input'],
+      confidence: 100,
+      reasoning: 'Invalid or empty payee name - excluded for safety'
+    };
+  }
+
+  const keywords = customKeywords || getComprehensiveExclusionKeywords();
+  const normalizedPayee = advancedNormalization(payeeName);
+  
+  console.log(`[ENHANCED EXCLUSION] Normalized "${payeeName}" -> "${normalizedPayee}"`);
+  
+  // Special debugging for AT&T variants
+  if (payeeName.toUpperCase().includes('AT') && (payeeName.includes('&') || payeeName.includes('T'))) {
+    console.log(`[ENHANCED EXCLUSION] [AT&T DEBUG] Processing AT&T variant: "${payeeName}"`);
+    console.log(`[ENHANCED EXCLUSION] [AT&T DEBUG] Normalized: "${normalizedPayee}"`);
+  }
+
+  const matchedKeywords: string[] = [];
+  const normalizedKeywords: string[] = [];
+  let highestConfidence = 0;
+  let bestReasoning = '';
+
+  // Check each exclusion keyword with enhanced normalization
+  for (const keyword of keywords) {
+    if (!keyword || typeof keyword !== 'string') continue;
+    
+    const originalKeyword = keyword.trim();
+    const normalizedKeyword = normalizeKeywordForMatching(originalKeyword);
+    normalizedKeywords.push(normalizedKeyword);
+    
+    // Special debugging for AT&T related keywords
+    if (originalKeyword.toUpperCase().includes('AT') && (originalKeyword.includes('&') || originalKeyword.includes('T'))) {
+      console.log(`[ENHANCED EXCLUSION] [AT&T DEBUG] Checking keyword: "${originalKeyword}" -> "${normalizedKeyword}"`);
+    }
+    
+    let isMatch = false;
+    let confidence = 0;
+    let matchReason = '';
+
+    // Method 1: Exact normalized match
+    if (normalizedPayee === normalizedKeyword) {
+      isMatch = true;
+      confidence = 100;
+      matchReason = 'Exact normalized match';
+    }
+    // Method 2: Token-based matching for compound names
+    else if (checkTokenMatch(normalizedPayee, normalizedKeyword)) {
+      isMatch = true;
+      confidence = 95;
+      matchReason = 'Token-based match';
+    }
+    // Method 3: Whole word matching with regex
+    else if (isWholeWordMatch(normalizedPayee, normalizedKeyword)) {
+      isMatch = true;
+      confidence = 90;
+      matchReason = 'Whole word match';
+    }
+    // Method 4: Simple contains check
+    else if (normalizedPayee.includes(normalizedKeyword) || normalizedKeyword.includes(normalizedPayee)) {
+      isMatch = true;
+      confidence = 80;
+      matchReason = 'Contains match';
+    }
+    // Method 5: Similarity scoring for fuzzy matches
+    else {
+      const similarity = calculateCombinedSimilarity(normalizedPayee, normalizedKeyword);
+      if (similarity.combined > 85) {
+        isMatch = true;
+        confidence = similarity.combined;
+        matchReason = `Similarity match (${similarity.combined.toFixed(1)}%)`;
+      }
+    }
+
+    if (isMatch) {
+      matchedKeywords.push(originalKeyword);
+      if (confidence > highestConfidence) {
+        highestConfidence = confidence;
+        bestReasoning = `Matched "${originalKeyword}" via ${matchReason}`;
+      }
+      
+      // Special logging for AT&T matches
+      if (originalKeyword.toUpperCase().includes('AT') && (originalKeyword.includes('&') || originalKeyword.includes('T'))) {
+        console.log(`[ENHANCED EXCLUSION] [AT&T DEBUG] ✓ MATCHED: "${payeeName}" -> "${originalKeyword}" (${matchReason}, ${confidence}% confidence)`);
+      }
+      
+      console.log(`[ENHANCED EXCLUSION] ✓ MATCH: "${payeeName}" -> "${originalKeyword}" (${matchReason})`);
+    }
+  }
+
+  const isExcluded = matchedKeywords.length > 0;
+  const finalConfidence = isExcluded ? highestConfidence : 0;
+  
+  const result: KeywordExclusionResult = {
+    isExcluded,
+    matchedKeywords,
+    confidence: finalConfidence,
+    reasoning: isExcluded 
+      ? `Excluded: ${bestReasoning}. Matched keywords: ${matchedKeywords.join(', ')}`
+      : 'No exclusion keywords matched - proceeding to AI classification',
+    normalizedInput: normalizedPayee,
+    normalizedKeywords: isExcluded ? normalizedKeywords.filter((_, i) => 
+      matchedKeywords.includes(keywords[i])
+    ) : undefined
+  };
+
+  // Special logging for AT&T cases
+  if (payeeName.toUpperCase().includes('AT') && (payeeName.includes('&') || payeeName.includes('T'))) {
+    console.log(`[ENHANCED EXCLUSION] [AT&T DEBUG] Final result for "${payeeName}":`, {
+      isExcluded: result.isExcluded,
+      matchedKeywords: result.matchedKeywords,
+      confidence: result.confidence
+    });
+  }
+
+  console.log(`[ENHANCED EXCLUSION] Result for "${payeeName}": ${isExcluded ? 'EXCLUDED' : 'NOT EXCLUDED'} (${finalConfidence}% confidence)`);
+  if (isExcluded) {
+    console.log(`[ENHANCED EXCLUSION] Matched: ${matchedKeywords.join(', ')}`);
+  }
+
+  return result;
+}
+
+/**
+ * Bulk keyword exclusion processing with enhanced logging
+ */
+export function bulkEnhancedKeywordExclusion(
+  payeeNames: string[],
+  customKeywords?: string[]
+): KeywordExclusionResult[] {
+  console.log(`[BULK ENHANCED EXCLUSION] Processing ${payeeNames.length} names`);
+  
+  const results = payeeNames.map((name, index) => {
+    console.log(`[BULK ENHANCED EXCLUSION] Processing ${index + 1}/${payeeNames.length}: "${name}"`);
+    return checkEnhancedKeywordExclusion(name, customKeywords);
+  });
+
+  const excludedCount = results.filter(r => r.isExcluded).length;
+  console.log(`[BULK ENHANCED EXCLUSION] Complete: ${excludedCount}/${payeeNames.length} excluded`);
+  
+  // Log AT&T specific results
+  const attResults = results.filter((_, i) => {
+    const name = payeeNames[i].toUpperCase();
+    return name.includes('AT') && (name.includes('&') || name.includes('T'));
+  });
+  
+  if (attResults.length > 0) {
+    console.log('[BULK ENHANCED EXCLUSION] [AT&T DEBUG] AT&T variant results:', 
+      attResults.map((result, i) => ({
+        name: payeeNames[results.indexOf(result)],
+        excluded: result.isExcluded,
+        matches: result.matchedKeywords
+      }))
+    );
+  }
+
   return results;
 }
