@@ -67,10 +67,10 @@ function checkTokenMatch(normalizedPayee: string, normalizedKeyword: string): bo
 /**
  * Enhanced keyword exclusion with improved special character handling
  */
-export function checkEnhancedKeywordExclusion(
+export async function checkEnhancedKeywordExclusion(
   payeeName: string,
   customKeywords?: string[]
-): KeywordExclusionResult {
+): Promise<KeywordExclusionResult> {
   console.log(`[ENHANCED EXCLUSION] Processing: "${payeeName}"`);
   
   if (!payeeName || typeof payeeName !== 'string') {
@@ -83,7 +83,7 @@ export function checkEnhancedKeywordExclusion(
     };
   }
 
-  const keywords = customKeywords || getComprehensiveExclusionKeywords();
+  const keywords = customKeywords || await getComprehensiveExclusionKeywords();
   const normalizedPayee = advancedNormalization(payeeName);
   
   console.log(`[ENHANCED EXCLUSION] Normalized "${payeeName}" -> "${normalizedPayee}"`);
@@ -202,16 +202,16 @@ export function checkEnhancedKeywordExclusion(
 /**
  * Bulk keyword exclusion processing with enhanced logging
  */
-export function bulkEnhancedKeywordExclusion(
+export async function bulkEnhancedKeywordExclusion(
   payeeNames: string[],
   customKeywords?: string[]
-): KeywordExclusionResult[] {
+): Promise<KeywordExclusionResult[]> {
   console.log(`[BULK ENHANCED EXCLUSION] Processing ${payeeNames.length} names`);
   
-  const results = payeeNames.map((name, index) => {
+  const results = await Promise.all(payeeNames.map(async (name, index) => {
     console.log(`[BULK ENHANCED EXCLUSION] Processing ${index + 1}/${payeeNames.length}: "${name}"`);
-    return checkEnhancedKeywordExclusion(name, customKeywords);
-  });
+    return await checkEnhancedKeywordExclusion(name, customKeywords);
+  }));
 
   const excludedCount = results.filter(r => r.isExcluded).length;
   console.log(`[BULK ENHANCED EXCLUSION] Complete: ${excludedCount}/${payeeNames.length} excluded`);
