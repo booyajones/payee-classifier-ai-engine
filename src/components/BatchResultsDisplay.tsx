@@ -13,6 +13,7 @@ interface BatchResultsDisplayProps {
   isDownloading?: boolean;
   downloadProgress?: { current: number; total: number };
   onCancelDownload?: () => void;
+  jobId?: string;
 }
 
 const BatchResultsDisplay = ({ 
@@ -22,7 +23,8 @@ const BatchResultsDisplay = ({
   isProcessing,
   isDownloading = false,
   downloadProgress,
-  onCancelDownload
+  onCancelDownload,
+  jobId
 }: BatchResultsDisplayProps) => {
   return (
     <>
@@ -41,6 +43,7 @@ const BatchResultsDisplay = ({
             onReset={onReset}
             isProcessing={isProcessing}
             isDownloading={isDownloading}
+            jobId={jobId}
           />
         </div>
       ) : (

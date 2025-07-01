@@ -4,14 +4,16 @@ import { enhancedClassifyPayeeWithAI } from '../openai/enhancedClassification';
 import { classifyPayeeWithAI } from '../openai/singleClassification';
 import { checkKeywordExclusion } from './enhancedKeywordExclusion';
 import { saveClassificationResults } from '../database/classificationService';
+import { PreGeneratedFileService } from '../storage/preGeneratedFileService';
 
 /**
- * Enhanced batch processor V3 with improved SIC code handling and database persistence
+ * Enhanced batch processor V3 with improved SIC code handling and pre-generated file creation
  */
 export async function enhancedProcessBatchV3(
   payeeNames: string[],
   config: ClassificationConfig,
-  originalFileData?: any[]
+  originalFileData?: any[],
+  jobId?: string
 ): Promise<BatchProcessingResult> {
   console.log(`[ENHANCED BATCH V3] Starting batch processing of ${payeeNames.length} payees with SIC codes`);
   
@@ -92,6 +94,23 @@ export async function enhancedProcessBatchV3(
   } catch (error) {
     console.error(`[ENHANCED BATCH V3] ERROR: Failed to save results to database:`, error);
     // Don't throw here - we still want to return the results even if database save fails
+  }
+
+  // Generate pre-generated files for instant download
+  if (jobId) {
+    try {
+      console.log(`[ENHANCED BATCH V3] Generating pre-generated files for job ${jobId}`);
+      const fileResult = await PreGeneratedFileService.generateAndStoreFiles(jobId, batchResult);
+      
+      if (fileResult.error) {
+        console.error(`[ENHANCED BATCH V3] File generation failed: ${fileResult.error}`);
+      } else {
+        console.log(`[ENHANCED BATCH V3] Pre-generated files created successfully for instant downloads`);
+      }
+    } catch (error) {
+      console.error(`[ENHANCED BATCH V3] Error generating pre-generated files:`, error);
+      // Don't throw - files can be generated on-demand later
+    }
   }
 
   const businessCount = results.filter(r => r.result.classification === 'Business').length;

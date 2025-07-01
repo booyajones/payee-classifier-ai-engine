@@ -16,11 +16,15 @@ export type Database = {
           cancelled_at_timestamp: number | null
           completed_at_timestamp: number | null
           created_at_timestamp: number
+          csv_file_url: string | null
           errors: Json | null
+          excel_file_url: string | null
           expired_at_timestamp: number | null
           failed_at_timestamp: number | null
+          file_generated_at: string | null
           file_headers: string[] | null
           file_name: string | null
+          file_size_bytes: number | null
           finalizing_at_timestamp: number | null
           id: string
           in_progress_at_timestamp: number | null
@@ -42,11 +46,15 @@ export type Database = {
           cancelled_at_timestamp?: number | null
           completed_at_timestamp?: number | null
           created_at_timestamp: number
+          csv_file_url?: string | null
           errors?: Json | null
+          excel_file_url?: string | null
           expired_at_timestamp?: number | null
           failed_at_timestamp?: number | null
+          file_generated_at?: string | null
           file_headers?: string[] | null
           file_name?: string | null
+          file_size_bytes?: number | null
           finalizing_at_timestamp?: number | null
           id: string
           in_progress_at_timestamp?: number | null
@@ -68,11 +76,15 @@ export type Database = {
           cancelled_at_timestamp?: number | null
           completed_at_timestamp?: number | null
           created_at_timestamp?: number
+          csv_file_url?: string | null
           errors?: Json | null
+          excel_file_url?: string | null
           expired_at_timestamp?: number | null
           failed_at_timestamp?: number | null
+          file_generated_at?: string | null
           file_headers?: string[] | null
           file_name?: string | null
+          file_size_bytes?: number | null
           finalizing_at_timestamp?: number | null
           id?: string
           in_progress_at_timestamp?: number | null
