@@ -102,6 +102,30 @@ export type Database = {
         }
         Relationships: []
       }
+      exclusion_keywords: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          keyword: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          keyword: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          keyword?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payee_classifications: {
         Row: {
           batch_id: string | null

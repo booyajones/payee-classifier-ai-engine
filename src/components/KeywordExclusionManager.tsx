@@ -7,12 +7,21 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash, Shield, TestTube } from "lucide-react";
+import { Plus, Edit, Trash, Shield, TestTube, Loader2 } from "lucide-react";
 import {
-  getComprehensiveExclusionKeywords,
-  validateExclusionKeywords
+  getBuiltInExclusionKeywords,
+  getCustomExclusionKeywords,
+  checkKeywordExclusion,
+  clearCustomKeywordsCache
 } from "@/lib/classification/keywordExclusion";
-import { checkKeywordExclusion } from "@/lib/classification/enhancedKeywordExclusion";
+import { 
+  addCustomExclusionKeyword,
+  updateCustomExclusionKeyword,
+  deleteCustomExclusionKeyword,
+  getAllCustomExclusionKeywords,
+  type ExclusionKeyword
+} from "@/lib/database/exclusionKeywordService";
+import { checkKeywordExclusion as checkEnhancedKeywordExclusion } from "@/lib/classification/enhancedKeywordExclusion";
 import { testKeywordExclusion, quickTest } from "@/lib/classification/keywordExclusionTest";
 import { KEYWORD_EXCLUSION_CONFIG } from "@/lib/classification/config";
 import {
@@ -24,62 +33,55 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const CUSTOM_KEYWORDS_STORAGE_KEY = 'custom-exclusion-keywords';
-
 const KeywordExclusionManager = () => {
   const [comprehensiveKeywords, setComprehensiveKeywords] = useState<string[]>([]);
-  const [customKeywords, setCustomKeywords] = useState<string[]>([]);
+  const [customKeywords, setCustomKeywords] = useState<ExclusionKeyword[]>([]);
   const [allKeywords, setAllKeywords] = useState<string[]>([]);
   const [newKeyword, setNewKeyword] = useState("");
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [testPayeeName, setTestPayeeName] = useState("");
   const [testResult, setTestResult] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
-  // Load custom keywords from localStorage
-  const loadCustomKeywords = (): string[] => {
+  // Load keywords from database and built-in sources
+  const loadKeywords = async () => {
     try {
-      const stored = localStorage.getItem(CUSTOM_KEYWORDS_STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [];
+      setLoading(true);
+      
+      // Load built-in keywords
+      const comprehensive = getBuiltInExclusionKeywords();
+      setComprehensiveKeywords(comprehensive);
+      
+      // Load custom keywords from database
+      const custom = await getAllCustomExclusionKeywords();
+      setCustomKeywords(custom);
+      
+      // Combine both lists for display and testing
+      const customKeywordStrings = custom.filter(k => k.is_active).map(k => k.keyword);
+      const combined = [...comprehensive, ...customKeywordStrings];
+      setAllKeywords(combined);
+      
+      console.log(`[KEYWORD EXCLUSION MANAGER] Loaded ${comprehensive.length} comprehensive + ${customKeywordStrings.length} custom = ${combined.length} total keywords`);
     } catch (error) {
-      console.error('Error loading custom keywords:', error);
-      return [];
-    }
-  };
-
-  // Save custom keywords to localStorage
-  const saveCustomKeywords = (keywords: string[]) => {
-    try {
-      localStorage.setItem(CUSTOM_KEYWORDS_STORAGE_KEY, JSON.stringify(keywords));
-      console.log(`[KEYWORD EXCLUSION MANAGER] Saved ${keywords.length} custom keywords`);
-    } catch (error) {
-      console.error('Error saving custom keywords:', error);
+      console.error('Error loading keywords:', error);
       toast({
-        title: "Storage Error",
-        description: "Failed to save custom keywords",
+        title: "Loading Error",
+        description: "Failed to load exclusion keywords",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    // Load comprehensive keywords (built-in)
-    const comprehensive = getComprehensiveExclusionKeywords();
-    setComprehensiveKeywords(comprehensive);
-    
-    // Load custom keywords from localStorage
-    const custom = loadCustomKeywords();
-    setCustomKeywords(custom);
-    
-    // Combine both lists for display and testing
-    const combined = [...comprehensive, ...custom];
-    setAllKeywords(combined);
-    
-    console.log(`[KEYWORD EXCLUSION MANAGER] Loaded ${comprehensive.length} comprehensive + ${custom.length} custom = ${combined.length} total keywords`);
+    loadKeywords();
   }, []);
 
-  const handleAddKeyword = () => {
+  const handleAddKeyword = async () => {
     if (!newKeyword.trim()) {
       toast({
         title: "Invalid Keyword",
@@ -101,20 +103,37 @@ const KeywordExclusionManager = () => {
       return;
     }
 
-    // Add to custom keywords
-    const updatedCustomKeywords = [...customKeywords, trimmedKeyword];
-    setCustomKeywords(updatedCustomKeywords);
-    saveCustomKeywords(updatedCustomKeywords);
-    
-    // Update combined list
-    const updatedAllKeywords = [...comprehensiveKeywords, ...updatedCustomKeywords];
-    setAllKeywords(updatedAllKeywords);
-    setNewKeyword("");
-    
-    toast({
-      title: "Keyword Added",
-      description: `"${trimmedKeyword}" has been added to the exclusion list`,
-    });
+    try {
+      setSaving(true);
+      const result = await addCustomExclusionKeyword(trimmedKeyword);
+      
+      if (result.success) {
+        // Clear cache and reload keywords
+        clearCustomKeywordsCache();
+        await loadKeywords();
+        setNewKeyword("");
+        
+        toast({
+          title: "Keyword Added",
+          description: `"${trimmedKeyword}" has been added to the exclusion list`,
+        });
+      } else {
+        toast({
+          title: "Failed to Add Keyword",
+          description: result.error || "Unknown error occurred",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error adding keyword:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add keyword",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleEditKeyword = (index: number) => {
@@ -122,7 +141,7 @@ const KeywordExclusionManager = () => {
     setEditingValue(allKeywords[index]);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (editingIndex === null) return;
 
     if (!editingValue.trim()) {
@@ -151,26 +170,51 @@ const KeywordExclusionManager = () => {
       return;
     }
     
-    // Find the keyword in custom keywords and update it
-    const customIndex = customKeywords.findIndex(k => k === keywordToEdit);
-    if (customIndex !== -1) {
-      const updatedCustomKeywords = [...customKeywords];
-      updatedCustomKeywords[customIndex] = trimmedValue;
-      setCustomKeywords(updatedCustomKeywords);
-      saveCustomKeywords(updatedCustomKeywords);
-      
-      // Update combined list
-      const updatedAllKeywords = [...comprehensiveKeywords, ...updatedCustomKeywords];
-      setAllKeywords(updatedAllKeywords);
+    // Find the custom keyword record
+    const customKeyword = customKeywords.find(k => k.keyword === keywordToEdit);
+    if (!customKeyword) {
+      toast({
+        title: "Keyword Not Found",
+        description: "Could not find the keyword to edit",
+        variant: "destructive",
+      });
+      setEditingIndex(null);
+      setEditingValue("");
+      return;
     }
-    
-    setEditingIndex(null);
-    setEditingValue("");
 
-    toast({
-      title: "Keyword Updated",
-      description: `Keyword has been updated to "${trimmedValue}"`,
-    });
+    try {
+      setSaving(true);
+      const result = await updateCustomExclusionKeyword(customKeyword.id, trimmedValue);
+      
+      if (result.success) {
+        // Clear cache and reload keywords
+        clearCustomKeywordsCache();
+        await loadKeywords();
+        setEditingIndex(null);
+        setEditingValue("");
+        
+        toast({
+          title: "Keyword Updated",
+          description: `Keyword has been updated to "${trimmedValue}"`,
+        });
+      } else {
+        toast({
+          title: "Failed to Update Keyword",
+          description: result.error || "Unknown error occurred",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error updating keyword:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update keyword",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancelEdit = () => {
@@ -178,7 +222,7 @@ const KeywordExclusionManager = () => {
     setEditingValue("");
   };
 
-  const handleDeleteKeyword = (index: number) => {
+  const handleDeleteKeyword = async (index: number) => {
     const keywordToDelete = allKeywords[index];
     
     // Check if this is a comprehensive (built-in) keyword
@@ -193,19 +237,47 @@ const KeywordExclusionManager = () => {
       return;
     }
     
-    // Remove from custom keywords
-    const updatedCustomKeywords = customKeywords.filter(k => k !== keywordToDelete);
-    setCustomKeywords(updatedCustomKeywords);
-    saveCustomKeywords(updatedCustomKeywords);
-    
-    // Update combined list
-    const updatedAllKeywords = [...comprehensiveKeywords, ...updatedCustomKeywords];
-    setAllKeywords(updatedAllKeywords);
+    // Find the custom keyword record
+    const customKeyword = customKeywords.find(k => k.keyword === keywordToDelete);
+    if (!customKeyword) {
+      toast({
+        title: "Keyword Not Found",
+        description: "Could not find the keyword to delete",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    toast({
-      title: "Keyword Deleted",
-      description: `"${keywordToDelete}" has been removed from the exclusion list`,
-    });
+    try {
+      setSaving(true);
+      const result = await deleteCustomExclusionKeyword(customKeyword.id);
+      
+      if (result.success) {
+        // Clear cache and reload keywords
+        clearCustomKeywordsCache();
+        await loadKeywords();
+        
+        toast({
+          title: "Keyword Deleted",
+          description: `"${keywordToDelete}" has been removed from the exclusion list`,
+        });
+      } else {
+        toast({
+          title: "Failed to Delete Keyword",
+          description: result.error || "Unknown error occurred",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting keyword:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete keyword",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleTestPayee = () => {
@@ -232,24 +304,49 @@ const KeywordExclusionManager = () => {
     });
   };
 
-  const resetToDefaults = () => {
-    // Clear custom keywords
-    setCustomKeywords([]);
-    saveCustomKeywords([]);
-    
-    // Reset to only comprehensive keywords
-    const defaultKeywords = getComprehensiveExclusionKeywords();
-    setAllKeywords(defaultKeywords);
-    
-    toast({
-      title: "Reset Complete",
-      description: "Custom keywords cleared. Only built-in keywords remain.",
-    });
+  const resetToDefaults = async () => {
+    try {
+      setSaving(true);
+      
+      // Delete all custom keywords
+      const deletePromises = customKeywords.map(keyword => 
+        deleteCustomExclusionKeyword(keyword.id)
+      );
+      
+      await Promise.all(deletePromises);
+      
+      // Clear cache and reload keywords
+      clearCustomKeywordsCache();
+      await loadKeywords();
+      
+      toast({
+        title: "Reset Complete",
+        description: "All custom keywords have been removed. Only built-in keywords remain.",
+      });
+    } catch (error) {
+      console.error('Error resetting keywords:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reset keywords",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const isCustomKeyword = (keyword: string): boolean => {
-    return customKeywords.includes(keyword);
+    return customKeywords.some(k => k.keyword === keyword && k.is_active);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading exclusion keywords...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -265,7 +362,7 @@ const KeywordExclusionManager = () => {
           <CardDescription>
             Keyword exclusions are automatically applied to ALL payee classifications. 
             Payees containing these keywords will be classified as businesses and excluded from AI processing.
-            This feature is always enabled and cannot be disabled for accuracy and performance.
+            Custom keywords are stored in the cloud and synchronized across all sessions.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -274,7 +371,7 @@ const KeywordExclusionManager = () => {
             <AlertDescription>
               <strong>System Status:</strong> Keyword exclusions are {KEYWORD_EXCLUSION_CONFIG.enabled ? 'ENABLED' : 'DISABLED'} and 
               auto-apply is {KEYWORD_EXCLUSION_CONFIG.autoApply ? 'ON' : 'OFF'}. 
-              This ensures consistent classification across all processing methods.
+              Custom keywords are stored in the cloud database for persistence.
             </AlertDescription>
           </Alert>
 
@@ -287,19 +384,21 @@ const KeywordExclusionManager = () => {
                 value={newKeyword}
                 onChange={(e) => setNewKeyword(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleAddKeyword()}
+                disabled={saving}
               />
             </div>
             <div className="flex items-end">
-              <Button onClick={handleAddKeyword}>
-                <Plus className="h-4 w-4 mr-2" />
+              <Button onClick={handleAddKeyword} disabled={saving}>
+                {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
                 Add
               </Button>
             </div>
           </div>
 
           <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" onClick={resetToDefaults}>
-              Clear Custom Keywords
+            <Button variant="outline" onClick={resetToDefaults} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Clear All Custom Keywords
             </Button>
             <Button variant="outline" onClick={runFullTest}>
               <TestTube className="h-4 w-4 mr-2" />
@@ -309,7 +408,7 @@ const KeywordExclusionManager = () => {
               {comprehensiveKeywords.length} built-in keywords
             </Badge>
             <Badge variant="outline">
-              {customKeywords.length} custom keywords
+              {customKeywords.filter(k => k.is_active).length} custom keywords
             </Badge>
             <Badge variant="default">
               {allKeywords.length} total keywords
@@ -353,16 +452,10 @@ const KeywordExclusionManager = () => {
                 <div className="space-y-2">
                   <p>
                     <strong>Result:</strong> {testResult.isExcluded ? "EXCLUDED" : "NOT EXCLUDED"}
-                    {testResult.confidence > 0 && ` (${testResult.confidence.toFixed(1)}% confidence)`}
                   </p>
                   {testResult.isExcluded && testResult.matchedKeywords.length > 0 && (
                     <p>
                       <strong>Matched Keywords:</strong> {testResult.matchedKeywords.join(", ")}
-                    </p>
-                  )}
-                  {testResult.reasoning && (
-                    <p>
-                      <strong>Reasoning:</strong> {testResult.reasoning}
                     </p>
                   )}
                 </div>
@@ -406,11 +499,12 @@ const KeywordExclusionManager = () => {
                                 if (e.key === 'Escape') handleCancelEdit();
                               }}
                               autoFocus
+                              disabled={saving}
                             />
-                            <Button size="sm" onClick={handleSaveEdit}>
-                              Save
+                            <Button size="sm" onClick={handleSaveEdit} disabled={saving}>
+                              {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
                             </Button>
-                            <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+                            <Button size="sm" variant="outline" onClick={handleCancelEdit} disabled={saving}>
                               Cancel
                             </Button>
                           </div>
@@ -430,7 +524,7 @@ const KeywordExclusionManager = () => {
                               size="sm"
                               variant="outline"
                               onClick={() => handleEditKeyword(index)}
-                              disabled={!isCustom}
+                              disabled={!isCustom || saving}
                               title={!isCustom ? "Built-in keywords cannot be edited" : "Edit keyword"}
                             >
                               <Edit className="h-3 w-3" />
@@ -439,7 +533,7 @@ const KeywordExclusionManager = () => {
                               size="sm"
                               variant="outline"
                               onClick={() => handleDeleteKeyword(index)}
-                              disabled={!isCustom}
+                              disabled={!isCustom || saving}
                               title={!isCustom ? "Built-in keywords cannot be deleted" : "Delete keyword"}
                             >
                               <Trash className="h-3 w-3" />
