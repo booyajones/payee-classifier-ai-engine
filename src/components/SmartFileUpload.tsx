@@ -98,7 +98,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
   };
 
   const isProcessing = uploadState === 'processing';
-  const hasGlobalError = hasError();
+  const hasGlobalError = hasError('');
 
   return (
     <Card>

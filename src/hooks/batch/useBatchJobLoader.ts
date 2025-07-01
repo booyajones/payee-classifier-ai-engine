@@ -25,13 +25,13 @@ export const useBatchJobLoader = (
         // Add a small delay to prevent immediate retry loops
         await new Promise(resolve => setTimeout(resolve, 100));
         
-        const { jobs, payeeRowDataMap } = await loadAllBatchJobs();
+      const { jobs, payeeDataMap } = await loadAllBatchJobs();
         
         // Only update state if component is still mounted
         if (isMounted) {
           console.log(`[BATCH LOADER] Successfully loaded ${jobs.length} jobs from database`);
           updateJobs(jobs);
-          updatePayeeDataMap(payeeRowDataMap);
+          updatePayeeDataMap(payeeDataMap);
           setLoaded(true);
         }
         
@@ -80,11 +80,11 @@ export const useBatchJobLoader = (
       
       while (retries < maxRetries) {
         try {
-          const { jobs, payeeRowDataMap } = await loadAllBatchJobs();
+          const { jobs, payeeDataMap } = await loadAllBatchJobs();
           
           console.log(`[BATCH LOADER] Successfully refreshed ${jobs.length} jobs`);
           updateJobs(jobs);
-          updatePayeeDataMap(payeeRowDataMap);
+          updatePayeeDataMap(payeeDataMap);
           return; // Success, exit retry loop
           
         } catch (error) {

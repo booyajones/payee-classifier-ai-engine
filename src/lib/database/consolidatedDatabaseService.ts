@@ -138,10 +138,10 @@ export class ConsolidatedDatabaseService {
           rowMappings: Array.isArray(row.row_mappings) ? row.row_mappings : [] as any,
           uniqueNormalizedNames: [], // Will be populated if needed
           standardizationStats: {
-            totalNames: 0,
-            standardizedNames: 0,
-            duplicatesRemoved: 0,
-            errors: []
+            totalProcessed: 0,
+            changesDetected: 0,
+            averageStepsPerName: 0,
+            mostCommonSteps: []
           }
         };
 

@@ -25,7 +25,7 @@ const BatchJobLoader = ({ onJobsLoaded, onLoadingComplete }: BatchJobLoaderProps
       setLoadingMessage("Connecting to database...");
       
       console.log('[BATCH LOADER] Starting to load all batch jobs from database');
-      const { jobs, payeeRowDataMap } = await loadAllBatchJobs();
+      const { jobs, payeeDataMap } = await loadAllBatchJobs();
       
       if (jobs.length === 0) {
         console.log('[BATCH LOADER] No saved jobs found in database');
@@ -64,14 +64,14 @@ const BatchJobLoader = ({ onJobsLoaded, onLoadingComplete }: BatchJobLoaderProps
             updatedJobs.push(job);
           }
           
-          validPayeeRowDataMap[job.id] = payeeRowDataMap[job.id];
-          console.log(`[BATCH LOADER] Job ${job.id} preserved with complete payee row data (${payeeRowDataMap[job.id]?.uniquePayeeNames?.length || 0} payees)`);
+          validPayeeRowDataMap[job.id] = payeeDataMap[job.id];
+          console.log(`[BATCH LOADER] Job ${job.id} preserved with complete payee row data (${payeeDataMap[job.id]?.uniquePayeeNames?.length || 0} payees)`);
           
         } catch (error) {
           console.error(`[BATCH LOADER] Job ${job.id} status check failed, but keeping data for recovery:`, error);
           // Keep the job data even if status check fails
           updatedJobs.push(job);
-          validPayeeRowDataMap[job.id] = payeeRowDataMap[job.id];
+          validPayeeRowDataMap[job.id] = payeeDataMap[job.id];
         }
       }
 

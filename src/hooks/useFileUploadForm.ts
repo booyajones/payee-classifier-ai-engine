@@ -11,7 +11,7 @@ import { createPayeeRowMapping, PayeeRowData } from "@/lib/rowMapping";
 import { saveBatchJob } from "@/lib/database/batchJobService";
 
 export type ValidationStatus = 'none' | 'validating' | 'valid' | 'error';
-export type BackgroundSaveStatus = 'none' | 'saving' | 'complete' | 'error';
+export type BackgroundSaveStatus = 'none' | 'saving' | 'saved' | 'complete' | 'error';
 
 export const useFileUploadForm = (
   onBatchJobCreated: (batchJob: BatchJob, payeeRowData: PayeeRowData) => void,
@@ -181,47 +181,15 @@ export const useFileUploadForm = (
         setBackgroundSaveStatus('saving');
         
         // Use new background save approach
-        const saveResult = await saveBatchJob(batchJob, payeeRowData, { background: isLargeFile });
+        await saveBatchJob(batchJob, payeeRowData);
         
-        if (saveResult.immediate) {
-          console.log(`[FILE UPLOAD] Batch job data saved immediately or queued for background processing`);
-          
-          if (saveResult.backgroundPromise) {
-            // Show background save status
-            toast({
-              title: "🔄 Background Data Save Active",
-              description: `Large file data is being saved in the background. You can continue working - this won't affect your batch job processing.`,
-              duration: 6000,
-            });
-
-            // Monitor background save
-            saveResult.backgroundPromise.then(async (result) => {
-              const backgroundResult = await result;
-              if (backgroundResult.success) {
-                setBackgroundSaveStatus('complete');
-                toast({
-                  title: "✅ Background Save Complete",
-                  description: `Full data for job ${batchJob.id.slice(-8)} has been saved successfully.`,
-                  duration: 4000,
-                });
-              } else {
-                setBackgroundSaveStatus('error');
-                console.error('[FILE UPLOAD] Background save failed:', backgroundResult.error);
-                toast({
-                  title: "⚠️ Background Save Issue",
-                  description: `Data save had issues but your job is still processing normally. Error: ${backgroundResult.error}`,
-                  variant: "destructive",
-                  duration: 6000,
-                });
-              }
-            }).catch((error) => {
-              setBackgroundSaveStatus('error');
-              console.error('[FILE UPLOAD] Background save promise failed:', error);
-            });
-          } else {
-            setBackgroundSaveStatus('complete');
-          }
-        }
+        console.log(`[FILE UPLOAD] Batch job data saved successfully`);
+        setBackgroundSaveStatus('saved');
+        
+        toast({
+          title: "✅ Batch Job Saved",
+          description: "Your batch job has been saved successfully and is ready for processing.",
+        });
 
       } catch (dbError) {
         console.error('[FILE UPLOAD] Database save failed:', dbError);

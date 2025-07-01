@@ -1,4 +1,3 @@
-
 import { useCallback, useRef } from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
@@ -81,21 +80,13 @@ export const useBatchJobCreation = (
       // Attempt to save to database (non-blocking for user experience)
       try {
         console.log(`[BATCH CREATION] Saving job ${job.id} to database...`);
-        const saveResult = await saveBatchJob(job, payeeRowData, { background: true });
+        await saveBatchJob(job, payeeRowData);
         
-        if (saveResult.immediate) {
-          console.log(`[BATCH CREATION] Job ${job.id} saved to database successfully`);
-          toast({
-            title: "Batch Job Created",
-            description: `Job ${job.id.substring(0, 8)}... created and saved successfully`,
-          });
-        } else {
-          console.log(`[BATCH CREATION] Job ${job.id} queued for background save`);
-          toast({
-            title: "Batch Job Created",
-            description: `Job ${job.id.substring(0, 8)}... created. Data optimization in progress...`,
-          });
-        }
+        console.log(`[BATCH CREATION] Job ${job.id} saved to database successfully`);
+        toast({
+          title: "Batch Job Created",
+          description: `Job ${job.id.substring(0, 8)}... created and saved successfully`,
+        });
 
       } catch (dbError) {
         console.error(`[BATCH CREATION] Database save failed for job ${job.id}:`, dbError);
