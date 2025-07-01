@@ -1,7 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { BatchJob, getBatchJobResults } from '@/lib/openai/trueBatchAPI';
-import { PayeeRowData } from '@/lib/rowMapping';
+import { PayeeRowData, RowMapping } from '@/lib/rowMapping';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
 import { processEnhancedBatchResults } from '@/services/batchProcessor';
 import { PreGeneratedFileService } from '@/lib/storage/preGeneratedFileService';
@@ -124,19 +124,45 @@ export class RetroactiveBatchProcessor {
       return null;
     }
 
+    // Type guard functions
+    const isStringArray = (value: any): value is string[] => {
+      return Array.isArray(value) && value.every(item => typeof item === 'string');
+    };
+
+    const isRowMappingArray = (value: any): value is RowMapping[] => {
+      return Array.isArray(value) && value.every(item => 
+        typeof item === 'object' && 
+        item !== null &&
+        typeof item.originalRowIndex === 'number' &&
+        typeof item.payeeName === 'string' &&
+        typeof item.normalizedPayeeName === 'string' &&
+        typeof item.uniquePayeeIndex === 'number'
+      );
+    };
+
+    const isObjectArray = (value: any): value is any[] => {
+      return Array.isArray(value);
+    };
+
+    // Safely extract and validate the data
+    const uniquePayeeNames = isStringArray(data.unique_payee_names) ? data.unique_payee_names : [];
+    const rowMappings = isRowMappingArray(data.row_mappings) ? data.row_mappings : [];
+    const originalFileData = isObjectArray(data.original_file_data) ? data.original_file_data : [];
+    const fileHeaders = isStringArray(data.file_headers) ? data.file_headers : undefined;
+
     return {
-      uniquePayeeNames: data.unique_payee_names || [],
-      uniqueNormalizedNames: data.unique_payee_names || [],
-      originalFileData: data.original_file_data || [],
-      rowMappings: data.row_mappings || [],
+      uniquePayeeNames,
+      uniqueNormalizedNames: uniquePayeeNames,
+      originalFileData,
+      rowMappings,
       standardizationStats: {
-        totalProcessed: data.unique_payee_names?.length || 0,
+        totalProcessed: uniquePayeeNames.length,
         changesDetected: 0,
         averageStepsPerName: 0,
         mostCommonSteps: []
       },
       fileName: data.file_name || undefined,
-      fileHeaders: data.file_headers || undefined,
+      fileHeaders,
       selectedPayeeColumn: data.selected_payee_column || undefined
     };
   }
