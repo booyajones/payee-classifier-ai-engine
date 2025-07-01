@@ -8,17 +8,8 @@ import DebugPanel from './DebugPanel';
  * Only renders in development mode
  */
 const DeveloperTools: React.FC = () => {
-  // Only render in development
-  if (!import.meta.env.DEV) {
-    return null;
-  }
-
-  return (
-    <>
-      <PerformanceDashboard />
-      <DebugPanel />
-    </>
-  );
+  // Temporarily disabled to fix page unresponsiveness
+  return null;
 };
 
 export default DeveloperTools;
