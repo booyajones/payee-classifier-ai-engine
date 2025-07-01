@@ -15,7 +15,7 @@ export class EnhancedFileGenerationService {
   static async processCompletedJob(job: BatchJob): Promise<{
     success: boolean;
     error?: string;
-    fileUrls?: { csvUrl: string; excelUrl: string };
+    fileUrls?: { csvUrl?: string; excelUrl?: string };
   }> {
     logger.info(`Enhanced processing for completed job ${job.id}`, undefined, this.context);
 
