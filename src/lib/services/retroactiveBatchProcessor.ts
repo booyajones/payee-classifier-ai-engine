@@ -1,4 +1,5 @@
 
+
 import { supabase } from '@/integrations/supabase/client';
 import { BatchJob, getBatchJobResults } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData, RowMapping } from '@/lib/rowMapping';
@@ -148,7 +149,6 @@ export class RetroactiveBatchProcessor {
     const uniquePayeeNames = isStringArray(data.unique_payee_names) ? data.unique_payee_names : [];
     const rowMappings = isRowMappingArray(data.row_mappings) ? data.row_mappings : [];
     const originalFileData = isObjectArray(data.original_file_data) ? data.original_file_data : [];
-    const fileHeaders = isStringArray(data.file_headers) ? data.file_headers : undefined;
 
     return {
       uniquePayeeNames,
@@ -160,10 +160,7 @@ export class RetroactiveBatchProcessor {
         changesDetected: 0,
         averageStepsPerName: 0,
         mostCommonSteps: []
-      },
-      fileName: data.file_name || undefined,
-      fileHeaders,
-      selectedPayeeColumn: data.selected_payee_column || undefined
+      }
     };
   }
 
@@ -195,3 +192,4 @@ export class RetroactiveBatchProcessor {
     return results;
   }
 }
+
