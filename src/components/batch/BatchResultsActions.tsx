@@ -115,9 +115,30 @@ const BatchResultsActions = ({
           throw new Error('Failed to fetch job data');
         }
 
-        const batchJob = {
+        // Safely parse metadata
+        let parsedMetadata: { payee_count: number; description: string } | undefined;
+        
+        if (jobData.metadata) {
+          try {
+            const metadataValue = typeof jobData.metadata === 'string' 
+              ? JSON.parse(jobData.metadata) 
+              : jobData.metadata;
+            
+            parsedMetadata = {
+              payee_count: metadataValue?.payee_count || 0,
+              description: metadataValue?.description || 'Payee classification batch'
+            };
+          } catch (error) {
+            parsedMetadata = {
+              payee_count: 0,
+              description: 'Payee classification batch'
+            };
+          }
+        }
+
+        const batchJob: BatchJob = {
           id: jobData.id,
-          status: jobData.status,
+          status: jobData.status as BatchJob['status'], // Type assertion to fix the status type
           created_at: jobData.created_at_timestamp,
           request_counts: {
             total: jobData.request_counts_total,
@@ -130,9 +151,9 @@ const BatchResultsActions = ({
           failed_at: jobData.failed_at_timestamp,
           expired_at: jobData.expired_at_timestamp,
           cancelled_at: jobData.cancelled_at_timestamp,
-          metadata: jobData.metadata,
-          errors: jobData.errors,
-          output_file_id: jobData.output_file_id
+          metadata: parsedMetadata,
+          errors: jobData.errors ? (typeof jobData.errors === 'string' ? JSON.parse(jobData.errors) : jobData.errors) : undefined,
+          output_file_id: jobData.output_file_id || undefined
         };
 
         // Generate files

@@ -71,9 +71,32 @@ export class AutomaticFileGenerationService {
 
       // Process each job
       for (const jobData of jobs) {
+        // Safely parse metadata with proper type handling
+        let parsedMetadata: { payee_count: number; description: string } | undefined;
+        
+        if (jobData.metadata) {
+          try {
+            // Handle the Json type from Supabase
+            const metadataValue = typeof jobData.metadata === 'string' 
+              ? JSON.parse(jobData.metadata) 
+              : jobData.metadata;
+            
+            parsedMetadata = {
+              payee_count: metadataValue?.payee_count || 0,
+              description: metadataValue?.description || 'Payee classification batch'
+            };
+          } catch (error) {
+            logger.warn(`Failed to parse metadata for job ${jobData.id}`, { error }, this.context);
+            parsedMetadata = {
+              payee_count: 0,
+              description: 'Payee classification batch'
+            };
+          }
+        }
+
         const batchJob: BatchJob = {
           id: jobData.id,
-          status: jobData.status as any,
+          status: jobData.status as BatchJob['status'], // Type assertion to fix the status type
           created_at: jobData.created_at_timestamp,
           request_counts: {
             total: jobData.request_counts_total,
@@ -86,9 +109,9 @@ export class AutomaticFileGenerationService {
           failed_at: jobData.failed_at_timestamp,
           expired_at: jobData.expired_at_timestamp,
           cancelled_at: jobData.cancelled_at_timestamp,
-          metadata: jobData.metadata,
-          errors: jobData.errors,
-          output_file_id: jobData.output_file_id
+          metadata: parsedMetadata,
+          errors: jobData.errors ? (typeof jobData.errors === 'string' ? JSON.parse(jobData.errors) : jobData.errors) : undefined,
+          output_file_id: jobData.output_file_id || undefined
         };
 
         await this.processCompletedJob(batchJob);
