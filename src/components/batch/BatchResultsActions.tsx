@@ -3,6 +3,7 @@ import React from 'react';
 import { Button } from "@/components/ui/button";
 import { RotateCcw, Download, Clock } from "lucide-react";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
+import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { PreGeneratedFileService } from "@/lib/storage/preGeneratedFileService";
 import { useEnhancedDownload } from "@/hooks/useEnhancedDownload";
 import { useDownloadProgress } from "@/contexts/DownloadProgressContext";
