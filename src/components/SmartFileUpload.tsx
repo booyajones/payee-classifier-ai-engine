@@ -9,7 +9,7 @@ import SmartFileUploadHeader from './upload/SmartFileUploadHeader';
 import SmartFileUploadContent from './upload/SmartFileUploadContent';
 import SmartFileUploadStatusDisplay from './upload/SmartFileUploadStatusDisplay';
 import { useSmartFileUploadCore } from './upload/SmartFileUploadCore';
-import { productionLogger } from '@/lib/logging/productionLogger';
+// import { productionLogger } from '@/lib/logging/productionLogger';
 
 interface SmartFileUploadProps {
   onBatchJobCreated: (batchJob: BatchJob | null, payeeRowData: PayeeRowData) => void;

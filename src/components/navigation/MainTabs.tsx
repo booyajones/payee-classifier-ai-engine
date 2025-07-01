@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Upload, Play, TestTube, Users, Eye } from "lucide-react";
 import SingleClassificationForm from "@/components/SingleClassificationForm";
@@ -11,7 +11,7 @@ import OptimizedVirtualizedTable from "@/components/table/OptimizedVirtualizedTa
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { useTableSorting } from "@/hooks/useTableSorting";
 import { useAppStore } from "@/stores/appStore";
-import { productionLogger } from "@/lib/logging/productionLogger";
+// import { productionLogger } from "@/lib/logging/productionLogger";
 
 interface MainTabsProps {
   allResults: PayeeClassification[];
@@ -23,21 +23,21 @@ interface MainTabsProps {
 const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: MainTabsProps) => {
   const { activeTab, setActiveTab } = useAppStore();
 
-  // Generate original columns from results data
-  const getOriginalColumns = () => {
+  // Generate original columns from results data - memoized to prevent rerenders
+  const getOriginalColumns = useMemo(() => {
     if (allResults.length === 0) {
       return ['payeeName'];
     }
     const firstResult = allResults[0];
     return firstResult.originalData ? Object.keys(firstResult.originalData) : ['payeeName'];
-  };
+  }, [allResults.length]);
 
   const {
     sortField,
     sortDirection,
     handleSort,
     sortedResults
-  } = useTableSorting(allResults, getOriginalColumns());
+  } = useTableSorting(allResults, getOriginalColumns);
 
   // Handler for tab changes
   const handleTabChange = (tab: string) => {
@@ -60,8 +60,8 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
     // Could open a modal or navigate to details page
   };
 
-  // Generate columns from results data
-  const generateColumns = () => {
+  // Generate columns from results data - memoized to prevent rerenders
+  const generateColumns = useMemo(() => {
     if (allResults.length === 0) {
       return [{ key: 'payeeName', label: 'Payee Name', isOriginal: true }];
     }
@@ -77,7 +77,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
       : [{ key: 'payeeName', label: 'Payee Name', isOriginal: true }];
 
     return originalColumns;
-  };
+  }, [allResults.length]);
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
@@ -141,7 +141,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
       <TabsContent value="results" className="mt-6">
         <OptimizedVirtualizedTable 
           results={sortedResults}
-          columns={generateColumns()}
+          columns={generateColumns}
           sortField={sortField}
           sortDirection={sortDirection}
           onSort={handleSort}
