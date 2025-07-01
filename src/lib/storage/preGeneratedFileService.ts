@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { BatchProcessingResult } from '@/lib/types/unified';
+import { BatchProcessingResult } from '@/lib/types';
 import { exportDirectCSV } from '@/lib/classification/batchExporter';
 import { logger } from '@/lib/logging/logger';
 import * as XLSX from 'xlsx';

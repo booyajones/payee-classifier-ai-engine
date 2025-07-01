@@ -32,7 +32,8 @@ export const useBatchJobDownload = ({
         {
           job,
           payeeData,
-          uniquePayeeNames: payeeData.uniquePayeeNames
+          uniquePayeeNames: payeeData.uniquePayeeNames,
+          onJobComplete
         },
         (processed, total, percentage) => {
           console.log(`[BATCH DOWNLOAD] Progress: ${processed}/${total} (${percentage}%)`);
