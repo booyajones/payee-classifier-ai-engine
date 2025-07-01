@@ -12,12 +12,12 @@ interface TrueBatchClassificationResult {
   sicDescription?: string;
 }
 
-export function processBatchResults(
+export async function processBatchResults(
   processedResults: TrueBatchClassificationResult[],
   uniquePayeeNames: string[],
   payeeData: PayeeRowData,
   job: BatchJob
-): { finalClassifications: PayeeClassification[], summary: BatchProcessingResult } {
+): Promise<{ finalClassifications: PayeeClassification[], summary: BatchProcessingResult }> {
   console.log(`[BATCH PROCESSOR] Processing ${processedResults.length} results with SIC validation`);
   
   // Log sample of what we're receiving
@@ -32,5 +32,5 @@ export function processBatchResults(
   }
   
   // Use the enhanced processor with the correct data format
-  return processEnhancedBatchResults(processedResults, uniquePayeeNames, payeeData, job);
+  return await processEnhancedBatchResults(processedResults, uniquePayeeNames, payeeData, job);
 }
