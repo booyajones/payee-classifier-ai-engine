@@ -31,10 +31,7 @@ const Index = () => {
     );
   }
 
-  console.log('[INDEX DEBUG] Rendering main app with hasApiKey:', hasApiKey);
-
   const handleBatchClassify = (results: any[]) => {
-    console.log('[INDEX] Batch classify results:', results);
     // Handle batch classification results
   };
 

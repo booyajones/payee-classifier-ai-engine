@@ -34,7 +34,7 @@ const BatchFormTabs = ({
   onJobDelete,
   onReset
 }: BatchFormTabsProps) => {
-  console.log(`[BATCH FORM TABS] Rendering with ${batchJobs.length} jobs, active tab: ${activeTab}`);
+  
 
   return (
     <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">

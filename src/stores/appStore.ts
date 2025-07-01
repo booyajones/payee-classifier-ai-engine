@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
+import { subscribeWithSelector, persist } from 'zustand/middleware';
 
 interface AppState {
   activeTab: string;
@@ -17,18 +17,26 @@ interface AppActions {
 }
 
 export const useAppStore = create<AppState & AppActions>()(
-  subscribeWithSelector((set) => ({
-    // State
-    activeTab: 'batch',
-    hasApiKey: false,
-    isLoading: false,
-    error: null,
+  subscribeWithSelector(
+    persist(
+      (set) => ({
+        // State
+        activeTab: 'single',
+        hasApiKey: false,
+        isLoading: false,
+        error: null,
 
-    // Actions
-    setActiveTab: (tab) => set({ activeTab: tab }),
-    setHasApiKey: (hasKey) => set({ hasApiKey: hasKey }),
-    setLoading: (loading) => set({ isLoading: loading }),
-    setError: (error) => set({ error }),
-    clearError: () => set({ error: null }),
-  }))
+        // Actions
+        setActiveTab: (tab) => set({ activeTab: tab }),
+        setHasApiKey: (hasKey) => set({ hasApiKey: hasKey }),
+        setLoading: (loading) => set({ isLoading: loading }),
+        setError: (error) => set({ error }),
+        clearError: () => set({ error: null }),
+      }),
+      {
+        name: 'app-store',
+        partialize: (state) => ({ activeTab: state.activeTab })
+      }
+    )
+  )
 );
