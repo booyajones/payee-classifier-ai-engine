@@ -1,16 +1,10 @@
-import { BatchJob, getBatchJobResults } from "@/lib/openai/trueBatchAPI";
-import { PayeeRowData } from "@/lib/rowMapping";
-import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
-import { processEnhancedBatchResults } from "@/services/batchProcessor";
-import { saveClassificationResultsWithValidation } from "@/lib/database/enhancedClassificationService";
-import { useToast } from "@/components/ui/use-toast";
-import { testSicCodePipeline } from "@/lib/testing/sicCodeTest";
-import { mapResultsToOriginalRowsAsync } from "@/lib/rowMapping";
 
-interface UseBatchJobDownloadProps {
-  payeeRowDataMap: Record<string, PayeeRowData>;
-  onJobComplete: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void;
-}
+import { BatchJob } from "@/lib/openai/trueBatchAPI";
+import { useToast } from "@/hooks/use-toast";
+import { UseBatchJobDownloadProps } from "./batch/downloadTypes";
+import { validateJobComplete, validatePayeeData } from "./batch/downloadValidation";
+import { processDownloadResults, saveProcessedResults } from "./batch/downloadProcessor";
+import { mapAndFinalizeResults, logFinalValidation } from "./batch/downloadResultMapper";
 
 export const useBatchJobDownload = ({
   payeeRowDataMap,
@@ -22,44 +16,31 @@ export const useBatchJobDownload = ({
     console.log(`[BATCH DOWNLOAD] === STARTING ENHANCED DOWNLOAD WITH CHUNKED PROCESSING FOR JOB ${job.id} ===`);
     
     // Validate callback before proceeding
-    if (typeof onJobComplete !== 'function') {
-      const errorMsg = `onJobComplete callback is not a function (type: ${typeof onJobComplete})`;
-      console.error(`[BATCH DOWNLOAD] ${errorMsg}`);
+    const callbackValidation = validateJobComplete(onJobComplete);
+    if (!callbackValidation.isValid) {
       toast({
         title: "Download Error",
-        description: "Download callback function is missing. Please refresh the page and try again.",
+        description: callbackValidation.error,
         variant: "destructive"
       });
-      throw new Error(errorMsg);
+      throw new Error(callbackValidation.error);
     }
 
+    // Validate payee data
     const payeeData = payeeRowDataMap[job.id];
-    if (!payeeData) {
+    const payeeValidation = validatePayeeData(payeeData, job);
+    if (!payeeValidation.isValid) {
       toast({
         title: "Download Error",
-        description: "Payee data not found for this job.",
+        description: payeeValidation.error,
         variant: "destructive"
       });
       return;
     }
 
-    const uniquePayeeNames = payeeData.uniquePayeeNames;
-    if (!uniquePayeeNames || uniquePayeeNames.length === 0) {
-      toast({
-        title: "Download Error",
-        description: "No payee names found for this job.",
-        variant: "destructive"
-      });
-      return;
-    }
+    const uniquePayeeNames = payeeData!.uniquePayeeNames;
 
     try {
-      console.log(`[BATCH DOWNLOAD] Downloading results for ${uniquePayeeNames.length} unique payees from ${payeeData.originalFileData.length} original rows`);
-      
-      // Download raw results from OpenAI
-      const rawResults = await getBatchJobResults(job, uniquePayeeNames);
-      console.log(`[BATCH DOWNLOAD] Downloaded ${rawResults.length} raw results from OpenAI`);
-
       // Show initial processing toast
       toast({
         title: "Processing Download",
@@ -79,16 +60,11 @@ export const useBatchJobDownload = ({
         }
       };
 
-      const { finalClassifications, summary } = await processEnhancedBatchResults({
-        rawResults,
-        uniquePayeeNames,
-        payeeData,
-        job,
+      const { finalClassifications, summary } = await processDownloadResults(
+        { job, payeeData: payeeData!, uniquePayeeNames, onJobComplete },
         onProgress
-      });
+      );
 
-      console.log(`[BATCH DOWNLOAD] Enhanced processing complete: ${finalClassifications.length} unique classifications`);
-      
       // Enhanced SIC code statistics after processing
       const businessResults = finalClassifications.filter(r => r.result.classification === 'Business');
       const sicResults = finalClassifications.filter(r => r.result.sicCode);
@@ -97,40 +73,33 @@ export const useBatchJobDownload = ({
       console.log(`[BATCH DOWNLOAD] Enhanced SIC Statistics: ${sicResults.length}/${businessResults.length} businesses (${sicCoverage}%) have SIC codes`);
 
       // Save with enhanced validation
-      try {
-        console.log(`[BATCH DOWNLOAD] Saving ${finalClassifications.length} results with enhanced validation`);
-        const saveStats = await saveClassificationResultsWithValidation(finalClassifications, job.id);
-        
-        console.log(`[BATCH DOWNLOAD] Enhanced save complete:`, saveStats);
-        
-        if (saveStats.sicValidationErrors.length > 0) {
-          console.warn('[BATCH DOWNLOAD] SIC validation errors during save:', saveStats.sicValidationErrors);
-          toast({
-            title: "SIC Code Validation Warnings",
-            description: `Saved results but found ${saveStats.sicValidationErrors.length} SIC validation issues.`,
-            variant: "destructive"
-          });
-        }
-      } catch (dbError) {
-        console.error('[BATCH DOWNLOAD] Enhanced database save failed:', dbError);
+      const saveResult = await saveProcessedResults(finalClassifications, job.id);
+      
+      if (!saveResult.success) {
         toast({
           title: "Database Save Failed",
-          description: "Results processed but database save failed with validation errors.",
+          description: saveResult.error,
+          variant: "destructive"
+        });
+      } else if (saveResult.warning) {
+        toast({
+          title: "SIC Code Validation Warnings",
+          description: saveResult.warning,
           variant: "destructive"
         });
       }
 
       // Map to original rows with chunked processing and progress
-      console.log(`[BATCH DOWNLOAD] Mapping ${finalClassifications.length} unique results to ${payeeData.originalFileData.length} original rows with chunked processing`);
-      
       toast({
         title: "Finalizing Download",
         description: "Mapping results to original data format. Almost done...",
       });
 
-      const mappedResults = await mapResultsToOriginalRowsAsync(
-        finalClassifications, 
-        payeeData,
+      const { fullResults, updatedSummary } = await mapAndFinalizeResults(
+        finalClassifications,
+        payeeData!,
+        summary,
+        job.id,
         (processed, total, percentage) => {
           if (percentage % 20 === 0) { // Update every 20%
             toast({
@@ -140,57 +109,16 @@ export const useBatchJobDownload = ({
           }
         }
       );
-      
-      console.log(`[BATCH DOWNLOAD] Successfully mapped to ${mappedResults.length} original rows`);
-
-      // Create full results with SIC validation
-      const fullResults: PayeeClassification[] = mappedResults.map((row, index) => ({
-        id: `${job.id}-${index}`,
-        payeeName: row.original_payee_name || row.payeeName || `Unknown_${index}`,
-        result: {
-          classification: row.classification,
-          confidence: row.confidence,
-          reasoning: row.reasoning,
-          processingTier: row.processingTier,
-          processingMethod: row.processingMethod,
-          sicCode: row.sicCode,
-          sicDescription: row.sicDescription,
-          matchingRules: [],
-          keywordExclusion: {
-            isExcluded: row.keywordExclusion === 'Yes',
-            matchedKeywords: row.matchedKeywords ? row.matchedKeywords.split('; ') : [],
-            confidence: parseFloat(row.keywordConfidence) || 0,
-            reasoning: row.keywordReasoning
-          }
-        },
-        timestamp: new Date(row.timestamp),
-        originalData: row,
-        rowIndex: index
-      }));
-
-      const updatedSummary: BatchProcessingResult = {
-        ...summary,
-        results: fullResults,
-        originalFileData: payeeData.originalFileData
-      };
-
-      // Run comprehensive SIC pipeline test
-      console.log('[BATCH DOWNLOAD] Running comprehensive SIC code pipeline test...');
-      await testSicCodePipeline(updatedSummary);
 
       // Final validation before completion
-      const finalSicCount = fullResults.filter(r => r.result.sicCode).length;
-      const finalBusinessCount = fullResults.filter(r => r.result.classification === 'Business').length;
-      const finalCoverage = finalBusinessCount > 0 ? Math.round((finalSicCount / finalBusinessCount) * 100) : 0;
-      
-      console.log(`[BATCH DOWNLOAD] Final validation: ${finalSicCount}/${finalBusinessCount} (${finalCoverage}%) results have SIC codes`);
+      logFinalValidation(fullResults);
 
       // Call completion callback
       onJobComplete(fullResults, updatedSummary, job.id);
 
       toast({
         title: "Download Complete",
-        description: `Successfully processed ${fullResults.length} results with ${finalSicCount} SIC codes. Download should start automatically.`,
+        description: `Successfully processed ${fullResults.length} results with ${fullResults.filter(r => r.result.sicCode).length} SIC codes. Download should start automatically.`,
       });
 
     } catch (error) {
