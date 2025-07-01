@@ -141,4 +141,5 @@ export interface AppError extends Error {
   context?: string;
   retryable: boolean;
   timestamp: Date;
+  cause?: Error;
 }

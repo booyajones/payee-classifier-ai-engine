@@ -18,6 +18,22 @@ export class UnifiedClassificationEngine {
   }
 
   /**
+   * Normalize classification result to match unified types
+   */
+  private normalizeClassification(classification: string): 'Personal' | 'Business' {
+    // Handle different classification formats from various engines
+    const normalized = classification.toLowerCase();
+    if (normalized === 'individual' || normalized === 'personal') {
+      return 'Personal';
+    }
+    if (normalized === 'business' || normalized === 'corporation') {
+      return 'Business';
+    }
+    // Default to Personal for safety
+    return 'Personal';
+  }
+
+  /**
    * Classify a single payee with full feature set
    */
   async classifyPayee(payeeName: string): Promise<ClassificationResult> {
@@ -36,7 +52,7 @@ export class UnifiedClassificationEngine {
       }
 
       const result: ClassificationResult = {
-        classification: aiResult.classification,
+        classification: this.normalizeClassification(aiResult.classification),
         confidence: aiResult.confidence,
         reasoning: aiResult.reasoning,
         processingTier: 'AI-Enhanced',
