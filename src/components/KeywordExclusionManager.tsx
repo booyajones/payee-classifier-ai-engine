@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,8 +24,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+const CUSTOM_KEYWORDS_STORAGE_KEY = 'custom-exclusion-keywords';
+
 const KeywordExclusionManager = () => {
-  const [keywords, setKeywords] = useState<string[]>([]);
+  const [comprehensiveKeywords, setComprehensiveKeywords] = useState<string[]>([]);
+  const [customKeywords, setCustomKeywords] = useState<string[]>([]);
+  const [allKeywords, setAllKeywords] = useState<string[]>([]);
   const [newKeyword, setNewKeyword] = useState("");
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState("");
@@ -32,11 +37,46 @@ const KeywordExclusionManager = () => {
   const [testResult, setTestResult] = useState<any>(null);
   const { toast } = useToast();
 
+  // Load custom keywords from localStorage
+  const loadCustomKeywords = (): string[] => {
+    try {
+      const stored = localStorage.getItem(CUSTOM_KEYWORDS_STORAGE_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.error('Error loading custom keywords:', error);
+      return [];
+    }
+  };
+
+  // Save custom keywords to localStorage
+  const saveCustomKeywords = (keywords: string[]) => {
+    try {
+      localStorage.setItem(CUSTOM_KEYWORDS_STORAGE_KEY, JSON.stringify(keywords));
+      console.log(`[KEYWORD EXCLUSION MANAGER] Saved ${keywords.length} custom keywords`);
+    } catch (error) {
+      console.error('Error saving custom keywords:', error);
+      toast({
+        title: "Storage Error",
+        description: "Failed to save custom keywords",
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
-    // Load initial keywords
-    const initialKeywords = getComprehensiveExclusionKeywords();
-    setKeywords(initialKeywords);
-    console.log(`[KEYWORD EXCLUSION MANAGER] Loaded ${initialKeywords.length} keywords`);
+    // Load comprehensive keywords (built-in)
+    const comprehensive = getComprehensiveExclusionKeywords();
+    setComprehensiveKeywords(comprehensive);
+    
+    // Load custom keywords from localStorage
+    const custom = loadCustomKeywords();
+    setCustomKeywords(custom);
+    
+    // Combine both lists for display and testing
+    const combined = [...comprehensive, ...custom];
+    setAllKeywords(combined);
+    
+    console.log(`[KEYWORD EXCLUSION MANAGER] Loaded ${comprehensive.length} comprehensive + ${custom.length} custom = ${combined.length} total keywords`);
   }, []);
 
   const handleAddKeyword = () => {
@@ -50,7 +90,9 @@ const KeywordExclusionManager = () => {
     }
 
     const trimmedKeyword = newKeyword.trim();
-    if (keywords.some(k => k.toLowerCase() === trimmedKeyword.toLowerCase())) {
+    
+    // Check if keyword already exists in either list
+    if (allKeywords.some(k => k.toLowerCase() === trimmedKeyword.toLowerCase())) {
       toast({
         title: "Duplicate Keyword",
         description: "This keyword already exists",
@@ -59,8 +101,14 @@ const KeywordExclusionManager = () => {
       return;
     }
 
-    const updatedKeywords = [...keywords, trimmedKeyword];
-    setKeywords(updatedKeywords);
+    // Add to custom keywords
+    const updatedCustomKeywords = [...customKeywords, trimmedKeyword];
+    setCustomKeywords(updatedCustomKeywords);
+    saveCustomKeywords(updatedCustomKeywords);
+    
+    // Update combined list
+    const updatedAllKeywords = [...comprehensiveKeywords, ...updatedCustomKeywords];
+    setAllKeywords(updatedAllKeywords);
     setNewKeyword("");
     
     toast({
@@ -71,7 +119,7 @@ const KeywordExclusionManager = () => {
 
   const handleEditKeyword = (index: number) => {
     setEditingIndex(index);
-    setEditingValue(keywords[index]);
+    setEditingValue(allKeywords[index]);
   };
 
   const handleSaveEdit = () => {
@@ -87,10 +135,35 @@ const KeywordExclusionManager = () => {
     }
 
     const trimmedValue = editingValue.trim();
-    const updatedKeywords = [...keywords];
-    updatedKeywords[editingIndex] = trimmedValue;
+    const keywordToEdit = allKeywords[editingIndex];
     
-    setKeywords(updatedKeywords);
+    // Check if this is a comprehensive (built-in) keyword
+    const isComprehensiveKeyword = comprehensiveKeywords.includes(keywordToEdit);
+    
+    if (isComprehensiveKeyword) {
+      toast({
+        title: "Cannot Edit Built-in Keyword",
+        description: "Built-in keywords cannot be modified. You can add a new custom keyword instead.",
+        variant: "destructive",
+      });
+      setEditingIndex(null);
+      setEditingValue("");
+      return;
+    }
+    
+    // Find the keyword in custom keywords and update it
+    const customIndex = customKeywords.findIndex(k => k === keywordToEdit);
+    if (customIndex !== -1) {
+      const updatedCustomKeywords = [...customKeywords];
+      updatedCustomKeywords[customIndex] = trimmedValue;
+      setCustomKeywords(updatedCustomKeywords);
+      saveCustomKeywords(updatedCustomKeywords);
+      
+      // Update combined list
+      const updatedAllKeywords = [...comprehensiveKeywords, ...updatedCustomKeywords];
+      setAllKeywords(updatedAllKeywords);
+    }
+    
     setEditingIndex(null);
     setEditingValue("");
 
@@ -106,13 +179,32 @@ const KeywordExclusionManager = () => {
   };
 
   const handleDeleteKeyword = (index: number) => {
-    const deletedKeyword = keywords[index];
-    const updatedKeywords = keywords.filter((_, i) => i !== index);
-    setKeywords(updatedKeywords);
+    const keywordToDelete = allKeywords[index];
+    
+    // Check if this is a comprehensive (built-in) keyword
+    const isComprehensiveKeyword = comprehensiveKeywords.includes(keywordToDelete);
+    
+    if (isComprehensiveKeyword) {
+      toast({
+        title: "Cannot Delete Built-in Keyword",
+        description: "Built-in keywords cannot be deleted. Only custom keywords can be removed.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Remove from custom keywords
+    const updatedCustomKeywords = customKeywords.filter(k => k !== keywordToDelete);
+    setCustomKeywords(updatedCustomKeywords);
+    saveCustomKeywords(updatedCustomKeywords);
+    
+    // Update combined list
+    const updatedAllKeywords = [...comprehensiveKeywords, ...updatedCustomKeywords];
+    setAllKeywords(updatedAllKeywords);
 
     toast({
       title: "Keyword Deleted",
-      description: `"${deletedKeyword}" has been removed from the exclusion list`,
+      description: `"${keywordToDelete}" has been removed from the exclusion list`,
     });
   };
 
@@ -123,7 +215,7 @@ const KeywordExclusionManager = () => {
     }
 
     console.log(`[KEYWORD EXCLUSION MANAGER] Testing: "${testPayeeName}"`);
-    const result = checkKeywordExclusion(testPayeeName, keywords);
+    const result = checkKeywordExclusion(testPayeeName, allKeywords);
     setTestResult(result);
     
     // Also run quick test for detailed logging
@@ -141,13 +233,22 @@ const KeywordExclusionManager = () => {
   };
 
   const resetToDefaults = () => {
+    // Clear custom keywords
+    setCustomKeywords([]);
+    saveCustomKeywords([]);
+    
+    // Reset to only comprehensive keywords
     const defaultKeywords = getComprehensiveExclusionKeywords();
-    setKeywords(defaultKeywords);
+    setAllKeywords(defaultKeywords);
     
     toast({
       title: "Reset Complete",
-      description: "Keyword exclusion list has been reset to defaults",
+      description: "Custom keywords cleared. Only built-in keywords remain.",
     });
+  };
+
+  const isCustomKeyword = (keyword: string): boolean => {
+    return customKeywords.includes(keyword);
   };
 
   return (
@@ -179,7 +280,7 @@ const KeywordExclusionManager = () => {
 
           <div className="flex gap-2">
             <div className="flex-1">
-              <Label htmlFor="new-keyword">Add New Keyword</Label>
+              <Label htmlFor="new-keyword">Add New Custom Keyword</Label>
               <Input
                 id="new-keyword"
                 placeholder="Enter keyword to exclude"
@@ -196,16 +297,22 @@ const KeywordExclusionManager = () => {
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button variant="outline" onClick={resetToDefaults}>
-              Reset to Defaults
+              Clear Custom Keywords
             </Button>
             <Button variant="outline" onClick={runFullTest}>
               <TestTube className="h-4 w-4 mr-2" />
               Run Test Suite
             </Button>
             <Badge variant="secondary">
-              {keywords.length} keywords
+              {comprehensiveKeywords.length} built-in keywords
+            </Badge>
+            <Badge variant="outline">
+              {customKeywords.length} custom keywords
+            </Badge>
+            <Badge variant="default">
+              {allKeywords.length} total keywords
             </Badge>
           </div>
         </CardContent>
@@ -269,66 +376,80 @@ const KeywordExclusionManager = () => {
         <CardHeader>
           <CardTitle>Current Exclusion Keywords</CardTitle>
           <CardDescription>
-            Click on any keyword to edit it, or use the delete button to remove it.
+            Built-in keywords cannot be edited or deleted. Custom keywords can be modified or removed.
+            Built-in keywords are marked with a green badge, custom keywords with a blue badge.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
+          <div className="rounded-md border max-h-96 overflow-y-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Keyword</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead className="w-32">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {keywords.map((keyword, index) => (
-                  <TableRow key={index}>
-                    <TableCell>
-                      {editingIndex === index ? (
-                        <div className="flex gap-2">
-                          <Input
-                            value={editingValue}
-                            onChange={(e) => setEditingValue(e.target.value)}
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter') handleSaveEdit();
-                              if (e.key === 'Escape') handleCancelEdit();
-                            }}
-                            autoFocus
-                          />
-                          <Button size="sm" onClick={handleSaveEdit}>
-                            Save
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={handleCancelEdit}>
-                            Cancel
-                          </Button>
-                        </div>
-                      ) : (
-                        <span className="font-mono">{keyword}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {editingIndex !== index && (
-                        <div className="flex gap-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEditKeyword(index)}
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDeleteKeyword(index)}
-                          >
-                            <Trash className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {allKeywords.map((keyword, index) => {
+                  const isCustom = isCustomKeyword(keyword);
+                  return (
+                    <TableRow key={index}>
+                      <TableCell>
+                        {editingIndex === index ? (
+                          <div className="flex gap-2">
+                            <Input
+                              value={editingValue}
+                              onChange={(e) => setEditingValue(e.target.value)}
+                              onKeyPress={(e) => {
+                                if (e.key === 'Enter') handleSaveEdit();
+                                if (e.key === 'Escape') handleCancelEdit();
+                              }}
+                              autoFocus
+                            />
+                            <Button size="sm" onClick={handleSaveEdit}>
+                              Save
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="font-mono">{keyword}</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={isCustom ? "default" : "secondary"}>
+                          {isCustom ? "Custom" : "Built-in"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {editingIndex !== index && (
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditKeyword(index)}
+                              disabled={!isCustom}
+                              title={!isCustom ? "Built-in keywords cannot be edited" : "Edit keyword"}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeleteKeyword(index)}
+                              disabled={!isCustom}
+                              title={!isCustom ? "Built-in keywords cannot be deleted" : "Delete keyword"}
+                            >
+                              <Trash className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
