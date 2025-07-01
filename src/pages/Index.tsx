@@ -9,8 +9,6 @@ import ApiKeySetupPage from "@/components/setup/ApiKeySetupPage";
 
 const Index = () => {
   const {
-    activeTab,
-    setActiveTab,
     batchResults,
     batchSummary,
     hasApiKey,
@@ -31,6 +29,11 @@ const Index = () => {
 
   console.log('[INDEX DEBUG] Rendering main app with hasApiKey:', hasApiKey);
 
+  const handleBatchClassify = (results: any[]) => {
+    console.log('[INDEX] Batch classify results:', results);
+    // Handle batch classification results
+  };
+
   return (
     <UnifiedProgressProvider>
       <ErrorBoundary>
@@ -43,11 +46,9 @@ const Index = () => {
           <main className="container px-4 pb-8">
             <ErrorBoundary>
               <MainTabs
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-                batchResults={batchResults}
-                batchSummary={batchSummary}
-                onBatchComplete={handleBatchComplete}
+                allResults={batchResults}
+                onBatchClassify={handleBatchClassify}
+                onComplete={handleBatchComplete}
                 onJobDelete={handleJobDelete}
               />
             </ErrorBoundary>

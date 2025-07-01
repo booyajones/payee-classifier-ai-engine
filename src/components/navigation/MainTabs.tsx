@@ -9,6 +9,7 @@ import KeywordExclusionManager from "@/components/KeywordExclusionManager";
 import SICCodeTester from "@/components/SICCodeTester";
 import OptimizedVirtualizedTable from "@/components/table/OptimizedVirtualizedTable";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
+import { useTableSorting } from "@/hooks/useTableSorting";
 
 interface MainTabsProps {
   allResults: PayeeClassification[];
@@ -18,6 +19,44 @@ interface MainTabsProps {
 }
 
 const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: MainTabsProps) => {
+  const {
+    sortField,
+    sortDirection,
+    handleSort,
+    sortedResults
+  } = useTableSorting(allResults);
+
+  // Handler for single classification results
+  const handleSingleClassify = (result: PayeeClassification) => {
+    console.log('[MAIN TABS] Single classification result:', result);
+    // Add to results if needed - for now just log
+  };
+
+  // Handler for viewing result details
+  const handleViewDetails = (result: PayeeClassification) => {
+    console.log('[MAIN TABS] View details for:', result);
+    // Could open a modal or navigate to details page
+  };
+
+  // Generate columns from results data
+  const generateColumns = () => {
+    if (allResults.length === 0) {
+      return [{ key: 'payeeName', label: 'Payee Name', isOriginal: true }];
+    }
+
+    // Get original data keys from the first result
+    const firstResult = allResults[0];
+    const originalColumns = firstResult.originalData 
+      ? Object.keys(firstResult.originalData).map(key => ({
+          key,
+          label: key.charAt(0).toUpperCase() + key.slice(1),
+          isOriginal: true
+        }))
+      : [{ key: 'payeeName', label: 'Payee Name', isOriginal: true }];
+
+    return originalColumns;
+  };
+
   return (
     <Tabs defaultValue="single" className="w-full">
       <TabsList className="grid w-full grid-cols-6">
@@ -48,7 +87,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
       </TabsList>
 
       <TabsContent value="single" className="mt-6">
-        <SingleClassificationForm />
+        <SingleClassificationForm onClassify={handleSingleClassify} />
       </TabsContent>
 
       <TabsContent value="batch" className="mt-6">
@@ -61,13 +100,24 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
 
       <TabsContent value="upload" className="mt-6">
         <SmartFileUpload 
-          onBatchClassify={onBatchClassify}
-          onComplete={onComplete}
+          onBatchJobCreated={(batchJob, payeeRowData) => {
+            console.log('[MAIN TABS] Batch job created:', batchJob);
+          }}
+          onProcessingComplete={(results, summary, jobId) => {
+            onComplete(results, summary);
+          }}
         />
       </TabsContent>
 
       <TabsContent value="results" className="mt-6">
-        <OptimizedVirtualizedTable results={allResults} />
+        <OptimizedVirtualizedTable 
+          results={sortedResults}
+          columns={generateColumns()}
+          sortField={sortField}
+          sortDirection={sortDirection}
+          onSort={handleSort}
+          onViewDetails={handleViewDetails}
+        />
       </TabsContent>
 
       <TabsContent value="keywords" className="mt-6">
