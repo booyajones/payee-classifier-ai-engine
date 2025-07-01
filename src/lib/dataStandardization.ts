@@ -1,4 +1,3 @@
-
 /**
  * Comprehensive data standardization and normalization service
  * Ensures consistent data cleaning while preserving all original records
@@ -176,7 +175,46 @@ export function standardizePayeeName(originalName: string | null | undefined): D
 }
 
 /**
- * Batch standardization for multiple names
+ * Async batch standardization for multiple names with chunked processing
+ * Maintains 1:1 record mapping and prevents browser blocking
+ */
+export async function batchStandardizeNamesAsync(
+  names: (string | null | undefined)[],
+  onProgress?: (processed: number, total: number, percentage: number) => void
+): Promise<DataStandardizationResult[]> {
+  console.log(`[DATA STANDARDIZATION ASYNC] Processing ${names.length} names for standardization with chunked processing`);
+  
+  const chunkOptions: ChunkProcessorOptions = {
+    chunkSize: names.length > 10000 ? 200 : 100,
+    delayMs: names.length > 5000 ? 15 : 10,
+    onProgress: onProgress
+  };
+
+  const { results } = await processInChunks(
+    names,
+    (name, index) => {
+      const result = standardizePayeeName(name);
+      
+      if (index < 3) {
+        console.log(`[DATA STANDARDIZATION ASYNC] Row ${index}: "${result.original}" → "${result.normalized}" (${result.cleaningSteps.length} steps)`);
+      }
+      
+      return result;
+    },
+    chunkOptions
+  );
+  
+  // Validation: Ensure 1:1 mapping
+  if (results.length !== names.length) {
+    throw new Error(`CRITICAL: Async standardization failed 1:1 mapping - input: ${names.length}, output: ${results.length}`);
+  }
+  
+  console.log(`[DATA STANDARDIZATION ASYNC] Successfully processed ${results.length} names with consistent normalization`);
+  return results;
+}
+
+/**
+ * Batch standardization for multiple names (synchronous - for backward compatibility)
  * Maintains 1:1 record mapping
  */
 export function batchStandardizeNames(names: (string | null | undefined)[]): DataStandardizationResult[] {

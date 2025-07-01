@@ -1,4 +1,3 @@
-
 import { BatchJob, getBatchJobResults } from "@/lib/openai/trueBatchAPI";
 import { PayeeRowData, mapResultsToOriginalRows } from "@/lib/rowMapping";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
@@ -6,6 +5,7 @@ import { processBatchResults } from "@/services/batchResultProcessor";
 import { saveClassificationResultsWithValidation } from "@/lib/database/enhancedClassificationService";
 import { useToast } from "@/components/ui/use-toast";
 import { testSicCodePipeline } from "@/lib/testing/sicCodeTest";
+import { mapResultsToOriginalRowsAsync } from "@/lib/rowMapping";
 
 interface UseBatchJobDownloadProps {
   payeeRowDataMap: Record<string, PayeeRowData>;
@@ -19,7 +19,7 @@ export const useBatchJobDownload = ({
   const { toast } = useToast();
 
   const handleDownloadResults = async (job: BatchJob) => {
-    console.log(`[BATCH DOWNLOAD] === STARTING ENHANCED DOWNLOAD WITH COMPREHENSIVE SIC VALIDATION FOR JOB ${job.id} ===`);
+    console.log(`[BATCH DOWNLOAD] === STARTING ENHANCED DOWNLOAD WITH CHUNKED PROCESSING FOR JOB ${job.id} ===`);
     
     // Validate callback before proceeding
     if (typeof onJobComplete !== 'function') {
@@ -60,12 +60,31 @@ export const useBatchJobDownload = ({
       const rawResults = await getBatchJobResults(job, uniquePayeeNames);
       console.log(`[BATCH DOWNLOAD] Downloaded ${rawResults.length} raw results from OpenAI`);
 
-      // Process results with enhanced validation
-      const { finalClassifications, summary } = processBatchResults(
+      // Show initial processing toast
+      toast({
+        title: "Processing Download",
+        description: "Processing results with keyword exclusion and SIC validation. This may take several minutes for large files...",
+      });
+
+      // Process results with enhanced validation and progress tracking
+      let currentProgress = 0;
+      const onProgress = (processed: number, total: number, percentage: number) => {
+        // Only update toast every 10% to avoid spam
+        if (percentage >= currentProgress + 10) {
+          currentProgress = Math.floor(percentage / 10) * 10;
+          toast({
+            title: "Processing Download",
+            description: `Processing ${processed}/${total} results (${percentage}%)... Please wait.`,
+          });
+        }
+      };
+
+      const { finalClassifications, summary } = await processEnhancedBatchResults(
         rawResults,
         uniquePayeeNames,
         payeeData,
-        job
+        job,
+        onProgress
       );
 
       console.log(`[BATCH DOWNLOAD] Enhanced processing complete: ${finalClassifications.length} unique classifications`);
@@ -101,9 +120,27 @@ export const useBatchJobDownload = ({
         });
       }
 
-      // Map to original rows with validation
-      console.log(`[BATCH DOWNLOAD] Mapping ${finalClassifications.length} unique results to ${payeeData.originalFileData.length} original rows`);
-      const mappedResults = mapResultsToOriginalRows(finalClassifications, payeeData);
+      // Map to original rows with chunked processing and progress
+      console.log(`[BATCH DOWNLOAD] Mapping ${finalClassifications.length} unique results to ${payeeData.originalFileData.length} original rows with chunked processing`);
+      
+      toast({
+        title: "Finalizing Download",
+        description: "Mapping results to original data format. Almost done...",
+      });
+
+      const mappedResults = await mapResultsToOriginalRowsAsync(
+        finalClassifications, 
+        payeeData,
+        (processed, total, percentage) => {
+          if (percentage % 20 === 0) { // Update every 20%
+            toast({
+              title: "Finalizing Download",
+              description: `Mapped ${processed}/${total} rows (${percentage}%). Almost done...`,
+            });
+          }
+        }
+      );
+      
       console.log(`[BATCH DOWNLOAD] Successfully mapped to ${mappedResults.length} original rows`);
 
       // Create full results with SIC validation
@@ -152,16 +189,16 @@ export const useBatchJobDownload = ({
       onJobComplete(fullResults, updatedSummary, job.id);
 
       toast({
-        title: "Enhanced Processing Complete",
-        description: `Successfully processed ${fullResults.length} results with ${finalSicCount} SIC codes (${finalCoverage}% coverage).`,
+        title: "Download Complete",
+        description: `Successfully processed ${fullResults.length} results with ${finalSicCount} SIC codes. Download should start automatically.`,
       });
 
     } catch (error) {
       console.error('[BATCH DOWNLOAD] Enhanced download failed:', error);
       
       toast({
-        title: "Enhanced Download Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred during enhanced processing",
+        title: "Download Failed", 
+        description: error instanceof Error ? error.message : "Unknown error occurred during processing. Please try again.",
         variant: "destructive"
       });
       throw error;
