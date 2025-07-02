@@ -9,11 +9,13 @@ export function normalizeForDuplicateDetection(text: string): string {
   
   let normalized = advancedNormalization(text);
   
-  // Normalize common business suffixes to catch duplicates
+  // LESS AGGRESSIVE NORMALIZATION - preserve distinguishing characteristics
+  // Only normalize the most common suffix variations, don't completely remove them
   normalized = normalized
-    .replace(/\b(INCORPORATED|INC|CORP|CORPORATION|LLC|LTD|LIMITED|CO|COMPANY)\b/g, 'BUSINESS')
-    .replace(/\b(ENTERPRISES|ENTERPRISE|GROUP|PARTNERS|PARTNERSHIP)\b/g, 'BUSINESS')
-    .replace(/\s+BUSINESS\s*$/g, '') // Remove trailing business indicator
+    .replace(/\b(INCORPORATED)\b/g, 'INC')  // Standardize to short form
+    .replace(/\b(CORPORATION)\b/g, 'CORP')
+    .replace(/\b(LIMITED)\b/g, 'LTD') 
+    .replace(/\b(COMPANY)\b/g, 'CO')
     .replace(/\s+/g, ' ')
     .trim();
   
@@ -27,19 +29,44 @@ export function isSameEntity(name1: string, name2: string): boolean {
   const norm1 = normalizeForDuplicateDetection(name1);
   const norm2 = normalizeForDuplicateDetection(name2);
   
+  console.log(`[SAME ENTITY CHECK] "${name1}" -> "${norm1}" vs "${name2}" -> "${norm2}"`);
+  
   // Direct match after normalization
-  if (norm1 === norm2) return true;
+  if (norm1 === norm2) {
+    console.log(`[SAME ENTITY CHECK] ✅ EXACT MATCH after normalization`);
+    return true;
+  }
   
   // Check if one is a subset of the other (partial name matching)
   const tokens1 = norm1.split(/\s+/).filter(t => t.length > 0);
   const tokens2 = norm2.split(/\s+/).filter(t => t.length > 0);
   
+  // Enhanced token matching - check for core name similarity
+  if (tokens1.length > 0 && tokens2.length > 0) {
+    // Get core tokens (remove business suffixes for comparison)
+    const coreTokens1 = tokens1.filter(t => !['INC', 'CORP', 'LLC', 'LTD', 'CO'].includes(t));
+    const coreTokens2 = tokens2.filter(t => !['INC', 'CORP', 'LLC', 'LTD', 'CO'].includes(t));
+    
+    // If core names match exactly, it's the same entity
+    if (coreTokens1.length > 0 && coreTokens2.length > 0) {
+      const coreMatch = coreTokens1.join(' ') === coreTokens2.join(' ');
+      if (coreMatch) {
+        console.log(`[SAME ENTITY CHECK] ✅ CORE TOKENS MATCH: "${coreTokens1.join(' ')}" = "${coreTokens2.join(' ')}"`);
+        return true;
+      }
+    }
+  }
+  
   // If one name has all tokens of the shorter name, they're likely the same entity
   if (tokens1.length !== tokens2.length) {
     const [shorter, longer] = tokens1.length < tokens2.length ? [tokens1, tokens2] : [tokens2, tokens1];
     const hasAllTokens = shorter.every(token => longer.includes(token));
-    if (hasAllTokens && shorter.length > 0) return true;
+    if (hasAllTokens && shorter.length > 0) {
+      console.log(`[SAME ENTITY CHECK] ✅ SUBSET MATCH: shorter "${shorter.join(' ')}" found in longer "${longer.join(' ')}"`);
+      return true;
+    }
   }
   
+  console.log(`[SAME ENTITY CHECK] ❌ NO MATCH FOUND`);
   return false;
 }

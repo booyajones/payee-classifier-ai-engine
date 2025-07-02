@@ -43,27 +43,8 @@ export function applyMatchingStrategies(
     };
   }
   
-  // Method 4: Enhanced whole word matching with length validation
-  // Only apply whole word matching if keyword is reasonably sized
-  if (normalizedKeyword.length >= 2 && normalizedKeyword.length <= normalizedPayee.length) {
-    if (isWholeWordMatch(normalizedPayee, normalizedKeyword)) {
-      return {
-        isMatch: true,
-        confidence: 85,
-        matchReason: 'Enhanced whole word match'
-      };
-    }
-  }
-  
-  // Method 5: Similarity scoring for fuzzy matches
-  const similarity = calculateCombinedSimilarity(normalizedPayee, normalizedKeyword);
-  if (similarity.combined > 85) {
-    return {
-      isMatch: true,
-      confidence: similarity.combined,
-      matchReason: `Similarity match (${similarity.combined.toFixed(1)}%)`
-    };
-  }
+  // Method 4: REMOVED - No more similarity/substring matching to prevent false positives
+  // like "VA" matching "Valley"
   
   return {
     isMatch: false,

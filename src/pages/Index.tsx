@@ -8,6 +8,7 @@ import AppFooter from "@/components/layout/AppFooter";
 import MainTabs from "@/components/navigation/MainTabs";
 import ApiKeySetupPage from "@/components/setup/ApiKeySetupPage";
 import DownloadProgressDisplay from "@/components/download/DownloadProgressDisplay";
+import DuplicateTestRunner from "@/components/testing/DuplicateTestRunner";
 
 const Index = () => {
   console.log('Index component rendering');
@@ -58,6 +59,11 @@ const Index = () => {
                 />
               </ErrorBoundary>
             </main>
+
+            {/* Test Runner for debugging (remove in production) */}
+            <div className="container px-4 mt-8 border-t pt-8">
+              <DuplicateTestRunner />
+            </div>
 
             <AppFooter />
             

@@ -99,7 +99,8 @@ export class SmartDuplicateDetectionEngine {
         
         // Boost score for obvious duplicates (like "Christa INC" vs "CHRISTA")
         if (obviousDuplicate) {
-          final_duplicate_score = Math.max(final_duplicate_score, 90);
+          final_duplicate_score = Math.max(final_duplicate_score, 95);
+          console.log(`[DUPLICATE ENGINE] ✅ OBVIOUS DUPLICATE DETECTED: "${record1.payee_name}" vs "${record2.payee_name}" - boosted to ${final_duplicate_score}%`);
         }
 
         // Determine confidence tier
