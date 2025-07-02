@@ -27,11 +27,24 @@ export function findDuplicatePairs(
       const similarity_scores = calculateDuplicateScore(record1.cleaned_name, record2.cleaned_name);
       let final_duplicate_score = similarity_scores.duplicateScore;
       
-      // Boost score for obvious duplicates (like "Christa INC" vs "CHRISTA")
+      // Enhanced boost for obvious duplicates
       if (obviousDuplicate) {
-        final_duplicate_score = Math.max(final_duplicate_score, 95);
+        final_duplicate_score = Math.max(final_duplicate_score, 96);
         console.log(`[PAIR ANALYZER] ✅ OBVIOUS DUPLICATE DETECTED: "${record1.payee_name}" vs "${record2.payee_name}" - boosted to ${final_duplicate_score}%`);
+      } else {
+        // Check for other patterns that should be high confidence
+        const name1Lower = record1.payee_name.toLowerCase();
+        const name2Lower = record2.payee_name.toLowerCase();
+        
+        // Case-only differences should be very high confidence
+        if (name1Lower === name2Lower && record1.payee_name !== record2.payee_name) {
+          final_duplicate_score = Math.max(final_duplicate_score, 98);
+          console.log(`[PAIR ANALYZER] ✅ CASE-ONLY DIFFERENCE: "${record1.payee_name}" vs "${record2.payee_name}" - boosted to ${final_duplicate_score}%`);
+        }
       }
+      
+      console.log(`[PAIR ANALYZER] Comparing "${record1.payee_name}" vs "${record2.payee_name}": ${final_duplicate_score}% (cleaned: "${record1.cleaned_name}" vs "${record2.cleaned_name}")`);
+      
 
       // Determine confidence tier
       let confidence_tier: 'High' | 'Low' | 'Ambiguous';

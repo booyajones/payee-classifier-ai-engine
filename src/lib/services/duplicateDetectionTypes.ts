@@ -19,6 +19,7 @@ export interface DuplicateDetectionInput {
 export interface DuplicateDetectionOutput extends DuplicateDetectionInput {
   is_potential_duplicate: boolean;
   duplicate_of_payee_id: string | null;
+  duplicate_of_payee_name?: string | null;
   final_duplicate_score: number;
   judgement_method: 'Algorithmic - High Confidence' | 'Algorithmic - Low Confidence' | 'AI Judgment';
   ai_judgement_is_duplicate: boolean | null;

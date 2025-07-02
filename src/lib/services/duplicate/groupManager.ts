@@ -17,6 +17,7 @@ export function generateEnrichedOutput(
   // Create a map to track duplicate relationships
   const duplicateMap = new Map<string, {
     duplicate_of: string;
+    duplicate_of_name: string;
     final_duplicate_score: number;
     judgement_method: string;
     ai_judgment?: { is_duplicate: boolean; confidence: number; reasoning: string };
@@ -24,17 +25,26 @@ export function generateEnrichedOutput(
   }>();
 
   // Process duplicate pairs to build relationships
+  console.log(`[GROUP MANAGER] Processing ${processedPairs.length} pairs to build duplicate relationships`);
   for (const pair of processedPairs) {
     if (pair.is_duplicate) {
+      console.log(`[GROUP MANAGER] ✅ DUPLICATE PAIR: "${pair.record1.payee_name}" (${pair.record1.payee_id}) = "${pair.record2.payee_name}" (${pair.record2.payee_id}) - Score: ${pair.final_duplicate_score}%`);
+      
       // Record2 is a duplicate of Record1 (canonical)
       duplicateMap.set(pair.record2.payee_id, {
         duplicate_of: pair.record1.payee_id,
+        duplicate_of_name: pair.record1.payee_name,
         final_duplicate_score: pair.final_duplicate_score,
         judgement_method: pair.judgement_method,
         ai_judgment: pair.ai_judgment,
         similarity_scores: pair.similarity_scores
       });
     }
+  }
+  
+  console.log(`[GROUP MANAGER] Built duplicate map with ${duplicateMap.size} duplicate relationships`);
+  for (const [payeeId, info] of duplicateMap.entries()) {
+    console.log(`[GROUP MANAGER] - ${payeeId} is duplicate of ${info.duplicate_of} (${info.final_duplicate_score}%)`);
   }
 
   // Generate output for each original record
@@ -47,6 +57,7 @@ export function generateEnrichedOutput(
         ...record,
         is_potential_duplicate: true,
         duplicate_of_payee_id: duplicateInfo.duplicate_of,
+        duplicate_of_payee_name: duplicateInfo.duplicate_of_name,
         final_duplicate_score: duplicateInfo.final_duplicate_score,
         judgement_method: duplicateInfo.judgement_method as any,
         ai_judgement_is_duplicate: duplicateInfo.ai_judgment?.is_duplicate || null,
@@ -61,6 +72,7 @@ export function generateEnrichedOutput(
         ...record,
         is_potential_duplicate: false,
         duplicate_of_payee_id: null,
+        duplicate_of_payee_name: null,
         final_duplicate_score: 0,
         judgement_method: 'Algorithmic - Low Confidence' as any,
         ai_judgement_is_duplicate: null,

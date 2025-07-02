@@ -45,14 +45,17 @@ export async function processIndividualResult(
     console.warn(`[RESULT PROCESSOR] Business "${payeeName}" missing SIC code`);
   }
 
-  // CRITICAL: Preserve ALL original row data
+  // CRITICAL: Preserve ALL original row data and ensure correct reasoning
   const processedResult: PayeeClassification = {
     id: `${jobId}-${index}`,
     payeeName: payeeName,
     result: {
       classification: finalClassification,
       confidence: confidence,
-      reasoning: result.result?.reasoning || result.reasoning || 'Classification completed',
+      // FIX: Ensure reasoning is specific to this payee and classification
+      reasoning: keywordExclusion.isExcluded 
+        ? `Keyword exclusion applied: ${keywordExclusion.reasoning}` 
+        : (result.result?.reasoning || result.reasoning || `Classified as ${finalClassification} based on analysis`),
       processingTier: result.result?.processingTier || 'AI-Powered',
       processingMethod: result.result?.processingMethod || 'OpenAI High-Accuracy',
       sicCode: sicCode || '',

@@ -9,8 +9,7 @@ export function normalizeForDuplicateDetection(text: string): string {
   
   let normalized = advancedNormalization(text);
   
-  // LESS AGGRESSIVE NORMALIZATION - preserve distinguishing characteristics
-  // Only normalize the most common suffix variations, don't completely remove them
+  // Enhanced normalization for better duplicate detection
   normalized = normalized
     .replace(/\b(INCORPORATED)\b/g, 'INC')  // Standardize to short form
     .replace(/\b(CORPORATION)\b/g, 'CORP')
@@ -18,6 +17,8 @@ export function normalizeForDuplicateDetection(text: string): string {
     .replace(/\b(COMPANY)\b/g, 'CO')
     .replace(/\s+/g, ' ')
     .trim();
+  
+  console.log(`[ENHANCED NORMALIZATION] "${text}" → "${normalized}"`);
   
   return normalized;
 }
