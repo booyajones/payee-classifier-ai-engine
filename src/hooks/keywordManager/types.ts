@@ -27,4 +27,5 @@ export interface KeywordManagerActions {
 export interface KeywordManagerReturn extends KeywordManagerState, KeywordManagerActions {
   totalKeywords: number;
   filteredCount: number;
+  rawAllKeywords: ExclusionKeyword[];
 }

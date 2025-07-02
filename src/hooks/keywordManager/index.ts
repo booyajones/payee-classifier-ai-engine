@@ -123,7 +123,10 @@ export const useKeywordManager = (): KeywordManagerReturn => {
     
     // Computed
     totalKeywords: allKeywords.length,
-    filteredCount: filteredKeywords.length
+    filteredCount: filteredKeywords.length,
+    
+    // Raw data for stats
+    rawAllKeywords: allKeywords
   };
 };
 

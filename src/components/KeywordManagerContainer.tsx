@@ -17,6 +17,7 @@ const KeywordManagerContainer = () => {
     saving,
     totalKeywords,
     filteredCount,
+    rawAllKeywords,
     handleAddKeyword,
     handleEditKeyword,
     handleSaveEdit,
@@ -49,7 +50,7 @@ const KeywordManagerContainer = () => {
         editingValue={editingValue}
         editingCategory={editingCategory}
         saving={saving}
-        totalKeywords={totalKeywords}
+        totalKeywords={rawAllKeywords.length}
         filteredCount={filteredCount}
         onAddKeyword={handleAddKeyword}
         onResetToDefaults={resetToDefaults}
