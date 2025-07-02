@@ -57,6 +57,11 @@ export const saveClassificationResultsWithValidation = async (
       console.error(`[ENHANCED DB SERVICE] ❌ ${error}`);
     }
 
+    // CRITICAL FIX: Transform NULL values to match COALESCE constraint logic
+    // The unique constraint uses COALESCE(row_index, '-1'::integer) and COALESCE(batch_id, ''::text)
+    const processedRowIndex = result.rowIndex !== null && result.rowIndex !== undefined ? result.rowIndex : -1;
+    const processedBatchId = batchId || '';
+
     return {
       payee_name: result.payeeName,
       classification: result.result.classification,
@@ -68,8 +73,8 @@ export const saveClassificationResultsWithValidation = async (
       similarity_scores: result.result.similarityScores ? JSON.parse(JSON.stringify(result.result.similarityScores)) : null,
       keyword_exclusion: result.result.keywordExclusion ? JSON.parse(JSON.stringify(result.result.keywordExclusion)) : null,
       original_data: result.originalData ? JSON.parse(JSON.stringify(result.originalData)) : null,
-      row_index: result.rowIndex || null,
-      batch_id: batchId || null,
+      row_index: processedRowIndex,
+      batch_id: processedBatchId,
       sic_code: result.result.sicCode || null,
       sic_description: result.result.sicDescription || null,
       // DUPLICATE DETECTION DATA - check if available in result object
@@ -84,26 +89,43 @@ export const saveClassificationResultsWithValidation = async (
 
   console.log(`[ENHANCED DB SERVICE] Validation complete: ${stats.businessCount} businesses, ${stats.individualCount} individuals, ${stats.sicCodeCount} with SIC codes`);
 
-  // Use ignoreDuplicates to handle conflicts without referencing complex unique constraints
-  const { error, count } = await supabase
-    .from('payee_classifications')
-    .upsert(validatedResults, {
-      ignoreDuplicates: true,
-      count: 'exact'
-    });
-
-  if (error) {
-    console.error('[ENHANCED DB SERVICE] Database save failed:', error);
-    console.error('[ENHANCED DB SERVICE] Error details:', {
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      code: error.code
-    });
-    throw new Error(`Failed to save classification results: ${error.message}`);
+  // CRITICAL FIX: Use regular insert with duplicate handling instead of problematic upsert
+  let successfulInserts = 0;
+  let duplicateSkips = 0;
+  
+  for (const record of validatedResults) {
+    try {
+      const { error } = await supabase
+        .from('payee_classifications')
+        .insert([record]);
+      
+      if (error) {
+        if (error.code === '23505') {
+          // Unique constraint violation - skip duplicate
+          duplicateSkips++;
+          console.log(`[ENHANCED DB SERVICE] Skipping duplicate: "${record.payee_name}" (batch: ${record.batch_id}, row: ${record.row_index})`);
+        } else {
+          console.error(`[ENHANCED DB SERVICE] Insert failed for "${record.payee_name}":`, error.message);
+          stats.sicValidationErrors.push(`Insert failed for "${record.payee_name}": ${error.message}`);
+        }
+      } else {
+        successfulInserts++;
+      }
+    } catch (insertError) {
+      console.error(`[ENHANCED DB SERVICE] Unexpected error inserting "${record.payee_name}":`, insertError);
+      stats.sicValidationErrors.push(`Unexpected error for "${record.payee_name}": ${insertError}`);
+    }
   }
 
-  stats.totalSaved = count || validatedResults.length;
+  stats.totalSaved = successfulInserts;
+  
+  if (duplicateSkips > 0) {
+    console.log(`[ENHANCED DB SERVICE] Skipped ${duplicateSkips} duplicate records, saved ${successfulInserts} new records`);
+  }
+  
+  if (stats.sicValidationErrors.length > 0) {
+    console.warn(`[ENHANCED DB SERVICE] ${stats.sicValidationErrors.length} errors occurred during save (but processing continued)`);
+  }
 
   // Post-save validation
   if (batchId) {
