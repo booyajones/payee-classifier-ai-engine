@@ -1,0 +1,21 @@
+-- Educational Institutions
+INSERT INTO exclusion_keywords (keyword, keyword_type, category) VALUES
+('UNIVERSITY', 'builtin', 'education'),
+('COLLEGE', 'builtin', 'education'),
+('SCHOOL', 'builtin', 'education'),
+('ACADEMY', 'builtin', 'education'),
+('HARVARD', 'builtin', 'education'),
+('STANFORD', 'builtin', 'education'),
+('MIT', 'builtin', 'education'),
+('UCLA', 'builtin', 'education'),
+('USC', 'builtin', 'education'),
+('BERKELEY', 'builtin', 'education'),
+('YALE', 'builtin', 'education'),
+('PRINCETON', 'builtin', 'education'),
+('COLUMBIA', 'builtin', 'education'),
+('NYU', 'builtin', 'education'),
+('COMMUNITY COLLEGE', 'builtin', 'education'),
+('STATE UNIVERSITY', 'builtin', 'education'),
+('TECHNICAL COLLEGE', 'builtin', 'education'),
+('TRAINING CENTER', 'builtin', 'education'),
+('LEARNING CENTER', 'builtin', 'education');
