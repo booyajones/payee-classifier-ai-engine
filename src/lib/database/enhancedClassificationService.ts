@@ -84,12 +84,11 @@ export const saveClassificationResultsWithValidation = async (
 
   console.log(`[ENHANCED DB SERVICE] Validation complete: ${stats.businessCount} businesses, ${stats.individualCount} individuals, ${stats.sicCodeCount} with SIC codes`);
 
-  // CRITICAL FIX: Use the actual unique constraint name that matches the COALESCE expression
+  // Use ignoreDuplicates to handle conflicts without referencing complex unique constraints
   const { error, count } = await supabase
     .from('payee_classifications')
     .upsert(validatedResults, {
-      onConflict: 'idx_payee_classifications_unique',
-      ignoreDuplicates: false,
+      ignoreDuplicates: true,
       count: 'exact'
     });
 
