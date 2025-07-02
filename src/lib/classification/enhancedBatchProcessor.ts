@@ -65,7 +65,7 @@ export async function enhancedProcessBatch(
       onProgress(0, total, 5, { phase: 'Filtering excluded keywords...' });
     }
     
-    const { validNames, excludedNames } = filterPayeeNames(validPayeeNames);
+    const { validNames, excludedNames } = await filterPayeeNames(validPayeeNames);
     stats.excludedCount = excludedNames.length;
     
     console.log(`[ENHANCED] Excluded ${excludedNames.length} names, processing ${validNames.length}`);

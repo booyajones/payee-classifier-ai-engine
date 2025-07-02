@@ -1,8 +1,8 @@
-
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Edit, Trash, Search, ArrowUpDown, ArrowUp, ArrowDown, Loader2 } from "lucide-react";
 import {
   Table,
@@ -15,82 +15,67 @@ import {
 import { type ExclusionKeyword } from "@/lib/database/exclusionKeywordService";
 
 interface KeywordTableProps {
-  allKeywords: string[];
-  comprehensiveKeywords: string[];
-  customKeywords: ExclusionKeyword[];
+  allKeywords: ExclusionKeyword[];
   editingIndex: number | null;
   editingValue: string;
+  editingCategory: string;
   saving: boolean;
   onEdit: (index: number) => void;
   onDelete: (index: number) => void;
   onSaveEdit: () => void;
   onCancelEdit: () => void;
   onEditingValueChange: (value: string) => void;
+  onEditingCategoryChange: (value: string) => void;
 }
 
 type SortDirection = 'asc' | 'desc' | null;
-type SortField = 'keyword' | 'type';
-type FilterType = 'all' | 'builtin' | 'custom';
+type SortField = 'keyword' | 'type' | 'category';
 
 const KeywordTable = ({
   allKeywords,
-  comprehensiveKeywords,
-  customKeywords,
   editingIndex,
   editingValue,
+  editingCategory,
   saving,
   onEdit,
   onDelete,
   onSaveEdit,
   onCancelEdit,
   onEditingValueChange,
+  onEditingCategoryChange,
 }: KeywordTableProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<SortField>('keyword');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-  const [filterType, setFilterType] = useState<FilterType>('all');
 
-  const isCustomKeyword = (keyword: string): boolean => {
-    return customKeywords.some(k => k.keyword === keyword && k.is_active);
-  };
+  const categories = [...new Set(allKeywords.map(k => k.category))].sort();
 
   const filteredAndSortedKeywords = useMemo(() => {
-    let filtered = allKeywords.filter(keyword => {
-      const matchesSearch = keyword.toLowerCase().includes(searchTerm.toLowerCase());
-      const isCustom = isCustomKeyword(keyword);
-      
-      switch (filterType) {
-        case 'builtin':
-          return matchesSearch && !isCustom;
-        case 'custom':
-          return matchesSearch && isCustom;
-        default:
-          return matchesSearch;
-      }
-    });
+    let filtered = allKeywords.filter(keyword => 
+      keyword.keyword.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
     if (sortDirection && sortField) {
       filtered.sort((a, b) => {
         let comparison = 0;
         
         if (sortField === 'keyword') {
-          comparison = a.localeCompare(b);
+          comparison = a.keyword.localeCompare(b.keyword);
         } else if (sortField === 'type') {
-          const aType = isCustomKeyword(a) ? 'custom' : 'builtin';
-          const bType = isCustomKeyword(b) ? 'custom' : 'builtin';
-          comparison = aType.localeCompare(bType);
+          comparison = a.keyword_type.localeCompare(b.keyword_type);
+        } else if (sortField === 'category') {
+          comparison = a.category.localeCompare(b.category);
         }
         
         return sortDirection === 'desc' ? -comparison : comparison;
       });
     }
 
-    return filtered.map(keyword => ({
-      keyword,
-      originalIndex: allKeywords.indexOf(keyword),
-      isCustom: isCustomKeyword(keyword)
+    return filtered.map((keyword, index) => ({
+      ...keyword,
+      displayIndex: index
     }));
-  }, [allKeywords, searchTerm, sortField, sortDirection, filterType, customKeywords]);
+  }, [allKeywords, searchTerm, sortField, sortDirection]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -108,6 +93,21 @@ const KeywordTable = ({
     return <ArrowUpDown className="h-4 w-4" />;
   };
 
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'builtin': return 'secondary';
+      case 'custom': return 'default';
+      case 'modified_builtin': return 'outline';
+      default: return 'secondary';
+    }
+  };
+
+  const getCategoryColor = (category: string): "default" | "destructive" | "outline" | "secondary" => {
+    const colors: ("default" | "destructive" | "outline" | "secondary")[] = ['default', 'secondary', 'outline', 'destructive'];
+    const index = categories.indexOf(category) % colors.length;
+    return colors[index];
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row gap-4">
@@ -120,29 +120,6 @@ const KeywordTable = ({
             className="pl-10"
           />
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant={filterType === 'all' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilterType('all')}
-          >
-            All ({allKeywords.length})
-          </Button>
-          <Button
-            variant={filterType === 'builtin' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilterType('builtin')}
-          >
-            Built-in ({comprehensiveKeywords.length})
-          </Button>
-          <Button
-            variant={filterType === 'custom' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilterType('custom')}
-          >
-            Custom ({customKeywords.filter(k => k.is_active).length})
-          </Button>
-        </div>
       </div>
 
       <div className="rounded-md border">
@@ -150,7 +127,7 @@ const KeywordTable = ({
           <Table>
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
-                <TableHead className="w-[60%]">
+                <TableHead className="w-[40%]">
                   <Button
                     variant="ghost"
                     onClick={() => handleSort('keyword')}
@@ -170,14 +147,24 @@ const KeywordTable = ({
                     {getSortIcon('type')}
                   </Button>
                 </TableHead>
+                <TableHead className="w-[20%]">
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSort('category')}
+                    className="h-auto p-0 font-medium"
+                  >
+                    Category
+                    {getSortIcon('category')}
+                  </Button>
+                </TableHead>
                 <TableHead className="w-[20%]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAndSortedKeywords.map(({ keyword, originalIndex, isCustom }) => (
-                <TableRow key={`${keyword}-${originalIndex}`}>
+              {filteredAndSortedKeywords.map(({ displayIndex, keyword, keyword_type, category, id }) => (
+                <TableRow key={`${id}-${displayIndex}`}>
                   <TableCell>
-                    {editingIndex === originalIndex ? (
+                    {editingIndex === displayIndex ? (
                       <div className="flex gap-2">
                         <Input
                           value={editingValue}
@@ -201,28 +188,51 @@ const KeywordTable = ({
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={isCustom ? "default" : "secondary"}>
-                      {isCustom ? "Custom" : "Built-in"}
+                    <Badge variant={getTypeColor(keyword_type)}>
+                      {keyword_type === 'builtin' ? 'Built-in' : 
+                       keyword_type === 'custom' ? 'Custom' : 
+                       'Modified'}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {editingIndex !== originalIndex && (
+                    {editingIndex === displayIndex ? (
+                      <Select value={editingCategory} onValueChange={onEditingCategoryChange}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="custom">Custom</SelectItem>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat} value={cat}>
+                              {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Badge variant={getCategoryColor(category)}>
+                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {editingIndex !== displayIndex && (
                       <div className="flex gap-1">
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => onEdit(originalIndex)}
-                          disabled={!isCustom || saving}
-                          title={!isCustom ? "Built-in keywords cannot be edited" : "Edit keyword"}
+                          onClick={() => onEdit(displayIndex)}
+                          disabled={saving}
+                          title="Edit keyword"
                         >
                           <Edit className="h-3 w-3" />
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => onDelete(originalIndex)}
-                          disabled={!isCustom || saving}
-                          title={!isCustom ? "Built-in keywords cannot be deleted" : "Delete keyword"}
+                          onClick={() => onDelete(displayIndex)}
+                          disabled={saving}
+                          title="Delete keyword"
                         >
                           <Trash className="h-3 w-3" />
                         </Button>
@@ -233,7 +243,7 @@ const KeywordTable = ({
               ))}
               {filteredAndSortedKeywords.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                     No keywords found matching your search.
                   </TableCell>
                 </TableRow>

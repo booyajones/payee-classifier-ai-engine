@@ -104,24 +104,30 @@ export type Database = {
       }
       exclusion_keywords: {
         Row: {
+          category: string | null
           created_at: string
           id: string
           is_active: boolean
           keyword: string
+          keyword_type: string
           updated_at: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
           keyword: string
+          keyword_type?: string
           updated_at?: string
         }
         Update: {
+          category?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
           keyword?: string
+          keyword_type?: string
           updated_at?: string
         }
         Relationships: []

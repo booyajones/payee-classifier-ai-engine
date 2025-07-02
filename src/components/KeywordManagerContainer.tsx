@@ -7,20 +7,26 @@ import { useKeywordManager } from "@/hooks/useKeywordManager";
 
 const KeywordManagerContainer = () => {
   const {
-    comprehensiveKeywords,
-    customKeywords,
     allKeywords,
+    categories,
+    selectedCategory,
     editingIndex,
     editingValue,
+    editingCategory,
     loading,
     saving,
+    totalKeywords,
+    filteredCount,
     handleAddKeyword,
     handleEditKeyword,
     handleSaveEdit,
     handleCancelEdit,
     handleDeleteKeyword,
     resetToDefaults,
-    setEditingValue
+    resetCategory,
+    setEditingValue,
+    setEditingCategory,
+    setSelectedCategory
   } = useKeywordManager();
 
   if (loading) {
@@ -36,19 +42,25 @@ const KeywordManagerContainer = () => {
     <div className="space-y-6">
       <KeywordManagerHeader />
       <KeywordManagerContent
-        comprehensiveKeywords={comprehensiveKeywords}
-        customKeywords={customKeywords}
         allKeywords={allKeywords}
+        categories={categories}
+        selectedCategory={selectedCategory}
         editingIndex={editingIndex}
         editingValue={editingValue}
+        editingCategory={editingCategory}
         saving={saving}
+        totalKeywords={totalKeywords}
+        filteredCount={filteredCount}
         onAddKeyword={handleAddKeyword}
         onResetToDefaults={resetToDefaults}
+        onResetCategory={resetCategory}
         onEdit={handleEditKeyword}
         onDelete={handleDeleteKeyword}
         onSaveEdit={handleSaveEdit}
         onCancelEdit={handleCancelEdit}
         onEditingValueChange={setEditingValue}
+        onEditingCategoryChange={setEditingCategory}
+        onCategoryChange={setSelectedCategory}
       />
       
       {/* Testing Section - Development/Debugging */}

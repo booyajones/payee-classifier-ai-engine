@@ -4,13 +4,15 @@ import { Shield } from "lucide-react";
 import { type ExclusionKeyword } from "@/lib/database/exclusionKeywordService";
 
 interface KeywordStatsProps {
-  comprehensiveKeywords: string[];
-  customKeywords: ExclusionKeyword[];
-  allKeywords: string[];
+  allKeywords: ExclusionKeyword[];
+  totalKeywords: number;
+  filteredCount: number;
 }
 
-const KeywordStats = ({ comprehensiveKeywords, customKeywords, allKeywords }: KeywordStatsProps) => {
-  const activeCustomKeywords = customKeywords.filter(k => k.is_active);
+const KeywordStats = ({ allKeywords, totalKeywords, filteredCount }: KeywordStatsProps) => {
+  const builtinKeywords = allKeywords.filter(k => k.keyword_type === 'builtin');
+  const customKeywords = allKeywords.filter(k => k.keyword_type === 'custom');
+  const categories = [...new Set(allKeywords.map(k => k.category))];
 
   return (
     <div className="flex gap-2 flex-wrap items-center">
@@ -19,14 +21,22 @@ const KeywordStats = ({ comprehensiveKeywords, customKeywords, allKeywords }: Ke
         <span className="text-sm font-medium">Keyword Statistics:</span>
       </div>
       <Badge variant="secondary">
-        {comprehensiveKeywords.length} built-in keywords
+        {builtinKeywords.length} built-in keywords
       </Badge>
       <Badge variant="outline">
-        {activeCustomKeywords.length} custom keywords
+        {customKeywords.length} custom keywords
       </Badge>
       <Badge variant="default">
-        {allKeywords.length} total keywords
+        {totalKeywords} total keywords
       </Badge>
+      <Badge variant="secondary">
+        {categories.length} categories
+      </Badge>
+      {filteredCount !== totalKeywords && (
+        <Badge variant="outline">
+          {filteredCount} filtered
+        </Badge>
+      )}
     </div>
   );
 };

@@ -1,46 +1,44 @@
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import {
-  getBuiltInExclusionKeywords,
   clearCustomKeywordsCache
 } from "@/lib/classification/keywordExclusion";
 import { 
   addCustomExclusionKeyword,
-  updateCustomExclusionKeyword,
-  deleteCustomExclusionKeyword,
+  updateExclusionKeyword,
+  deleteExclusionKeyword,
   getAllCustomExclusionKeywords,
+  loadAllExclusionKeywords,
+  resetKeywordsByCategory,
+  getKeywordCategories,
   type ExclusionKeyword
 } from "@/lib/database/exclusionKeywordService";
 
 export const useKeywordManager = () => {
-  const [comprehensiveKeywords, setComprehensiveKeywords] = useState<string[]>([]);
-  const [customKeywords, setCustomKeywords] = useState<ExclusionKeyword[]>([]);
-  const [allKeywords, setAllKeywords] = useState<string[]>([]);
+  const [allKeywords, setAllKeywords] = useState<ExclusionKeyword[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState("");
+  const [editingCategory, setEditingCategory] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
-  // Load keywords from database and built-in sources
+  // Load keywords from database
   const loadKeywords = async () => {
     try {
       setLoading(true);
       
-      // Load built-in keywords
-      const comprehensive = getBuiltInExclusionKeywords();
-      setComprehensiveKeywords(comprehensive);
+      // Load all keywords from database
+      const allKeywordData = await loadAllExclusionKeywords();
+      setAllKeywords(allKeywordData);
       
-      // Load custom keywords from database
-      const custom = await getAllCustomExclusionKeywords();
-      setCustomKeywords(custom);
+      // Load categories
+      const categoryData = await getKeywordCategories();
+      setCategories(['all', ...categoryData]);
       
-      // Combine both lists for display and testing
-      const customKeywordStrings = custom.filter(k => k.is_active).map(k => k.keyword);
-      const combined = [...comprehensive, ...customKeywordStrings];
-      setAllKeywords(combined);
-      
-      console.log(`[KEYWORD EXCLUSION MANAGER] Loaded ${comprehensive.length} comprehensive + ${customKeywordStrings.length} custom = ${combined.length} total keywords`);
+      console.log(`[KEYWORD EXCLUSION MANAGER] Loaded ${allKeywordData.length} total keywords with ${categoryData.length} categories`);
     } catch (error) {
       console.error('Error loading keywords:', error);
       toast({
@@ -53,9 +51,17 @@ export const useKeywordManager = () => {
     }
   };
 
-  const handleAddKeyword = async (keyword: string) => {
-    // Check if keyword already exists in either list
-    if (allKeywords.some(k => k.toLowerCase() === keyword.toLowerCase())) {
+  // Get filtered keywords based on selected category
+  const getFilteredKeywords = () => {
+    if (selectedCategory === 'all') {
+      return allKeywords;
+    }
+    return allKeywords.filter(k => k.category === selectedCategory);
+  };
+
+  const handleAddKeyword = async (keyword: string, category: string = 'custom') => {
+    // Check if keyword already exists
+    if (allKeywords.some(k => k.keyword.toLowerCase() === keyword.toLowerCase())) {
       toast({
         title: "Duplicate Keyword",
         description: "This keyword already exists",
@@ -66,7 +72,7 @@ export const useKeywordManager = () => {
 
     try {
       setSaving(true);
-      const result = await addCustomExclusionKeyword(keyword);
+      const result = await addCustomExclusionKeyword(keyword, category);
       
       if (result.success) {
         // Clear cache and reload keywords
@@ -97,8 +103,10 @@ export const useKeywordManager = () => {
   };
 
   const handleEditKeyword = (index: number) => {
+    const keyword = getFilteredKeywords()[index];
     setEditingIndex(index);
-    setEditingValue(allKeywords[index]);
+    setEditingValue(keyword.keyword);
+    setEditingCategory(keyword.category);
   };
 
   const handleSaveEdit = async () => {
@@ -114,38 +122,12 @@ export const useKeywordManager = () => {
     }
 
     const trimmedValue = editingValue.trim();
-    const keywordToEdit = allKeywords[editingIndex];
-    
-    // Check if this is a comprehensive (built-in) keyword
-    const isComprehensiveKeyword = comprehensiveKeywords.includes(keywordToEdit);
-    
-    if (isComprehensiveKeyword) {
-      toast({
-        title: "Cannot Edit Built-in Keyword",
-        description: "Built-in keywords cannot be modified. You can add a new custom keyword instead.",
-        variant: "destructive",
-      });
-      setEditingIndex(null);
-      setEditingValue("");
-      return;
-    }
-    
-    // Find the custom keyword record
-    const customKeyword = customKeywords.find(k => k.keyword === keywordToEdit);
-    if (!customKeyword) {
-      toast({
-        title: "Keyword Not Found",
-        description: "Could not find the keyword to edit",
-        variant: "destructive",
-      });
-      setEditingIndex(null);
-      setEditingValue("");
-      return;
-    }
+    const trimmedCategory = editingCategory.trim();
+    const keywordToEdit = getFilteredKeywords()[editingIndex];
 
     try {
       setSaving(true);
-      const result = await updateCustomExclusionKeyword(customKeyword.id, trimmedValue);
+      const result = await updateExclusionKeyword(keywordToEdit.id, trimmedValue, trimmedCategory);
       
       if (result.success) {
         // Clear cache and reload keywords
@@ -153,6 +135,7 @@ export const useKeywordManager = () => {
         await loadKeywords();
         setEditingIndex(null);
         setEditingValue("");
+        setEditingCategory("");
         
         toast({
           title: "Keyword Updated",
@@ -180,37 +163,15 @@ export const useKeywordManager = () => {
   const handleCancelEdit = () => {
     setEditingIndex(null);
     setEditingValue("");
+    setEditingCategory("");
   };
 
   const handleDeleteKeyword = async (index: number) => {
-    const keywordToDelete = allKeywords[index];
-    
-    // Check if this is a comprehensive (built-in) keyword
-    const isComprehensiveKeyword = comprehensiveKeywords.includes(keywordToDelete);
-    
-    if (isComprehensiveKeyword) {
-      toast({
-        title: "Cannot Delete Built-in Keyword",
-        description: "Built-in keywords cannot be deleted. Only custom keywords can be removed.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Find the custom keyword record
-    const customKeyword = customKeywords.find(k => k.keyword === keywordToDelete);
-    if (!customKeyword) {
-      toast({
-        title: "Keyword Not Found",
-        description: "Could not find the keyword to delete",
-        variant: "destructive",
-      });
-      return;
-    }
+    const keywordToDelete = getFilteredKeywords()[index];
 
     try {
       setSaving(true);
-      const result = await deleteCustomExclusionKeyword(customKeyword.id);
+      const result = await deleteExclusionKeyword(keywordToDelete.id);
       
       if (result.success) {
         // Clear cache and reload keywords
@@ -219,7 +180,7 @@ export const useKeywordManager = () => {
         
         toast({
           title: "Keyword Deleted",
-          description: `"${keywordToDelete}" has been removed from the exclusion list`,
+          description: `"${keywordToDelete.keyword}" has been removed from the exclusion list`,
         });
       } else {
         toast({
@@ -245,8 +206,9 @@ export const useKeywordManager = () => {
       setSaving(true);
       
       // Delete all custom keywords
+      const customKeywords = allKeywords.filter(k => k.keyword_type === 'custom');
       const deletePromises = customKeywords.map(keyword => 
-        deleteCustomExclusionKeyword(keyword.id)
+        deleteExclusionKeyword(keyword.id)
       );
       
       await Promise.all(deletePromises);
@@ -271,17 +233,51 @@ export const useKeywordManager = () => {
     }
   };
 
+  const resetCategory = async (category: string) => {
+    try {
+      setSaving(true);
+      const result = await resetKeywordsByCategory(category);
+      
+      if (result.success) {
+        // Clear cache and reload keywords
+        clearCustomKeywordsCache();
+        await loadKeywords();
+        
+        toast({
+          title: "Category Reset",
+          description: `"${category}" category has been reset to defaults`,
+        });
+      } else {
+        toast({
+          title: "Failed to Reset Category",
+          description: result.error || "Unknown error occurred",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error resetting category:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reset category",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   useEffect(() => {
     loadKeywords();
   }, []);
 
   return {
     // State
-    comprehensiveKeywords,
-    customKeywords,
-    allKeywords,
+    allKeywords: getFilteredKeywords(),
+    categories,
+    selectedCategory,
     editingIndex,
     editingValue,
+    editingCategory,
     loading,
     saving,
     
@@ -292,6 +288,13 @@ export const useKeywordManager = () => {
     handleCancelEdit,
     handleDeleteKeyword,
     resetToDefaults,
-    setEditingValue
+    resetCategory,
+    setEditingValue,
+    setEditingCategory,
+    setSelectedCategory,
+    
+    // Computed
+    totalKeywords: allKeywords.length,
+    filteredCount: getFilteredKeywords().length
   };
 };

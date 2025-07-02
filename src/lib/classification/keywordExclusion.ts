@@ -1,6 +1,6 @@
 
-import { COMPREHENSIVE_EXCLUSION_KEYWORDS, DEFAULT_EXCLUSION_KEYWORDS } from './exclusionKeywords';
-import { loadCustomExclusionKeywords } from '../database/exclusionKeywordService';
+import { DEFAULT_EXCLUSION_KEYWORDS } from './exclusionKeywords';
+import { loadAllExclusionKeywords } from '../database/exclusionKeywordService';
 
 export interface ExclusionResult {
   isExcluded: boolean;
@@ -8,67 +8,83 @@ export interface ExclusionResult {
   originalName: string;
 }
 
-// Cache for custom keywords to avoid repeated database calls
-let customKeywordsCache: string[] = [];
+// Cache for all keywords to avoid repeated database calls
+let allKeywordsCache: string[] = [];
 let cacheTimestamp = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Load custom keywords from database with caching
+ * Load all keywords from database with caching
  */
-async function loadCustomKeywords(): Promise<string[]> {
+async function loadAllKeywords(): Promise<string[]> {
   const now = Date.now();
   
   // Return cached keywords if cache is still valid
-  if (customKeywordsCache.length > 0 && now - cacheTimestamp < CACHE_DURATION) {
-    return customKeywordsCache;
+  if (allKeywordsCache.length > 0 && now - cacheTimestamp < CACHE_DURATION) {
+    return allKeywordsCache;
   }
 
   try {
-    const keywords = await loadCustomExclusionKeywords();
-    customKeywordsCache = keywords;
+    const keywordData = await loadAllExclusionKeywords();
+    const keywords = keywordData.map(k => k.keyword);
+    allKeywordsCache = keywords;
     cacheTimestamp = now;
     return keywords;
   } catch (error) {
-    console.error('Error loading custom keywords:', error);
-    return customKeywordsCache; // Return cached data if available
+    console.error('Error loading all keywords:', error);
+    return allKeywordsCache; // Return cached data if available
   }
 }
 
 /**
- * Clear the custom keywords cache (call when keywords are modified)
+ * Clear the keywords cache (call when keywords are modified)
  */
 export function clearCustomKeywordsCache(): void {
-  customKeywordsCache = [];
+  allKeywordsCache = [];
   cacheTimestamp = 0;
 }
 
 /**
- * Get the comprehensive exclusion keywords list combined with custom keywords
+ * Get all exclusion keywords from database
  */
 export async function getComprehensiveExclusionKeywords(): Promise<string[]> {
-  const comprehensiveKeywords = COMPREHENSIVE_EXCLUSION_KEYWORDS;
-  const customKeywords = await loadCustomKeywords();
+  const allKeywords = await loadAllKeywords();
   
-  const combined = [...comprehensiveKeywords, ...customKeywords];
+  console.log(`[KEYWORD EXCLUSION] Loaded ${allKeywords.length} total keywords from database`);
   
-  console.log(`[KEYWORD EXCLUSION] Loaded ${comprehensiveKeywords.length} comprehensive + ${customKeywords.length} custom = ${combined.length} total keywords`);
-  
-  return combined;
+  return allKeywords;
 }
 
 /**
- * Get only the built-in comprehensive keywords (without custom ones)
+ * Get only the built-in keywords from database (for backwards compatibility)
  */
-export function getBuiltInExclusionKeywords(): string[] {
-  return COMPREHENSIVE_EXCLUSION_KEYWORDS;
+export async function getBuiltInExclusionKeywords(): Promise<string[]> {
+  try {
+    const keywordData = await loadAllExclusionKeywords();
+    const builtinKeywords = keywordData
+      .filter(k => k.keyword_type === 'builtin')
+      .map(k => k.keyword);
+    return builtinKeywords;
+  } catch (error) {
+    console.error('Error loading built-in keywords:', error);
+    return [];
+  }
 }
 
 /**
  * Get only the custom keywords from database
  */
 export async function getCustomExclusionKeywords(): Promise<string[]> {
-  return await loadCustomKeywords();
+  try {
+    const keywordData = await loadAllExclusionKeywords();
+    const customKeywords = keywordData
+      .filter(k => k.keyword_type === 'custom')
+      .map(k => k.keyword);
+    return customKeywords;
+  } catch (error) {
+    console.error('Error loading custom keywords:', error);
+    return [];
+  }
 }
 
 /**
@@ -81,10 +97,12 @@ export function getDefaultExclusionKeywords(): string[] {
 /**
  * Check if a payee name contains any exclusion keywords using whole word matching
  */
-export function checkKeywordExclusion(
+export async function checkKeywordExclusion(
   payeeName: string, 
-  exclusionKeywords: string[] = COMPREHENSIVE_EXCLUSION_KEYWORDS
-): ExclusionResult {
+  exclusionKeywords?: string[]
+): Promise<ExclusionResult> {
+  // If keywords not provided, load from database
+  const keywords = exclusionKeywords || await getComprehensiveExclusionKeywords();
   if (!payeeName || typeof payeeName !== 'string') {
     return {
       isExcluded: true,
@@ -97,7 +115,7 @@ export function checkKeywordExclusion(
   const matchedKeywords: string[] = [];
 
   // Check each exclusion keyword using whole word matching with regex
-  for (const keyword of exclusionKeywords) {
+  for (const keyword of keywords) {
     if (!keyword || typeof keyword !== 'string') continue;
     
     const normalizedKeyword = keyword.toUpperCase().trim();
@@ -120,18 +138,19 @@ export function checkKeywordExclusion(
 /**
  * Filter an array of payee names, separating excluded from valid ones
  */
-export function filterPayeeNames(
+export async function filterPayeeNames(
   payeeNames: string[],
-  exclusionKeywords: string[] = COMPREHENSIVE_EXCLUSION_KEYWORDS
-): {
+  exclusionKeywords?: string[]
+): Promise<{
   validNames: string[];
   excludedNames: Array<{ name: string; reason: string[] }>;
-} {
+}> {
+  const keywords = exclusionKeywords || await getComprehensiveExclusionKeywords();
   const validNames: string[] = [];
   const excludedNames: Array<{ name: string; reason: string[] }> = [];
 
   for (const name of payeeNames) {
-    const exclusionResult = checkKeywordExclusion(name, exclusionKeywords);
+    const exclusionResult = await checkKeywordExclusion(name, keywords);
     
     if (exclusionResult.isExcluded) {
       excludedNames.push({
