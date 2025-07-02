@@ -84,11 +84,11 @@ export const saveClassificationResultsWithValidation = async (
 
   console.log(`[ENHANCED DB SERVICE] Validation complete: ${stats.businessCount} businesses, ${stats.individualCount} individuals, ${stats.sicCodeCount} with SIC codes`);
 
-  // CRITICAL FIX: Use constraint name instead of column names for onConflict
+  // CRITICAL FIX: Use column names for onConflict instead of index name
   const { error, count } = await supabase
     .from('payee_classifications')
     .upsert(validatedResults, {
-      onConflict: 'idx_payee_classifications_unique',
+      onConflict: 'payee_name,batch_id',
       ignoreDuplicates: false,
       count: 'exact'
     });
