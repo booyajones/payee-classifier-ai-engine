@@ -6,6 +6,8 @@ import { checkBatchJobStatus } from '@/lib/openai/trueBatchAPI';
 import { getBatchJobResults } from '@/lib/openai/trueBatchAPI';
 import { generateDownloadFilename } from '@/lib/utils/batchIdentifierGenerator';
 import { useBatchJobRealtime } from '@/hooks/useBatchJobRealtime';
+import { useBatchJobActions } from './useBatchJobActions';
+import { useBatchJobAutoPolling } from './BatchJobAutoPolling';
 import BatchJobContainer from './BatchJobContainer';
 
 const BatchJobManagerContainer = () => {
@@ -20,7 +22,7 @@ const BatchJobManagerContainer = () => {
   } = useBatchJobStore();
   
   const { toast } = useToast();
-  const [refreshingJobs, setRefreshingJobs] = useState<Set<string>>(new Set());
+  const [autoPollingJobs, setAutoPollingJobs] = useState<Set<string>>(new Set());
 
   // Handle real-time job updates from Supabase
   const handleRealtimeJobUpdate = useCallback((updatedJob: BatchJob) => {
@@ -40,36 +42,29 @@ const BatchJobManagerContainer = () => {
   // Enable real-time updates
   useBatchJobRealtime(handleRealtimeJobUpdate);
 
-  const handleRefresh = async (jobId: string) => {
-    try {
-      setRefreshingJobs(prev => new Set(prev).add(jobId));
-      setProcessing(jobId, true);
-      clearError(jobId);
-      
-      const updatedJob = await checkBatchJobStatus(jobId);
-      updateJob(updatedJob);
-      
-      toast({
-        title: "Job Status Updated",
-        description: `Job ${jobId.slice(0, 8)}... status: ${updatedJob.status}`,
-      });
-      
-    } catch (error) {
-      console.error('Failed to refresh job:', error);
-      toast({
-        title: "Refresh Failed",
-        description: error instanceof Error ? error.message : 'Failed to refresh',
-        variant: "destructive"
-      });
-    } finally {
-      setProcessing(jobId, false);
-      setRefreshingJobs(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(jobId);
-        return newSet;
-      });
-    }
-  };
+  // Use the comprehensive batch job actions system
+  const {
+    refreshingJobs,
+    pollingStates,
+    handleRefreshJob,
+    handleDownloadResults,
+    handleCancelJob,
+    getStalledJobActions,
+    detectStalledJob
+  } = useBatchJobActions({
+    jobs,
+    payeeRowDataMap: payeeDataMap,
+    onJobUpdate: updateJob,
+    onJobComplete: () => {} // Handle job completion if needed
+  });
+
+  // Initialize auto-polling for active jobs
+  useBatchJobAutoPolling({
+    jobs,
+    autoPollingJobs,
+    setAutoPollingJobs,
+    handleRefreshJob
+  });
 
   const handleDownload = async (job: BatchJob) => {
     if (job.status !== 'completed') {
@@ -191,19 +186,25 @@ const BatchJobManagerContainer = () => {
     }
   };
 
-  // Convert processing Set to refreshingJobs Set for compatibility
-  const refreshingJobsSet = new Set(Array.from(processing));
+  // Generate stalled job actions for all jobs
+  const stalledJobActions = jobs.reduce((acc, job) => {
+    const stalledAction = getStalledJobActions(job);
+    if (stalledAction) {
+      acc[job.id] = stalledAction;
+    }
+    return acc;
+  }, {} as Record<string, any>);
 
   return (
     <BatchJobContainer
       jobs={jobs}
       payeeRowDataMap={payeeDataMap}
-      refreshingJobs={refreshingJobsSet}
-      pollingStates={{}} // Empty for now, can be enhanced later
-      stalledJobActions={{}} // Empty for now, can be enhanced later
-      onRefresh={handleRefresh}
-      onDownload={handleDownload}
-      onCancel={handleCancel}
+      refreshingJobs={refreshingJobs}
+      pollingStates={pollingStates}
+      stalledJobActions={stalledJobActions}
+      onRefresh={handleRefreshJob}
+      onDownload={handleDownloadResults}
+      onCancel={handleCancelJob}
       onJobDelete={handleJobDelete}
     />
   );
