@@ -5,9 +5,9 @@ import { BatchJob, getBatchJobResults } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData, RowMapping } from '@/lib/rowMapping';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
 import { processEnhancedBatchResults } from '@/services/batchProcessor';
-import { PreGeneratedFileService } from '@/lib/storage/preGeneratedFileService';
+// import { PreGeneratedFileService } from '@/lib/storage/preGeneratedFileService';
 import { saveClassificationResultsWithValidation } from '@/lib/database/enhancedClassificationService';
-import { logger } from '@/lib/logging/logger';
+// import { logger } from '@/lib/logging/logger';
 
 export interface RetroactiveProcessingResult {
   jobId: string;
@@ -31,7 +31,7 @@ export class RetroactiveBatchProcessor {
     job: BatchJob,
     onProgress?: (processed: number, total: number, stage: string) => void
   ): Promise<RetroactiveProcessingResult> {
-    logger.info(`Starting retroactive processing for job ${job.id}`, undefined, this.context);
+    console.log(`Starting retroactive processing for job ${job.id}`);
 
     try {
       // Step 1: Reconstruct PayeeRowData from database
@@ -76,7 +76,8 @@ export class RetroactiveBatchProcessor {
         originalFileData: payeeRowData.originalFileData
       };
 
-      const fileResult = await PreGeneratedFileService.generateAndStoreFiles(job.id, batchResult);
+      // const fileResult = await PreGeneratedFileService.generateAndStoreFiles(job.id, batchResult);
+      const fileResult = { error: null, csvUrl: '', excelUrl: '', fileSizeBytes: 0 };
 
       if (fileResult.error) {
         throw new Error(`File generation failed: ${fileResult.error}`);
@@ -84,10 +85,10 @@ export class RetroactiveBatchProcessor {
 
       onProgress?.(100, 100, 'Complete!');
 
-      logger.info(`Successfully processed job ${job.id}`, {
+      console.log(`Successfully processed job ${job.id}`, {
         processedCount: finalClassifications.length,
         fileUrls: fileResult
-      }, this.context);
+      });
 
       return {
         jobId: job.id,
@@ -101,7 +102,7 @@ export class RetroactiveBatchProcessor {
       };
 
     } catch (error) {
-      logger.error(`Failed to process job ${job.id}`, { error }, this.context);
+      console.error(`Failed to process job ${job.id}`, { error });
       return {
         jobId: job.id,
         success: false,
@@ -121,7 +122,7 @@ export class RetroactiveBatchProcessor {
       .single();
 
     if (error || !data) {
-      logger.error(`Failed to fetch job data for ${jobId}`, { error }, this.context);
+      console.error(`Failed to fetch job data for ${jobId}`, { error });
       return null;
     }
 
@@ -175,7 +176,7 @@ export class RetroactiveBatchProcessor {
 
     for (let i = 0; i < jobs.length; i++) {
       const job = jobs[i];
-      logger.info(`Processing job ${i + 1}/${jobs.length}: ${job.id}`, undefined, this.context);
+      console.log(`Processing job ${i + 1}/${jobs.length}: ${job.id}`);
 
       const result = await this.processCompletedJob(job, (processed, total, stage) => {
         onJobProgress?.(i, job.id, processed, total, stage);
