@@ -3,6 +3,8 @@ import { processInChunks } from '@/lib/performance/chunkProcessor';
 import { processIndividualResult } from './resultProcessor';
 import { buildBatchSummary, logProcessingStats } from './summaryBuilder';
 import { ProcessBatchResultsParams, ProcessBatchResultsReturn, BatchProcessorStats } from './types';
+import { detectDuplicates } from '@/lib/services/smartDuplicateDetectionEngine';
+import { DEFAULT_DUPLICATE_CONFIG } from '@/lib/services/duplicateDetectionTypes';
 
 /**
  * Enhanced batch result processor with chunked processing and keyword exclusion
@@ -58,6 +60,27 @@ export async function processEnhancedBatchResults({
   );
 
   processedResults.push(...results);
+
+  // RUN DUPLICATE DETECTION on the unique payee names
+  console.log(`[ENHANCED BATCH PROCESSOR] Running duplicate detection on ${uniquePayeeNames.length} unique payees`);
+  try {
+    const duplicateInput = uniquePayeeNames.map((name, index) => ({
+      payee_id: `payee_${index}`,
+      payee_name: name
+    }));
+
+    const duplicateResults = await detectDuplicates(duplicateInput, DEFAULT_DUPLICATE_CONFIG);
+    
+    console.log(`[ENHANCED BATCH PROCESSOR] Duplicate detection complete: ${duplicateResults.statistics.duplicates_found} duplicates found`);
+    
+    // Store duplicate detection results in payeeData for use in row mapping
+    payeeData.duplicateDetectionResults = duplicateResults;
+    
+  } catch (error) {
+    console.warn('[ENHANCED BATCH PROCESSOR] Duplicate detection failed:', error);
+    // Continue without duplicate detection if it fails
+    payeeData.duplicateDetectionResults = undefined;
+  }
 
   const summary = buildBatchSummary(processedResults, stats, payeeData.originalFileData);
 

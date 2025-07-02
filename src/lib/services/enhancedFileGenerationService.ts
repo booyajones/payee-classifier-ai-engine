@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { RetroactiveBatchProcessor } from './retroactiveBatchProcessor';
 import { logger } from '@/lib/logging/logger';
+import { generateBatchIdentifier } from '@/lib/utils/batchIdentifierGenerator';
 
 export class EnhancedFileGenerationService {
   private static context = 'ENHANCED_FILE_GENERATION';

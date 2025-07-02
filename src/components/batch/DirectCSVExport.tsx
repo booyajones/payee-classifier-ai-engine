@@ -5,6 +5,7 @@ import { Download, FileSpreadsheet } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
+import { generateDownloadFilename } from '@/lib/utils/batchIdentifierGenerator';
 
 interface DirectCSVExportProps {
   job: BatchJob;
@@ -84,7 +85,7 @@ const DirectCSVExport = ({ job, payeeData, onDownloadResults }: DirectCSVExportP
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
-      link.setAttribute('download', `original_data_${job.id.slice(-8)}_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.setAttribute('download', generateDownloadFilename('original_data', job.id, 'csv'));
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();

@@ -10,6 +10,7 @@ import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import { useToast } from '@/hooks/use-toast';
 import { useBatchJobPersistence } from '@/hooks/useBatchJobPersistence';
+import { generateDownloadFilename } from '@/lib/utils/batchIdentifierGenerator';
 
 const BatchJobManager = () => {
   const {
@@ -198,7 +199,7 @@ const BatchJobManager = () => {
       
       const link = document.createElement('a');
       link.href = url;
-      link.download = `complete_results_${job.id.slice(0, 8)}_${new Date().toISOString().slice(0, 10)}.csv`;
+      link.download = generateDownloadFilename('complete_results', job.id, 'csv');
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

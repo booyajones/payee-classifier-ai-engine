@@ -20,4 +20,16 @@ export interface PayeeRowData {
     averageStepsPerName: number;
     mostCommonSteps: Array<{ step: string; count: number }>;
   };
+  duplicateDetectionResults?: {
+    processed_records: any[];
+    duplicate_groups: any[];
+    statistics: {
+      total_processed: number;
+      duplicates_found: number;
+      high_confidence_matches: number;
+      low_confidence_matches: number;
+      ai_judgments_made: number;
+      processing_time_ms: number;
+    };
+  };
 }
