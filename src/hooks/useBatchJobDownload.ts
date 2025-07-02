@@ -46,12 +46,18 @@ export const useBatchJobDownload = ({
       if (hasPreProcessed) {
         console.log(`[BATCH DOWNLOAD] Using pre-processed results for instant download of job ${job.id}`);
         
+        // Add a small delay to ensure progress is visible for instant downloads
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         updateDownload(downloadId, { 
           stage: 'Loading pre-processed results', 
           progress: 50,
-          processed: totalPayees,
+          processed: Math.floor(totalPayees * 0.5),
           total: totalPayees 
         });
+        
+        // Add another small delay for better UX
+        await new Promise(resolve => setTimeout(resolve, 300));
         
         // Get pre-processed results
         const preProcessedResults = await AutomaticResultProcessor.getPreProcessedResults(job.id);
@@ -59,8 +65,12 @@ export const useBatchJobDownload = ({
         if (preProcessedResults) {
           updateDownload(downloadId, { 
             stage: 'Finalizing download', 
-            progress: 90 
+            progress: 90,
+            processed: Math.floor(totalPayees * 0.9),
           });
+          
+          // Final delay before completion
+          await new Promise(resolve => setTimeout(resolve, 200));
           
           // Convert database results to PayeeClassification format
           const finalClassifications: PayeeClassification[] = preProcessedResults.map(r => ({

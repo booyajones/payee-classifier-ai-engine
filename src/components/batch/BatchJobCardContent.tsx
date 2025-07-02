@@ -28,6 +28,8 @@ const BatchJobCardContent = ({
   const downloadId = `batch-${job.id}`;
   const activeDownload = downloads[downloadId];
   
+  console.log(`[BATCH JOB CARD] Job ${job.id.substring(0,8)}: activeDownload =`, activeDownload);
+  
   const getProgressPercentage = () => {
     if (total === 0) return 0;
     return Math.round((completed / total) * 100);

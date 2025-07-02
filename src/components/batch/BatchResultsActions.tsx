@@ -30,6 +30,8 @@ const BatchResultsActions = ({
     processingSummary
   );
 
+  console.log(`[BATCH RESULTS ACTIONS] JobId: ${jobId}, isGenerating: ${isGenerating}, isChecking: ${isChecking}`);
+
   const isDownloadDisabled = isProcessing || !processingSummary || batchResults.length === 0;
 
   return (

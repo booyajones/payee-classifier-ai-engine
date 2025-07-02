@@ -31,6 +31,7 @@ export const DownloadProgressProvider: React.FC<{ children: React.ReactNode }> =
   const [downloads, setDownloads] = useState<Record<string, DownloadState>>({});
 
   const startDownload = useCallback((id: string, filename: string, total: number) => {
+    console.log(`[DOWNLOAD PROGRESS] Starting download: ${id}, filename: ${filename}, total: ${total}`);
     setDownloads(prev => ({
       ...prev,
       [id]: {
@@ -48,9 +49,13 @@ export const DownloadProgressProvider: React.FC<{ children: React.ReactNode }> =
   }, []);
 
   const updateDownload = useCallback((id: string, updates: Partial<DownloadState>) => {
+    console.log(`[DOWNLOAD PROGRESS] Updating download: ${id}`, updates);
     setDownloads(prev => {
       const current = prev[id];
-      if (!current) return prev;
+      if (!current) {
+        console.warn(`[DOWNLOAD PROGRESS] No download found for ID: ${id}`);
+        return prev;
+      }
 
       // Calculate estimated time remaining
       let estimatedTimeRemaining: number | undefined;
@@ -60,7 +65,7 @@ export const DownloadProgressProvider: React.FC<{ children: React.ReactNode }> =
         estimatedTimeRemaining = rate > 0 ? (100 - updates.progress) / rate : undefined;
       }
 
-      return {
+      const newState = {
         ...prev,
         [id]: {
           ...current,
@@ -68,10 +73,14 @@ export const DownloadProgressProvider: React.FC<{ children: React.ReactNode }> =
           estimatedTimeRemaining
         }
       };
+      
+      console.log(`[DOWNLOAD PROGRESS] Updated download state for ${id}:`, newState[id]);
+      return newState;
     });
   }, []);
 
   const completeDownload = useCallback((id: string) => {
+    console.log(`[DOWNLOAD PROGRESS] Completing download: ${id}`);
     updateDownload(id, {
       progress: 100,
       stage: 'Complete',
@@ -81,6 +90,7 @@ export const DownloadProgressProvider: React.FC<{ children: React.ReactNode }> =
 
     // Auto-clear completed downloads after 10 seconds
     setTimeout(() => {
+      console.log(`[DOWNLOAD PROGRESS] Auto-clearing completed download: ${id}`);
       clearDownload(id);
     }, 10000);
   }, [updateDownload]);

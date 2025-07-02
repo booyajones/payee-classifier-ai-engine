@@ -92,7 +92,10 @@ const DownloadProgressDisplay: React.FC = () => {
   const { downloads, cancelDownload, clearDownload } = useDownloadProgress();
   const activeDownloads = Object.values(downloads);
 
+  console.log(`[DOWNLOAD PROGRESS DISPLAY] Rendering with ${activeDownloads.length} downloads:`, activeDownloads);
+
   if (activeDownloads.length === 0) {
+    console.log(`[DOWNLOAD PROGRESS DISPLAY] No active downloads, hiding display`);
     return null;
   }
 
@@ -103,8 +106,8 @@ const DownloadProgressDisplay: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-80 max-h-96 overflow-y-auto">
-      <div className="bg-background border rounded-lg shadow-lg p-4">
+    <div className="fixed bottom-4 right-4 z-[9999] w-80 max-h-96 overflow-y-auto">
+      <div className="bg-background border rounded-lg shadow-2xl p-4 border-primary/20">
         <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
           <Download className="h-4 w-4" />
           Downloads ({activeDownloads.length})
