@@ -40,8 +40,8 @@ const FileGenerationMonitor = () => {
   useEffect(() => {
     fetchQueueStatus();
     
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchQueueStatus, 30000);
+    // Auto-refresh every 60 seconds (reduced since real-time updates handle most changes)
+    const interval = setInterval(fetchQueueStatus, 60000);
     
     return () => clearInterval(interval);
   }, []);

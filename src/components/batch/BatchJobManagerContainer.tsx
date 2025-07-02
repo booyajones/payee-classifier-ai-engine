@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useBatchJobStore } from '@/stores/batchJobStore';
 import { useToast } from '@/hooks/use-toast';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { checkBatchJobStatus } from '@/lib/openai/trueBatchAPI';
 import { getBatchJobResults } from '@/lib/openai/trueBatchAPI';
 import { generateDownloadFilename } from '@/lib/utils/batchIdentifierGenerator';
+import { useBatchJobRealtime } from '@/hooks/useBatchJobRealtime';
 import BatchJobContainer from './BatchJobContainer';
 
 const BatchJobManagerContainer = () => {
@@ -20,6 +21,24 @@ const BatchJobManagerContainer = () => {
   
   const { toast } = useToast();
   const [refreshingJobs, setRefreshingJobs] = useState<Set<string>>(new Set());
+
+  // Handle real-time job updates from Supabase
+  const handleRealtimeJobUpdate = useCallback((updatedJob: BatchJob) => {
+    console.log('[REALTIME] Received job update:', updatedJob.id.substring(0, 8), 'status:', updatedJob.status);
+    updateJob(updatedJob);
+    
+    // Show toast notification for significant status changes
+    if (['completed', 'failed', 'expired', 'cancelled'].includes(updatedJob.status)) {
+      toast({
+        title: "Job Status Updated",
+        description: `Job ${updatedJob.id.slice(0, 8)}... is now ${updatedJob.status}`,
+        variant: updatedJob.status === 'completed' ? 'default' : 'destructive'
+      });
+    }
+  }, [updateJob, toast]);
+
+  // Enable real-time updates
+  useBatchJobRealtime(handleRealtimeJobUpdate);
 
   const handleRefresh = async (jobId: string) => {
     try {

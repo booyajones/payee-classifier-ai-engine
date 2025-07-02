@@ -91,7 +91,13 @@ const BatchJobContainer = ({
       
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <h3 className="text-lg font-semibold">Batch Jobs ({jobs.length})</h3>
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-semibold">Batch Jobs ({jobs.length})</h3>
+            <div className="flex items-center gap-1 text-xs bg-green-50 text-green-700 px-2 py-1 rounded-full border border-green-200">
+              <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span>Live Updates</span>
+            </div>
+          </div>
           <div className="flex gap-4 text-sm text-muted-foreground">
             {activeJobs.length > 0 && (
               <span>{activeJobs.length} active job{activeJobs.length !== 1 ? 's' : ''}</span>
