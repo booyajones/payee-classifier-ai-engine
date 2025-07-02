@@ -7,7 +7,6 @@ import { PayeeRowData } from '@/lib/rowMapping';
 import BatchJobList from './BatchJobList';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import FileGenerationFixer from '@/components/debug/FileGenerationFixer';
 
 
 interface BatchJobContainerProps {
@@ -70,16 +69,8 @@ const BatchJobContainer = ({
     );
   }
 
-  // Only show file generation fixer for truly completed jobs that have processed data
-  const completedJobsWithoutFiles = jobs.filter(job => 
-    job.status === 'completed' && 
-    job.request_counts.completed > 0
-  );
-
   return (
     <div className="space-y-4">
-      {/* Only show file generation fixer for truly completed jobs with missing files */}
-      {completedJobsWithoutFiles.length > 0 && <FileGenerationFixer />}
       
       <div className="flex items-center justify-between">
         <div className="space-y-1">
