@@ -50,12 +50,8 @@ export const createActionHandlers = (
       
       productionLogger.info(`Enhanced refresh completed successfully for job ${jobId}`, undefined, 'BATCH_ACTIONS');
       
-      if (!silent) {
-        toast({
-          title: "Job Refreshed",
-          description: `Successfully refreshed job ${jobId.substring(0, 8)}...`,
-        });
-      }
+      // Note: Success toast is handled by useBatchJobRefresh.ts with detailed status info
+      // No redundant toast needed here
       
     } catch (error) {
       productionLogger.error(`Enhanced refresh error for job ${jobId}`, error, 'BATCH_ACTIONS');
