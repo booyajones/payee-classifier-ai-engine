@@ -128,11 +128,17 @@ export type Database = {
       }
       payee_classifications: {
         Row: {
+          ai_duplicate_reasoning: string | null
           batch_id: string | null
           classification: string
           confidence: number
           created_at: string
+          duplicate_confidence_score: number | null
+          duplicate_detection_method: string | null
+          duplicate_group_id: string | null
+          duplicate_of_payee_id: string | null
           id: string
+          is_potential_duplicate: boolean | null
           keyword_exclusion: Json | null
           matching_rules: string[] | null
           original_data: Json | null
@@ -147,11 +153,17 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_duplicate_reasoning?: string | null
           batch_id?: string | null
           classification: string
           confidence: number
           created_at?: string
+          duplicate_confidence_score?: number | null
+          duplicate_detection_method?: string | null
+          duplicate_group_id?: string | null
+          duplicate_of_payee_id?: string | null
           id?: string
+          is_potential_duplicate?: boolean | null
           keyword_exclusion?: Json | null
           matching_rules?: string[] | null
           original_data?: Json | null
@@ -166,11 +178,17 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_duplicate_reasoning?: string | null
           batch_id?: string | null
           classification?: string
           confidence?: number
           created_at?: string
+          duplicate_confidence_score?: number | null
+          duplicate_detection_method?: string | null
+          duplicate_group_id?: string | null
+          duplicate_of_payee_id?: string | null
           id?: string
+          is_potential_duplicate?: boolean | null
           keyword_exclusion?: Json | null
           matching_rules?: string[] | null
           original_data?: Json | null

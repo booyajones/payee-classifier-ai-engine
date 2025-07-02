@@ -72,6 +72,13 @@ export const saveClassificationResultsWithValidation = async (
       batch_id: batchId || null,
       sic_code: result.result.sicCode || null,
       sic_description: result.result.sicDescription || null,
+      // DUPLICATE DETECTION DATA - check if available in result object
+      is_potential_duplicate: (result as any).is_potential_duplicate || false,
+      duplicate_of_payee_id: (result as any).duplicate_of_payee_id || null,
+      duplicate_confidence_score: (result as any).duplicate_confidence_score || 0,
+      duplicate_detection_method: (result as any).duplicate_detection_method || 'Not Analyzed',
+      duplicate_group_id: (result as any).duplicate_group_id || null,
+      ai_duplicate_reasoning: (result as any).ai_duplicate_reasoning || null,
     };
   });
 
