@@ -7,6 +7,7 @@ import EnhancedUploadProgressDisplay from './EnhancedUploadProgressDisplay';
 import UploadSuccessDisplay from './UploadSuccessDisplay';
 import UploadErrorDisplay from './UploadErrorDisplay';
 import ProgressIndicator from '../ui/progress-indicator';
+import DuplicateDetectionResults from '../duplicate/DuplicateDetectionResults';
 
 interface SmartFileUploadContentProps {
   uploadState: UploadState;
@@ -21,6 +22,8 @@ interface SmartFileUploadContentProps {
   handleColumnSelect: () => void;
   resetUpload: () => void;
   UPLOAD_ID: string;
+  duplicateDetectionResults?: any;
+  onDuplicateReviewComplete?: () => void;
 }
 
 const SmartFileUploadContent = ({
@@ -35,7 +38,9 @@ const SmartFileUploadContent = ({
   triggerFileSelect,
   handleColumnSelect,
   resetUpload,
-  UPLOAD_ID
+  UPLOAD_ID,
+  duplicateDetectionResults,
+  onDuplicateReviewComplete
 }: SmartFileUploadContentProps) => {
   
 
@@ -89,11 +94,23 @@ const SmartFileUploadContent = ({
         </div>
       )}
 
-      {uploadState === 'complete' && (
+      {uploadState === 'complete' && !duplicateDetectionResults && (
         <UploadSuccessDisplay
           uploadId={UPLOAD_ID}
           onReset={resetUpload}
           resultCount={processingInfo.uniquePayees}
+        />
+      )}
+
+      {uploadState === 'complete' && duplicateDetectionResults && (
+        <DuplicateDetectionResults
+          result={duplicateDetectionResults}
+          onAcceptGroup={(groupId) => console.log('Accept group:', groupId)}
+          onRejectGroup={(groupId) => console.log('Reject group:', groupId)}
+          onAcceptMember={(groupId, payeeId) => console.log('Accept member:', payeeId)}
+          onRejectMember={(groupId, payeeId) => console.log('Reject member:', payeeId)}
+          onExportResults={() => console.log('Export results')}
+          onProceedWithProcessing={() => onDuplicateReviewComplete?.()}
         />
       )}
 

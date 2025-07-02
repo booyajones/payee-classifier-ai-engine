@@ -4,7 +4,9 @@ export interface SimilarityScores {
   jaroWinkler: number;
   dice: number;
   tokenSort: number;
-  combined: number;
+  tokenSet: number;
+  duplicateScore: number;
+  combined: number; // For backward compatibility
 }
 
 /**
@@ -134,16 +136,35 @@ export function tokenSortRatio(str1: string, str2: string): number {
 }
 
 /**
- * Calculate combined similarity score between two strings
+ * Calculate Token Set Ratio between two strings
+ * This compares the unique tokens in each string
  */
-export function calculateCombinedSimilarity(str1: string, str2: string): SimilarityScores {
+export function tokenSetRatio(str1: string, str2: string): number {
+  const tokens1 = new Set(str1.toLowerCase().split(/\s+/).filter(t => t.length > 0));
+  const tokens2 = new Set(str2.toLowerCase().split(/\s+/).filter(t => t.length > 0));
+  
+  const intersection = new Set([...tokens1].filter(x => tokens2.has(x)));
+  const union = new Set([...tokens1, ...tokens2]);
+  
+  if (union.size === 0) return 100;
+  return (intersection.size / union.size) * 100;
+}
+
+/**
+ * Calculate duplicate detection score using the specified formula:
+ * (jaro_winkler * 0.2) + (token_sort * 0.4) + (token_set * 0.4)
+ */
+export function calculateDuplicateScore(str1: string, str2: string): SimilarityScores {
   const maxLength = Math.max(str1.length, str2.length);
   const levenshtein = maxLength === 0 ? 100 : ((maxLength - levenshteinDistance(str1, str2)) / maxLength) * 100;
   const jaro = jaroSimilarity(str1, str2) * 100;
   const jaroWinkler = jaroWinklerSimilarity(str1, str2) * 100;
   const dice = diceCoefficient(str1, str2) * 100;
   const tokenSort = tokenSortRatio(str1, str2);
-  const combined = (levenshtein * 0.3 + jaro * 0.2 + jaroWinkler * 0.2 + dice * 0.15 + tokenSort * 0.15);
+  const tokenSet = tokenSetRatio(str1, str2);
+  
+  // Official duplicate detection formula
+  const duplicateScore = (jaroWinkler * 0.2) + (tokenSort * 0.4) + (tokenSet * 0.4);
   
   return {
     levenshtein,
@@ -151,7 +172,20 @@ export function calculateCombinedSimilarity(str1: string, str2: string): Similar
     jaroWinkler,
     dice,
     tokenSort,
-    combined
+    tokenSet,
+    duplicateScore,
+    combined: duplicateScore // For backward compatibility
+  };
+}
+
+/**
+ * Calculate combined similarity score between two strings (legacy function)
+ */
+export function calculateCombinedSimilarity(str1: string, str2: string): SimilarityScores {
+  const scores = calculateDuplicateScore(str1, str2);
+  return {
+    ...scores,
+    combined: scores.duplicateScore // For backward compatibility
   };
 }
 
@@ -159,7 +193,7 @@ export function calculateCombinedSimilarity(str1: string, str2: string): Similar
  * Quick similarity test function for debugging
  */
 export function quickSimilarityTest(str1: string, str2: string): SimilarityScores {
-  return calculateCombinedSimilarity(str1, str2);
+  return calculateDuplicateScore(str1, str2);
 }
 
 /**

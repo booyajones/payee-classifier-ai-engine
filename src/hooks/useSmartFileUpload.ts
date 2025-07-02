@@ -14,6 +14,8 @@ export interface FileProcessingInfo {
   totalRows?: number;
   uniquePayees?: number;
   duplicates?: number;
+  duplicateDetectionEnabled?: boolean;
+  duplicateDetectionResults?: any;
   fileInfo?: {
     size: number;
     type: string;
