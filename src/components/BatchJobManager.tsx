@@ -144,38 +144,75 @@ const BatchJobManager = () => {
     }
 
     try {
+      console.log(`[DOWNLOAD] Starting enhanced download for job ${job.id}`);
+      
       const payeeData = payeeDataMap[job.id];
       if (!payeeData) {
         throw new Error('Payee data not found for this job');
       }
 
-      const results = await getBatchJobResults(job, payeeData.uniquePayeeNames);
+      // Get raw OpenAI results
+      const rawResults = await getBatchJobResults(job, payeeData.uniquePayeeNames);
+      console.log(`[DOWNLOAD] Retrieved ${rawResults.length} raw results from OpenAI`);
       
-      // Create a simple CSV download
-      const csvHeader = 'Payee Name,Classification,Confidence,SIC Code,SIC Description,Reasoning\n';
-      const csvRows = results.map(result => 
-        `"${result.payeeName}","${result.classification}",${result.confidence},"${result.sicCode || ''}","${result.sicDescription || ''}","${result.reasoning}"`
-      ).join('\n');
+      // Process through enhanced pipeline to get properly formatted results
+      const { processEnhancedBatchResults } = await import('@/services/batchProcessor/enhancedProcessor');
+      const { finalClassifications } = await processEnhancedBatchResults({
+        rawResults: rawResults.map(r => ({ result: r })), // Convert to expected format
+        uniquePayeeNames: payeeData.uniquePayeeNames,
+        payeeData,
+        job
+      });
+      
+      console.log(`[DOWNLOAD] Processed ${finalClassifications.length} enhanced results`);
+      
+      // Map results to original rows with ALL DATA PRESERVATION
+      const { mapResultsToOriginalRows } = await import('@/lib/rowMapping/resultMapper');
+      const mappedResults = mapResultsToOriginalRows(finalClassifications, payeeData);
+      
+      console.log(`[DOWNLOAD] Mapped to ${mappedResults.length} complete rows with original data`);
+      
+      // Create comprehensive CSV with ALL original columns + classification data
+      if (mappedResults.length === 0) {
+        throw new Error('No results to download');
+      }
+      
+      // Get all column headers (original + new classification columns)
+      const allColumns = Object.keys(mappedResults[0]);
+      console.log(`[DOWNLOAD] Creating CSV with ${allColumns.length} total columns`);
+      
+      // Create CSV header
+      const csvHeader = allColumns.map(col => `"${col}"`).join(',') + '\n';
+      
+      // Create CSV rows with ALL data
+      const csvRows = mappedResults.map(row => {
+        return allColumns.map(col => {
+          const value = row[col] || '';
+          return `"${String(value).replace(/"/g, '""')}"`;
+        }).join(',');
+      }).join('\n');
       
       const csvContent = csvHeader + csvRows;
-      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       
       const link = document.createElement('a');
       link.href = url;
-      link.download = `batch_results_${job.id.slice(0, 8)}.csv`;
+      link.download = `complete_results_${job.id.slice(0, 8)}_${new Date().toISOString().slice(0, 10)}.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       
       toast({
-        title: "Results Downloaded",
-        description: `Downloaded ${results.length} classification results`,
+        title: "Complete Results Downloaded",
+        description: `Downloaded ${mappedResults.length} rows with ${allColumns.length} columns (original + AI classifications)`,
       });
       
+      console.log(`[DOWNLOAD] Successfully downloaded complete results with data integrity preserved`);
+      
     } catch (error) {
-      console.error('Failed to download results:', error);
+      console.error('[DOWNLOAD] Failed to download results:', error);
       toast({
         title: "Download Failed",
         description: error instanceof Error ? error.message : 'Failed to download results',

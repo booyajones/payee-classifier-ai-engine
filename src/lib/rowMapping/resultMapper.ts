@@ -157,34 +157,49 @@ export function mapResultsToOriginalRows(
 }
 
 /**
- * Creates a mapped row with all necessary data
+ * Creates a mapped row with all necessary data - PRESERVES ALL ORIGINAL COLUMNS
  */
 function createMappedRow(originalRow: any, classificationResult: any, mapping: any): any {
-  return {
-    ...originalRow,
-    // Original classification fields
-    classification: classificationResult.result?.classification || 'Individual',
-    confidence: classificationResult.result?.confidence || 50,
-    reasoning: classificationResult.result?.reasoning || 'No classification result',
-    processingTier: classificationResult.result?.processingTier || 'Failed',
-    processingMethod: classificationResult.result?.processingMethod || 'Unknown',
-    keywordExclusion: classificationResult.result?.keywordExclusion?.isExcluded ? 'Yes' : 'No',
-    matchedKeywords: classificationResult.result?.keywordExclusion?.matchedKeywords?.join('; ') || '',
-    keywordConfidence: classificationResult.result?.keywordExclusion?.confidence?.toString() || '0',
-    keywordReasoning: classificationResult.result?.keywordExclusion?.reasoning || 'No keyword exclusion applied',
-    timestamp: classificationResult.timestamp instanceof Date ? classificationResult.timestamp.toISOString() : new Date().toISOString(),
-    
-    // SIC code fields
-    sicCode: classificationResult.result?.sicCode || '',
-    sicDescription: classificationResult.result?.sicDescription || '',
-    
-    // NEW: Standardization fields
-    normalized_payee_name: mapping.normalizedPayeeName,
-    original_payee_name: mapping.payeeName,
-    standardization_steps: mapping.standardizationResult.cleaningSteps.join(', '),
-    standardization_steps_count: mapping.standardizationResult.cleaningSteps.length,
-    data_quality_improved: mapping.standardizationResult.original !== mapping.standardizationResult.normalized ? 'Yes' : 'No'
+  // CRITICAL: Start with ALL original columns to preserve data integrity
+  const mappedRow = {
+    ...originalRow, // Preserve every single original column
   };
+  
+  // Append classification data as new columns (don't overwrite any originals)
+  mappedRow.ai_classification = classificationResult.result?.classification || 'Individual';
+  mappedRow.ai_confidence = classificationResult.result?.confidence || 50;
+  mappedRow.ai_reasoning = classificationResult.result?.reasoning || 'No classification result';
+  mappedRow.ai_processing_tier = classificationResult.result?.processingTier || 'Failed';
+  mappedRow.ai_processing_method = classificationResult.result?.processingMethod || 'Unknown';
+  mappedRow.ai_timestamp = classificationResult.timestamp instanceof Date ? classificationResult.timestamp.toISOString() : new Date().toISOString();
+  
+  // Keyword exclusion data as new columns
+  mappedRow.keyword_exclusion_applied = classificationResult.result?.keywordExclusion?.isExcluded ? 'Yes' : 'No';
+  mappedRow.matched_keywords = classificationResult.result?.keywordExclusion?.matchedKeywords?.join('; ') || '';
+  mappedRow.keyword_confidence = classificationResult.result?.keywordExclusion?.confidence?.toString() || '0';
+  mappedRow.keyword_reasoning = classificationResult.result?.keywordExclusion?.reasoning || 'No keyword exclusion applied';
+  
+  // SIC code fields as new columns
+  mappedRow.sic_code = classificationResult.result?.sicCode || '';
+  mappedRow.sic_description = classificationResult.result?.sicDescription || '';
+  
+  // Standardization fields as new columns
+  if (mapping.normalizedPayeeName) {
+    mappedRow.normalized_payee_name = mapping.normalizedPayeeName;
+    mappedRow.original_payee_name = mapping.payeeName;
+    mappedRow.standardization_steps = mapping.standardizationResult?.cleaningSteps?.join(', ') || '';
+    mappedRow.standardization_steps_count = mapping.standardizationResult?.cleaningSteps?.length || 0;
+    mappedRow.data_quality_improved = mapping.standardizationResult?.original !== mapping.standardizationResult?.normalized ? 'Yes' : 'No';
+  }
+  
+  // Quality metrics as new columns
+  mappedRow.processing_quality_score = classificationResult.result?.confidence >= 90 ? 'High' : 
+                                      classificationResult.result?.confidence >= 70 ? 'Medium' : 'Low';
+  mappedRow.requires_review = (classificationResult.result?.confidence || 0) < 85 ? 'Yes' : 'No';
+  
+  console.log(`[ROW MAPPER] Created mapped row with ${Object.keys(mappedRow).length} total columns (${Object.keys(originalRow).length} original + ${Object.keys(mappedRow).length - Object.keys(originalRow).length} new)`);
+  
+  return mappedRow;
 }
 
 /**

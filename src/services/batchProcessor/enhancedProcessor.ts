@@ -25,12 +25,30 @@ export async function processEnhancedBatchResults({
     sicCodeCount: 0
   };
 
-  // Process results in chunks to prevent browser blocking
+  // Process results in chunks to prevent browser blocking with ORIGINAL DATA PRESERVATION
   const { results } = await processInChunks(
     rawResults,
     async (result, index) => {
       const payeeName = uniquePayeeNames[index] || `Unknown_${index}`;
-      return await processIndividualResult(result, index, payeeName, job.id, stats);
+      
+      // CRITICAL: Find and preserve original row data for each result
+      let originalRowData = {};
+      
+      // Find the matching original row(s) for this payee name
+      const matchingRows = payeeData.rowMappings.filter(mapping => 
+        mapping.uniquePayeeIndex === index
+      );
+      
+      if (matchingRows.length > 0) {
+        // Use the first matching row's original data
+        const firstMatch = matchingRows[0];
+        originalRowData = payeeData.originalFileData[firstMatch.originalRowIndex] || {};
+        console.log(`[ENHANCED PROCESSOR] Found original data for "${payeeName}" with ${Object.keys(originalRowData).length} columns`);
+      } else {
+        console.warn(`[ENHANCED PROCESSOR] No original data found for "${payeeName}" at index ${index}`);
+      }
+      
+      return await processIndividualResult(result, index, payeeName, job.id, stats, originalRowData);
     },
     {
       chunkSize: rawResults.length > 5000 ? 100 : 50,
