@@ -7,7 +7,7 @@ import SingleClassificationForm from "@/components/SingleClassificationForm";
 import SmartFileUpload from "@/components/SmartFileUpload";
 import KeywordExclusionManager from "@/components/KeywordExclusionManager";
 import BatchJobManager from "@/components/BatchJobManager";
-import ExistingJobsProcessor from "@/components/batch/ExistingJobsProcessor";
+
 
 import OptimizedVirtualizedTable from "@/components/table/OptimizedVirtualizedTable";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
@@ -167,7 +167,6 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
       </TabsContent>
 
       <TabsContent value="jobs" className="mt-6">
-        <ExistingJobsProcessor />
         <BatchJobManager />
       </TabsContent>
 

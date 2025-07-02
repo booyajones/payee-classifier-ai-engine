@@ -48,28 +48,11 @@ export class BatchJobUpdater {
         
         // Enhanced automatic processing when job completes
         if (batchJob.status === 'completed' && batchJob.request_counts.completed > 0) {
-          console.log(`[BATCH JOB UPDATER] Job ${batchJob.id} completed, triggering automatic result processing`);
+          console.log(`[BATCH JOB UPDATER] Job ${batchJob.id} completed, triggering automatic result processing and file generation`);
           
-          // Process and store results automatically for instant downloads
-          AutomaticResultProcessor.processCompletedBatch(batchJob).then(success => {
-            if (success) {
-              console.log(`[BATCH JOB UPDATER] Automatic result processing completed for ${batchJob.id}`);
-              
-              // Then generate download files
-              EnhancedFileGenerationService.processCompletedJob(batchJob).then(result => {
-                if (result.success) {
-                  console.log(`[BATCH JOB UPDATER] Enhanced file generation completed for ${batchJob.id}`);
-                } else {
-                  console.error(`[BATCH JOB UPDATER] Enhanced file generation failed for ${batchJob.id}:`, result.error);
-                }
-              }).catch(error => {
-                console.error(`[BATCH JOB UPDATER] Enhanced file generation error for ${batchJob.id}:`, error);
-              });
-            } else {
-              console.error(`[BATCH JOB UPDATER] Automatic result processing failed for ${batchJob.id}`);
-            }
-          }).catch(error => {
-            console.error(`[BATCH JOB UPDATER] Automatic result processing error for ${batchJob.id}:`, error);
+          // Process and store results automatically for instant downloads with retry logic
+          this.processJobWithRetries(batchJob, 3).catch(error => {
+            console.error(`[BATCH JOB UPDATER] Critical failure in automatic processing for ${batchJob.id}:`, error);
           });
         }
         
@@ -87,5 +70,47 @@ export class BatchJobUpdater {
     }
     
     throw new Error(`Status update failed after ${maxRetries} attempts: ${lastError?.message}`);
+  }
+
+  /**
+   * Process completed job with automatic retry logic
+   */
+  private static async processJobWithRetries(batchJob: BatchJob, maxRetries: number): Promise<void> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[BATCH JOB UPDATER] Processing attempt ${attempt}/${maxRetries} for job ${batchJob.id}`);
+        
+        // First, process and store results
+        const success = await AutomaticResultProcessor.processCompletedBatch(batchJob);
+        
+        if (!success) {
+          throw new Error('Result processing failed');
+        }
+        
+        console.log(`[BATCH JOB UPDATER] Result processing completed for ${batchJob.id}`);
+        
+        // Then generate download files
+        const fileResult = await EnhancedFileGenerationService.processCompletedJob(batchJob);
+        
+        if (!fileResult.success) {
+          throw new Error(`File generation failed: ${fileResult.error}`);
+        }
+        
+        console.log(`[BATCH JOB UPDATER] Complete automatic processing successful for ${batchJob.id}`);
+        return;
+        
+      } catch (error) {
+        console.error(`[BATCH JOB UPDATER] Processing attempt ${attempt} failed for ${batchJob.id}:`, error);
+        
+        if (attempt < maxRetries) {
+          const delay = 2000 * Math.pow(2, attempt - 1); // 2s, 4s, 8s
+          console.log(`[BATCH JOB UPDATER] Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          console.error(`[BATCH JOB UPDATER] All processing attempts failed for ${batchJob.id}`);
+          throw error;
+        }
+      }
+    }
   }
 }

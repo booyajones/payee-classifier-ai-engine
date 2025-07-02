@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { BatchJob, checkBatchJobStatus } from "@/lib/openai/trueBatchAPI";
 import { handleError, showRetryableErrorToast } from "@/lib/errorHandler";
 import { useApiRetry } from "@/hooks/useRetry";
+import { BatchJobUpdater } from "@/lib/database/batchJobUpdater";
 
 export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
   const [refreshingJobs, setRefreshingJobs] = useState<Set<string>>(new Set());
@@ -55,6 +56,14 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
           variant: "destructive",
           duration: 10000,
         });
+      }
+      
+      // Update job status in database and trigger automatic processing
+      try {
+        await BatchJobUpdater.updateBatchJobStatus(updatedJob);
+      } catch (updateError) {
+        console.warn(`[JOB REFRESH] Database update failed for ${jobId}:`, updateError);
+        // Don't fail the whole refresh if database update fails
       }
       
       onJobUpdate(updatedJob);
