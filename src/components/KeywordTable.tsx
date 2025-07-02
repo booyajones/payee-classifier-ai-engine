@@ -123,7 +123,7 @@ const KeywordTable = ({
       </div>
 
       <div className="rounded-md border">
-        <div className="max-h-[600px] overflow-y-auto">
+        <div className="max-h-[800px] overflow-y-auto">
           <Table>
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>

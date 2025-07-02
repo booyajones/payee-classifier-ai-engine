@@ -59,9 +59,9 @@ const KeywordManagerContent = ({
               <label htmlFor="category-filter" className="block text-sm font-medium mb-2">
                 Filter by Category
               </label>
-              <Select value={selectedCategory} onValueChange={onCategoryChange}>
+              <Select value={selectedCategory === 'all' ? selectedCategory : undefined} onValueChange={onCategoryChange}>
                 <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Select category" />
+                  <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((category) => (

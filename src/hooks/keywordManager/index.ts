@@ -91,6 +91,13 @@ export const useKeywordManager = (): KeywordManagerReturn => {
     loadKeywords();
   }, [loadKeywords]);
 
+  // Ensure we always start with 'all' categories selected
+  useEffect(() => {
+    if (categories.length > 0 && !categories.includes(selectedCategory)) {
+      setSelectedCategory('all');
+    }
+  }, [categories, selectedCategory]);
+
   return {
     // State
     allKeywords: filteredKeywords,
