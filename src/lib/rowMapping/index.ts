@@ -4,7 +4,15 @@ export * from './types';
 export * from './asyncMappingCreator';
 export * from './syncMappingCreator';
 export * from './validationUtils';
-export * from './resultMapper';
+
+// New modular exports
+export {
+  mapResultsToOriginalRows,
+  mapResultsToOriginalRowsAsync
+} from './mapper';
+
+export { createMappedRow } from './rowCreator';
+export { validateMappedResults } from './validator';
 
 // Legacy exports for backward compatibility
 export { 
@@ -14,8 +22,3 @@ export {
 export {
   createPayeeRowMappingAsync
 } from './asyncMappingCreator';
-
-export {
-  mapResultsToOriginalRows,
-  mapResultsToOriginalRowsAsync
-} from './resultMapper';
