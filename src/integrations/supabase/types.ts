@@ -110,6 +110,7 @@ export type Database = {
           is_active: boolean
           keyword: string
           keyword_type: string
+          normalized_keyword: string | null
           updated_at: string
         }
         Insert: {
@@ -119,6 +120,7 @@ export type Database = {
           is_active?: boolean
           keyword: string
           keyword_type?: string
+          normalized_keyword?: string | null
           updated_at?: string
         }
         Update: {
@@ -128,6 +130,7 @@ export type Database = {
           is_active?: boolean
           keyword?: string
           keyword_type?: string
+          normalized_keyword?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -215,7 +218,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      normalize_keyword: {
+        Args: { input_text: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
