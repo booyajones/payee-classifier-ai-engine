@@ -70,9 +70,12 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
     
     try {
       // Create the actual OpenAI batch job
+      const { generateContextualBatchJobName } = await import('@/lib/services/batchJobNameGenerator');
+      const jobName = generateContextualBatchJobName(payeeRowData.uniquePayeeNames.length, 'file');
       const newBatchJob = await createBatchJob(
         payeeRowData.uniquePayeeNames,
-        `Payee classification for ${payeeRowData.uniquePayeeNames.length} payees`
+        `Payee classification for ${payeeRowData.uniquePayeeNames.length} payees`,
+        jobName
       );
       
       // Add to the batch job store

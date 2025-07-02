@@ -46,7 +46,9 @@ const BatchTextInput = ({
       const names = payeeNames.split("\n").map(name => name.trim()).filter(name => name !== "");
       console.log(`[BATCH TEXT INPUT] Creating batch job for ${names.length} names:`, names);
       
-      const batchJob = await createBatchJob(names, `Text input batch: ${names.length} payees`);
+      const { generateContextualBatchJobName } = await import('@/lib/services/batchJobNameGenerator');
+      const jobName = generateContextualBatchJobName(names.length, 'text');
+      const batchJob = await createBatchJob(names, `Text input batch: ${names.length} payees`, jobName);
       console.log(`[BATCH TEXT INPUT] Batch job created:`, batchJob);
 
       onBatchJobCreated(batchJob, names);

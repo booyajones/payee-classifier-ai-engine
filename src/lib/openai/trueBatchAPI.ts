@@ -26,6 +26,7 @@ export interface BatchJob {
   metadata?: {
     payee_count: number;
     description: string;
+    job_name?: string;
   };
 }
 
@@ -70,14 +71,19 @@ export interface TrueBatchClassificationResult {
  */
 export async function createBatchJob(
   payeeNames: string[],
-  description?: string
+  description?: string,
+  jobName?: string
 ): Promise<BatchJob> {
   logMemoryUsage('createBatchJob');
   
   return makeAPIRequest(async () => {
     const client = getOpenAIClient();
     
-    console.log(`[TRUE BATCH API] Creating batch job for ${payeeNames.length} payees with SIC codes using model: ${CLASSIFICATION_MODEL}`);
+    // Generate creative job name if not provided
+    const { generateContextualBatchJobName } = await import('@/lib/services/batchJobNameGenerator');
+    const finalJobName = jobName || generateContextualBatchJobName(payeeNames.length, 'file');
+    
+    console.log(`[TRUE BATCH API] Creating batch job "${finalJobName}" for ${payeeNames.length} payees with SIC codes using model: ${CLASSIFICATION_MODEL}`);
     
     // Create batch requests in JSONL format with enhanced SIC code system prompt
     const batchRequests = payeeNames.map((name, index) => ({
@@ -144,7 +150,8 @@ Example responses:
       completion_window: '24h',
       metadata: {
         payee_count: payeeNames.length.toString(),
-        description: description || 'Payee classification batch with SIC codes'
+        description: description || 'Payee classification batch with SIC codes',
+        job_name: finalJobName
       }
     });
     
@@ -172,7 +179,8 @@ Example responses:
       },
       metadata: {
         payee_count: payeeNames.length,
-        description: description || 'Payee classification batch with SIC codes'
+        description: description || 'Payee classification batch with SIC codes',
+        job_name: finalJobName
       }
     };
   }, { timeout: 60000, retries: 2 });
@@ -209,7 +217,8 @@ export async function checkBatchJobStatus(batchId: string): Promise<BatchJob> {
       },
       metadata: batch.metadata ? {
         payee_count: parseInt(batch.metadata.payee_count || '0'),
-        description: batch.metadata.description || 'Payee classification batch'
+        description: batch.metadata.description || 'Payee classification batch',
+        job_name: batch.metadata.job_name
       } : undefined
     };
   }, { timeout: 15000, retries: 1 }); // Shorter timeout for status checks
@@ -362,7 +371,8 @@ export async function cancelBatchJob(batchId: string): Promise<BatchJob> {
       },
       metadata: batch.metadata ? {
         payee_count: parseInt(batch.metadata.payee_count || '0'),
-        description: batch.metadata.description || 'Payee classification batch'
+        description: batch.metadata.description || 'Payee classification batch',
+        job_name: batch.metadata.job_name
       } : undefined
     };
   }, { timeout: 30000, retries: 1 });

@@ -221,12 +221,27 @@ const BatchJobManager = () => {
     }
   };
 
-  const handleDeleteJob = (jobId: string) => {
-    removeJob(jobId);
-    toast({
-      title: "Job Deleted",
-      description: `Removed job ${jobId.slice(0, 8)}...`,
-    });
+  const handleDeleteJob = async (jobId: string) => {
+    try {
+      // Delete from database first
+      const { BatchJobDatabaseOperations } = await import('@/lib/database/batchJobDatabaseOperations');
+      await BatchJobDatabaseOperations.deleteBatchJob(jobId);
+      
+      // Then remove from store
+      removeJob(jobId);
+      
+      toast({
+        title: "Job Deleted",
+        description: `Permanently removed job ${jobId.slice(0, 8)}...`,
+      });
+    } catch (error) {
+      console.error('Failed to delete job:', error);
+      toast({
+        title: "Delete Failed",
+        description: error instanceof Error ? error.message : 'Failed to delete job',
+        variant: "destructive"
+      });
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -286,7 +301,7 @@ const BatchJobManager = () => {
                         {job.status}
                       </Badge>
                       <CardTitle className="text-lg">
-                        Job {job.id.slice(0, 8)}...
+                        {job.metadata?.job_name || `Job ${job.id.slice(0, 8)}...`}
                       </CardTitle>
                       {isPolling && (
                         <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
