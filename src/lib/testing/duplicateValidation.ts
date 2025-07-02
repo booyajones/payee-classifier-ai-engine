@@ -1,7 +1,7 @@
 /**
  * Validation utilities for testing specific duplicate detection scenarios
  */
-import { detectDuplicates } from '@/lib/services/smartDuplicateDetectionEngine';
+import { detectDuplicates } from '@/lib/services/duplicate';
 import { isSameEntity, normalizeForDuplicateDetection } from '@/lib/classification/enhancedNormalization';
 
 /**

@@ -1,4 +1,4 @@
-import { detectDuplicates } from './smartDuplicateDetectionEngine';
+import { detectDuplicates } from './duplicate';
 import { DuplicateDetectionInput } from './duplicateDetectionTypes';
 
 /**

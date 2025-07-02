@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { detectDuplicates } from '@/lib/services/smartDuplicateDetectionEngine';
+import { detectDuplicates } from '@/lib/services/duplicate';
 import { 
   DuplicateDetectionResult, 
   DuplicateDetectionInput,

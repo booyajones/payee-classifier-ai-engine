@@ -3,7 +3,7 @@ import { processInChunks } from '@/lib/performance/chunkProcessor';
 import { processIndividualResult } from './resultProcessor';
 import { buildBatchSummary, logProcessingStats } from './summaryBuilder';
 import { ProcessBatchResultsParams, ProcessBatchResultsReturn, BatchProcessorStats } from './types';
-import { detectDuplicates } from '@/lib/services/smartDuplicateDetectionEngine';
+import { detectDuplicates } from '@/lib/services/duplicate';
 import { DEFAULT_DUPLICATE_CONFIG } from '@/lib/services/duplicateDetectionTypes';
 
 /**
