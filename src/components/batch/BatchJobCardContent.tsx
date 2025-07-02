@@ -109,15 +109,6 @@ const BatchJobCardContent = ({
       <BatchJobStuckWarning job={job} />
       <BatchJobActiveDownload activeDownload={activeDownload} />
       
-      {job.status === 'completed' && (
-        <BatchJobCompletedDownload 
-          downloadStatus={downloadStatus}
-          activeDownload={activeDownload}
-          onDownload={onDownload}
-          onForceDownload={handleForceDownload}
-        />
-      )}
-      
       <BatchJobFinalizingDownload 
         job={job}
         activeDownload={activeDownload}

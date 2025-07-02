@@ -110,35 +110,34 @@ const DirectCSVExport = ({ job, payeeData, onDownloadResults }: DirectCSVExportP
   };
 
   return (
-    <div className="pl-4 border-l-2 border-muted">
-      <div className="flex items-center justify-between p-3 bg-muted/30 rounded-md">
-        <div className="text-sm">
-          <p className="font-medium">Download Options</p>
-          <p className="text-muted-foreground text-xs">
-            Get processed results or export original data
+    <div className="border border-border rounded-lg p-4 bg-background">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h4 className="font-medium text-foreground">Download Results</h4>
+          <p className="text-sm text-muted-foreground">
+            CSV file with AI classifications and SIC codes
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handleMainDownload}
-            disabled={isDownloading}
-          >
-            <Download className={`h-3 w-3 mr-1 ${isDownloading ? 'animate-pulse' : ''}`} />
-            {isDownloading ? 'Downloading...' : 'Download CSV'}
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportOriginal}
-            disabled={isExporting}
-          >
-            <FileSpreadsheet className="h-3 w-3 mr-1" />
-            {isExporting ? 'Exporting...' : 'Export Original'}
-          </Button>
-        </div>
+      </div>
+      
+      <div className="flex gap-3">
+        <Button
+          onClick={handleMainDownload}
+          disabled={isDownloading}
+          className="flex-1"
+        >
+          <Download className={`h-4 w-4 mr-2 ${isDownloading ? 'animate-pulse' : ''}`} />
+          {isDownloading ? 'Downloading...' : 'Download CSV'}
+        </Button>
+        
+        <Button
+          variant="outline"
+          onClick={handleExportOriginal}
+          disabled={isExporting}
+        >
+          <FileSpreadsheet className="h-4 w-4 mr-2" />
+          {isExporting ? 'Exporting...' : 'Export Original'}
+        </Button>
       </div>
     </div>
   );
