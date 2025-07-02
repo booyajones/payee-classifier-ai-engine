@@ -28,7 +28,7 @@ const BatchJobCompletedDownload = ({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Zap className="h-4 w-4 text-green-600" />
-          <span className="text-sm font-medium text-green-700">✅ Files Ready - Click Download</span>
+          <span className="text-sm font-medium text-green-700">✅ CSV Ready - Click Download</span>
         </div>
         
         <Button 
@@ -38,12 +38,12 @@ const BatchJobCompletedDownload = ({
           disabled={activeDownload?.isActive}
         >
           <Download className="h-4 w-4" />
-          Download Files
+          Download CSV
         </Button>
       </div>
       
       <div className="text-xs text-green-600 font-medium">
-        ✓ CSV and Excel files are ready for immediate download
+        ✓ CSV file is ready for immediate download
       </div>
     </div>
   );

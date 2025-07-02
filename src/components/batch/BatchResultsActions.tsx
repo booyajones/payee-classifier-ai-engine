@@ -118,25 +118,6 @@ const BatchResultsActions = ({
         
         <Button
           variant="outline"
-          onClick={() => handleDownload('excel')}
-          disabled={isDownloadDisabled || isGenerating}
-          className="flex-1 min-w-[120px]"
-        >
-          {isChecking || isGenerating ? (
-            <>
-              <Clock className="h-4 w-4 mr-2 animate-spin" />
-              {isGenerating ? 'Generating...' : 'Checking...'}
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4 mr-2" />
-              Download Excel
-            </>
-          )}
-        </Button>
-        
-        <Button
-          variant="outline"
           onClick={onReset}
           disabled={isProcessing}
         >

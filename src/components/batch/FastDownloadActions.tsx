@@ -152,16 +152,6 @@ const FastDownloadActions = ({
           <Download className="h-4 w-4 mr-2" />
           Download CSV
         </Button>
-        
-        <Button
-          variant="outline"
-          onClick={() => handleInstantDownload('excel')}
-          disabled={isDownloadDisabled || !fileStatus.filesReady}
-          className="flex-1 min-w-[120px]"
-        >
-          <Download className="h-4 w-4 mr-2" />
-          Download Excel
-        </Button>
 
         {showRegenerateOption && (
           <Button
@@ -195,13 +185,13 @@ const FastDownloadActions = ({
       </div>
       
       <div className="text-xs text-muted-foreground mt-2 space-y-1">
-        <p>CSV and Excel files include SIC codes and descriptions for business classifications.</p>
+        <p>CSV file includes SIC codes and descriptions for business classifications.</p>
         
         {fileStatus.filesReady ? (
           <div className="flex items-center gap-2 text-green-600 font-medium">
             <CheckCircle className="h-3 w-3" />
             <span>
-              ⚡ Files ready for instant download
+              ⚡ CSV file ready for instant download
               {fileStatus.fileSizeBytes && ` (${formatFileSize(fileStatus.fileSizeBytes)})`}
             </span>
             {fileStatus.fileGeneratedAt && (
@@ -213,11 +203,11 @@ const FastDownloadActions = ({
         ) : showRegenerateOption ? (
           <div className="flex items-center gap-2 text-amber-600">
             <AlertCircle className="h-3 w-3" />
-            <span>Files not available - click "Generate Files" to create them</span>
+            <span>CSV file not available - click "Generate Files" to create it</span>
           </div>
         ) : (
           <div className="flex items-center gap-2 text-blue-600">
-            <span>Files will be generated automatically when processing completes</span>
+            <span>CSV file will be generated automatically when processing completes</span>
           </div>
         )}
 
