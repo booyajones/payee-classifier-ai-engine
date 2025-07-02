@@ -36,7 +36,7 @@ const BatchJobManagerContainer = () => {
         updatedJob.id.length > 20) {
       toast({
         title: "Job Status Updated",
-        description: `Job ${updatedJob.id.slice(0, 8)}... is now ${updatedJob.status}`,
+        description: `Batch job (...${updatedJob.id.slice(-8)}) is now ${updatedJob.status}`,
         variant: updatedJob.status === 'completed' ? 'default' : 'destructive'
       });
     }
