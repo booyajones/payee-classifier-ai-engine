@@ -25,7 +25,7 @@ export const useBatchJobAutoPolling = ({
       delete pollTimeouts.current[jobId];
     }
     isPollingRef.current.delete(jobId);
-    console.log(`[AUTO POLLING] Stopped polling for job ${jobId.slice(-8)}`);
+    // Removed console.log for performance
   }, []);
 
   const hasJobChanged = useCallback((job: BatchJob): boolean => {
@@ -56,7 +56,7 @@ export const useBatchJobAutoPolling = ({
         completed: job.request_counts.completed,
         lastUpdate: now
       };
-      console.log(`[AUTO POLLING] Job ${job.id.slice(-8)} changed: status=${job.status}, completed=${job.request_counts.completed}`);
+      // Job state changed - polling will refresh
     }
     
     return hasChanged;
@@ -67,7 +67,7 @@ export const useBatchJobAutoPolling = ({
       return; // Already polling this job
     }
 
-    console.log(`[AUTO POLLING] Starting polling for job ${jobId.slice(-8)}`);
+    // Starting polling for active job
     isPollingRef.current.add(jobId);
     
     const poll = async () => {
@@ -82,7 +82,6 @@ export const useBatchJobAutoPolling = ({
         const shouldPoll = job.status === 'in_progress' || hasJobChanged(job) || Math.random() < 0.4;
         
         if (shouldPoll) {
-          console.log(`[AUTO POLLING] Checking job ${jobId.slice(-8)} (status: ${job.status})`);
           await handleRefreshJob(jobId, true);
         }
         
@@ -93,7 +92,7 @@ export const useBatchJobAutoPolling = ({
           const delay = updatedJob.status === 'in_progress' ? 10000 : 8000; // 10s for in_progress, 8s for others
           pollTimeouts.current[jobId] = setTimeout(poll, delay);
         } else {
-          console.log(`[AUTO POLLING] Job ${jobId.slice(-8)} completed or failed, stopping polling`);
+          // Job completed, cleanup polling
           cleanupPolling(jobId);
           setAutoPollingJobs(prev => {
             const newSet = new Set(prev);
@@ -102,7 +101,6 @@ export const useBatchJobAutoPolling = ({
           });
         }
       } catch (error) {
-        console.error(`[AUTO POLLING] Error polling job ${jobId}:`, error);
         // Continue polling even on error, but with longer delay
         pollTimeouts.current[jobId] = setTimeout(poll, 15000); // 15 second delay on error
       }
@@ -119,12 +117,11 @@ export const useBatchJobAutoPolling = ({
       ['validating', 'in_progress', 'finalizing'].includes(job.status)
     );
 
-    console.log(`[AUTO POLLING] Found ${activeJobs.length} active jobs to poll`);
+    // Check for active jobs that need polling
 
     // Start polling for new active jobs
     for (const job of activeJobs) {
       if (!autoPollingJobs.has(job.id) && !isPollingRef.current.has(job.id)) {
-        console.log(`[AUTO POLLING] Starting auto-polling for active job ${job.id.slice(-8)} (status: ${job.status})`);
         setAutoPollingJobs(prev => new Set(prev).add(job.id));
         startPolling(job.id);
       }
@@ -134,7 +131,6 @@ export const useBatchJobAutoPolling = ({
     const activeJobIds = new Set(activeJobs.map(j => j.id));
     for (const jobId of autoPollingJobs) {
       if (!activeJobIds.has(jobId)) {
-        console.log(`[AUTO POLLING] Stopping auto-polling for completed job ${jobId.slice(-8)}`);
         cleanupPolling(jobId);
         setAutoPollingJobs(prev => {
           const newSet = new Set(prev);
@@ -148,7 +144,7 @@ export const useBatchJobAutoPolling = ({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      console.log('[AUTO POLLING] Cleaning up all polling timeouts');
+      // Cleanup all polling timeouts
       Object.values(pollTimeouts.current).forEach(timeout => clearTimeout(timeout));
       pollTimeouts.current = {};
       isPollingRef.current.clear();

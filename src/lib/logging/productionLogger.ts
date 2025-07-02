@@ -81,6 +81,14 @@ class ProductionLogger {
   }
 
   /**
+   * Legacy console.log replacement for migration
+   */
+  log(message: string, ...data: any[]) {
+    if (!isDevelopment) return; // No-op in production
+    this.debug(message, data.length === 1 ? data[0] : data);
+  }
+
+  /**
    * Performance-aware batch logging
    */
   batch(entries: Array<{ level: LogLevel; message: string; data?: any; context?: string }>) {
