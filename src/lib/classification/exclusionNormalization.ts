@@ -37,6 +37,6 @@ export function checkTokenMatch(normalizedPayee: string, normalizedKeyword: stri
     if (hasAllTokens) return true;
   }
   
-  // Also check if the full normalized strings match
-  return normalizedPayee.includes(normalizedKeyword) || normalizedKeyword.includes(normalizedPayee);
+  // Only allow exact normalized string matches to prevent substring issues
+  return normalizedPayee === normalizedKeyword;
 }

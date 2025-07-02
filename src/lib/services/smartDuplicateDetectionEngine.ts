@@ -1,5 +1,6 @@
 import { calculateDuplicateScore } from '@/lib/classification/stringMatching';
 import { standardizePayeeName } from '@/lib/dataStandardization/nameStandardizer';
+import { normalizeForDuplicateDetection, isSameEntity } from '@/lib/classification/enhancedNormalization';
 import { duplicateDetectionWithAI } from '@/lib/openai/duplicateDetection';
 import {
   DuplicateDetectionConfig,
@@ -69,10 +70,11 @@ export class SmartDuplicateDetectionEngine {
    */
   private cleanRecords(records: DuplicateDetectionInput[]): Array<DuplicateDetectionInput & { cleaned_name: string }> {
     return records.map(record => {
-      const standardized = standardizePayeeName(record.payee_name);
+      // Use enhanced normalization for better duplicate detection
+      const cleaned_name = normalizeForDuplicateDetection(record.payee_name);
       return {
         ...record,
-        cleaned_name: standardized.normalized
+        cleaned_name
       };
     });
   }
@@ -88,9 +90,17 @@ export class SmartDuplicateDetectionEngine {
         const record1 = cleanedRecords[i];
         const record2 = cleanedRecords[j];
 
+        // First check if they're obviously the same entity
+        const obviousDuplicate = isSameEntity(record1.payee_name, record2.payee_name);
+        
         // Calculate similarity using the official duplicate detection formula
         const similarity_scores = calculateDuplicateScore(record1.cleaned_name, record2.cleaned_name);
-        const final_duplicate_score = similarity_scores.duplicateScore;
+        let final_duplicate_score = similarity_scores.duplicateScore;
+        
+        // Boost score for obvious duplicates (like "Christa INC" vs "CHRISTA")
+        if (obviousDuplicate) {
+          final_duplicate_score = Math.max(final_duplicate_score, 90);
+        }
 
         // Determine confidence tier
         let confidence_tier: 'High' | 'Low' | 'Ambiguous';

@@ -19,25 +19,32 @@ export async function duplicateDetectionWithAI(
 PAYEE NAME 1: "${payeeName1}"
 PAYEE NAME 2: "${payeeName2}"
 
-Consider these factors:
-1. Business entities: Different legal structures (LLC vs Corp) of the same company ARE duplicates
-2. Abbreviations: "McDonald's" vs "McDonalds" ARE duplicates  
-3. Punctuation/spacing: "AT&T" vs "AT T" vs "ATT" ARE duplicates
-4. Common variations: "John Smith" vs "John W Smith" vs "J Smith" ARE duplicates
-5. Address differences: Same name with different addresses ARE duplicates
-6. Completely different entities: "Apple Inc" vs "Microsoft Corp" are NOT duplicates
+SPECIFIC ANALYSIS REQUIRED:
+1. Are these names referring to the same person or business entity?
+2. Consider variations in business suffixes (INC, LLC, CORP, etc.) - these are usually the SAME entity
+3. Consider case variations, abbreviations, and formatting differences
+4. Consider partial names vs full names of the same entity
+
+KEY DUPLICATE INDICATORS:
+- Same core name with different business suffixes (INC, LLC, etc.) → DUPLICATE
+- Case-only differences ("CHRISTA" vs "Christa") → DUPLICATE  
+- Abbreviations vs full forms ("McDonald's" vs "McDonalds") → DUPLICATE
+- Punctuation differences ("AT&T" vs "AT T") → DUPLICATE
+- Partial vs full names of same entity ("J Smith" vs "John Smith") → DUPLICATE
+
+IMPORTANT: Focus on whether these represent the SAME REAL-WORLD ENTITY, not just textual similarity.
 
 Examples:
+- "Christa INC" vs "CHRISTA" vs "Christa" → ALL DUPLICATES (same person/entity with variations)
 - "WALMART INC" vs "WAL-MART STORES" → DUPLICATE (same company)
-- "John Smith" vs "Jonathan Smith" → NOT DUPLICATE (different people)  
-- "ABC Company LLC" vs "ABC Company Corp" → DUPLICATE (same business)
-- "McDonald's #123" vs "McDonalds Restaurant" → DUPLICATE (same business)
+- "John Smith" vs "Jonathan Smith" → LIKELY NOT DUPLICATE (different people)
+- "ABC Company LLC" vs "ABC Company Corp" → DUPLICATE (same business, different structure)
 
 Return your analysis as JSON:
 {
   "is_duplicate": boolean,
   "confidence": number (0-100),
-  "reasoning": "Brief explanation of your decision"
+  "reasoning": "Explain WHY these names represent the same or different real-world entities"
 }`;
 
   try {

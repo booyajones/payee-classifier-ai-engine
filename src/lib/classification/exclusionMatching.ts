@@ -43,13 +43,16 @@ export function applyMatchingStrategies(
     };
   }
   
-  // Method 4: Simple contains check
-  if (normalizedPayee.includes(normalizedKeyword) || normalizedKeyword.includes(normalizedPayee)) {
-    return {
-      isMatch: true,
-      confidence: 80,
-      matchReason: 'Contains match'
-    };
+  // Method 4: Enhanced whole word matching with length validation
+  // Only apply whole word matching if keyword is reasonably sized
+  if (normalizedKeyword.length >= 2 && normalizedKeyword.length <= normalizedPayee.length) {
+    if (isWholeWordMatch(normalizedPayee, normalizedKeyword)) {
+      return {
+        isMatch: true,
+        confidence: 85,
+        matchReason: 'Enhanced whole word match'
+      };
+    }
   }
   
   // Method 5: Similarity scoring for fuzzy matches

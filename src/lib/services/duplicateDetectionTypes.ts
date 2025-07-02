@@ -63,8 +63,8 @@ export interface DuplicateDetectionResult {
 }
 
 export const DEFAULT_DUPLICATE_CONFIG: DuplicateDetectionConfig = {
-  highConfidenceThreshold: 95,
-  lowConfidenceThreshold: 75,
+  highConfidenceThreshold: 85, // Lowered to catch obvious duplicates like "Christa" variants
+  lowConfidenceThreshold: 60,  // Lowered to allow more cases to reach AI judgment
   enableAiJudgment: true,
   algorithmWeights: {
     jaroWinkler: 0.2,
