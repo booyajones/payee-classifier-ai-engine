@@ -79,8 +79,9 @@ export const useBatchJobAutoPolling = ({
           return;
         }
 
-        // More aggressive polling for in-progress jobs
-        const shouldPoll = job.status === 'in_progress' || hasJobChanged(job) || Math.random() < 0.4;
+        // Only poll active jobs - NEVER poll completed jobs
+        const isActiveJob = ['validating', 'in_progress', 'finalizing'].includes(job.status);
+        const shouldPoll = isActiveJob && (job.status === 'in_progress' || hasJobChanged(job) || Math.random() < 0.4);
         
         if (shouldPoll) {
           await handleRefreshJob(jobId, true);
@@ -88,12 +89,15 @@ export const useBatchJobAutoPolling = ({
         
         // Check if job is still active after refresh
         const updatedJob = jobs.find(j => j.id === jobId);
-        if (updatedJob && ['validating', 'in_progress', 'finalizing'].includes(updatedJob.status)) {
+        const isStillActive = updatedJob && ['validating', 'in_progress', 'finalizing'].includes(updatedJob.status);
+        
+        if (isStillActive) {
           // More frequent polling intervals
           const delay = updatedJob.status === 'in_progress' ? 10000 : 8000; // 10s for in_progress, 8s for others
           pollTimeouts.current[jobId] = setTimeout(poll, delay);
         } else {
-          // Job completed, cleanup polling
+          // Job completed or no longer exists - cleanup polling immediately
+          productionLogger.info(`Job ${jobId.substring(0, 8)}... completed or removed - stopping polling`, undefined, 'BATCH_POLLING');
           cleanupPolling(jobId);
           setAutoPollingJobs(prev => {
             const newSet = new Set(prev);
@@ -102,8 +106,22 @@ export const useBatchJobAutoPolling = ({
           });
         }
       } catch (error) {
-        // Continue polling even on error, but with longer delay
-        pollTimeouts.current[jobId] = setTimeout(poll, 15000); // 15 second delay on error
+        // Only continue polling if job is still active, even on error
+        const job = jobs.find(j => j.id === jobId);
+        const isStillActive = job && ['validating', 'in_progress', 'finalizing'].includes(job.status);
+        
+        if (isStillActive) {
+          productionLogger.warn(`Polling error for active job ${jobId.substring(0, 8)}..., retrying`, error, 'BATCH_POLLING');
+          pollTimeouts.current[jobId] = setTimeout(poll, 15000); // 15 second delay on error
+        } else {
+          productionLogger.info(`Polling error for completed/removed job ${jobId.substring(0, 8)}..., stopping polling`, error, 'BATCH_POLLING');
+          cleanupPolling(jobId);
+          setAutoPollingJobs(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(jobId);
+            return newSet;
+          });
+        }
       }
     };
 
