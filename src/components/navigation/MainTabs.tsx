@@ -127,7 +127,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
   
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-      <TabsList className="grid w-full grid-cols-5">
+      <TabsList className="grid w-full grid-cols-4">
         <TabsTrigger value="single" className="flex items-center gap-2">
           <Play className="h-4 w-4" />
           Single
@@ -139,10 +139,6 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
         <TabsTrigger value="jobs" className="flex items-center gap-2">
           <Users className="h-4 w-4" />
           Jobs
-        </TabsTrigger>
-        <TabsTrigger value="results" className="flex items-center gap-2">
-          <Eye className="h-4 w-4" />
-          Results
         </TabsTrigger>
         <TabsTrigger value="keywords" className="flex items-center gap-2">
           <FileText className="h-4 w-4" />
@@ -161,7 +157,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
           onProcessingComplete={(results, summary, jobId) => {
             console.log('Processing complete:', results.length, jobId);
             onComplete(results, summary);
-            setActiveTab('results');
+            setActiveTab('jobs');
           }}
         />
       </TabsContent>
@@ -170,16 +166,6 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
         <BatchJobManagerContainer />
       </TabsContent>
 
-      <TabsContent value="results" className="mt-6">
-        <OptimizedVirtualizedTable 
-          results={sortedResults}
-          columns={generateColumns}
-          sortField={sortField}
-          sortDirection={sortDirection}
-          onSort={handleSort}
-          onViewDetails={handleViewDetails}
-        />
-      </TabsContent>
 
       <TabsContent value="keywords" className="mt-6">
         <KeywordExclusionManager />
