@@ -64,12 +64,12 @@ export interface DuplicateDetectionResult {
 }
 
 export const DEFAULT_DUPLICATE_CONFIG: DuplicateDetectionConfig = {
-  highConfidenceThreshold: 85, // Lowered to catch obvious duplicates like "Christa" variants
-  lowConfidenceThreshold: 60,  // Lowered to allow more cases to reach AI judgment
+  highConfidenceThreshold: 75, // Optimized to catch obvious duplicates like "Christa INC" vs "CHRISTA"
+  lowConfidenceThreshold: 45,  // Lowered to catch more potential duplicates for AI judgment
   enableAiJudgment: true,
   algorithmWeights: {
-    jaroWinkler: 0.2,
-    tokenSort: 0.4,
-    tokenSet: 0.4
+    jaroWinkler: 0.4,  // Increased - better for similar strings with variations
+    tokenSort: 0.3,    // Decreased - less emphasis on word order
+    tokenSet: 0.3      // Decreased - less emphasis on exact token matching
   }
 };

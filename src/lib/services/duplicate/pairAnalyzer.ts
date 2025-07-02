@@ -43,7 +43,8 @@ export function findDuplicatePairs(
         }
       }
       
-      console.log(`[PAIR ANALYZER] Comparing "${record1.payee_name}" vs "${record2.payee_name}": ${final_duplicate_score}% (cleaned: "${record1.cleaned_name}" vs "${record2.cleaned_name}")`);
+      // DEBUG: Show detailed similarity breakdown
+      console.log(`[PAIR ANALYZER] "${record1.payee_name}" vs "${record2.payee_name}": FINAL=${final_duplicate_score.toFixed(1)}% | JW=${similarity_scores.jaroWinkler.toFixed(1)}% | TS=${similarity_scores.tokenSort.toFixed(1)}% | TSe=${similarity_scores.tokenSet.toFixed(1)}% | Obvious=${obviousDuplicate}`);
       
 
       // Determine confidence tier
