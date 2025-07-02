@@ -21,12 +21,14 @@ export function createPayeeRowMapping(
   console.log(`[ROW MAPPING] Performing comprehensive data standardization...`);
   const standardizationResults = batchStandardizeNames(originalPayeeNames);
   
-  // Step 3: Create unique name mappings using NORMALIZED names for deduplication
+  // Step 3: Create unique name mappings using ORIGINAL names for duplicate detection
+  // The duplicate detection engine should see all variants to properly analyze them
   const uniquePayeeNames: string[] = [];
   const uniqueNormalizedNames: string[] = [];
   const rowMappings: RowMapping[] = [];
   const payeeToIndexMap = new Map<string, number>();
-  const normalizedToIndexMap = new Map<string, number>();
+
+  console.log(`[ROW MAPPING] Creating unique payee mapping using ORIGINAL names for proper duplicate detection...`);
 
   // Process EVERY single row to ensure complete mapping
   originalFileData.forEach((row, originalRowIndex) => {
@@ -34,17 +36,16 @@ export function createPayeeRowMapping(
     const originalPayeeName = standardizationResult.original || `Unknown_Row_${originalRowIndex}`;
     const normalizedPayeeName = standardizationResult.normalized;
     
-    // Use NORMALIZED name for uniqueness detection
-    let uniquePayeeIndex = normalizedToIndexMap.get(normalizedPayeeName);
+    // Use ORIGINAL name for uniqueness detection so duplicate detection can analyze all variants
+    let uniquePayeeIndex = payeeToIndexMap.get(originalPayeeName);
     if (uniquePayeeIndex === undefined) {
-      // This is a new unique payee (based on normalized name)
+      // This is a new unique payee (based on original name)
       uniquePayeeIndex = uniquePayeeNames.length;
-      uniquePayeeNames.push(originalPayeeName); // Store original name for display
-      uniqueNormalizedNames.push(normalizedPayeeName); // Store normalized name for processing
+      uniquePayeeNames.push(originalPayeeName); // Store original name for duplicate detection
+      uniqueNormalizedNames.push(normalizedPayeeName); // Store normalized name for classification
       payeeToIndexMap.set(originalPayeeName, uniquePayeeIndex);
-      normalizedToIndexMap.set(normalizedPayeeName, uniquePayeeIndex);
       
-      console.log(`[ROW MAPPING] New unique payee ${uniquePayeeIndex}: "${originalPayeeName}" → "${normalizedPayeeName}"`);
+      console.log(`[ROW MAPPING] New unique payee ${uniquePayeeIndex}: "${originalPayeeName}" (normalized: "${normalizedPayeeName}")`);
     }
 
     // CRITICAL: Create mapping for EVERY row - no skipping
@@ -56,10 +57,13 @@ export function createPayeeRowMapping(
       standardizationResult
     });
     
-    if (originalRowIndex < 5) {
-      console.log(`[ROW MAPPING] Row ${originalRowIndex}: "${originalPayeeName}" → "${normalizedPayeeName}" (unique index ${uniquePayeeIndex})`);
+    if (originalRowIndex < 10) {
+      console.log(`[ROW MAPPING] Row ${originalRowIndex}: "${originalPayeeName}" → unique index ${uniquePayeeIndex} (normalized: "${normalizedPayeeName}")`);
     }
   });
+
+  console.log(`[ROW MAPPING] ✅ Created ${uniquePayeeNames.length} unique payees from ${originalFileData.length} rows`);
+  console.log(`[ROW MAPPING] First 5 unique payees:`, uniquePayeeNames.slice(0, 5));
 
   // Validation and statistics calculations
   return validateAndCreatePayeeRowData(
