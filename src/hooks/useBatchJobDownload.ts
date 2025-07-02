@@ -19,7 +19,7 @@ export const useBatchJobDownload = ({
   onJobComplete
 }: UseBatchJobDownloadProps) => {
   const { toast } = useToast();
-  const { startDownload, updateDownload, completeDownload, clearDownload } = useDownloadProgress();
+  const { startDownload, updateDownload, completeDownload, clearDownload, clearAllDownloads } = useDownloadProgress();
 
   const handleDownloadResults = useCallback(async (job: BatchJob) => {
     const payeeData = payeeRowDataMap[job.id];
@@ -28,13 +28,17 @@ export const useBatchJobDownload = ({
       return;
     }
 
-    const downloadId = `batch-${job.id}`;
+    // Generate unique download ID using timestamp to avoid conflicts
+    const downloadId = `batch-${job.id}-${Date.now()}`;
     const filename = `batch-results-${job.id.substring(0, 8)}.csv`;
     const totalPayees = payeeData.uniquePayeeNames.length;
 
     try {
       console.log(`[BATCH DOWNLOAD] Starting download for job ${job.id}`);
       console.log(`[BATCH DOWNLOAD] Download ID: ${downloadId}, Filename: ${filename}, Total payees: ${totalPayees}`);
+      
+      // Clear any stale downloads first to prevent old error states
+      clearAllDownloads();
       
       // Start the download progress tracking
       startDownload(downloadId, filename, totalPayees);
@@ -182,19 +186,22 @@ export const useBatchJobDownload = ({
       });
 
     } catch (error) {
-      console.error('[BATCH DOWNLOAD] Download failed:', error);
+      console.error(`[BATCH DOWNLOAD] Download failed for job ${job.id}:`, error);
+      
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       updateDownload(downloadId, { 
-        error: error instanceof Error ? error.message : "Unknown error occurred",
+        error: `Job ${job.id.substring(0, 8)}: ${errorMessage}`,
         isActive: false,
         canCancel: false 
       });
+      
       toast({
         title: "Download Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
+        description: `Job ${job.id.substring(0, 8)}: ${errorMessage}`,
         variant: "destructive",
       });
     }
-  }, [payeeRowDataMap, onJobComplete, toast, startDownload, updateDownload, completeDownload]);
+  }, [payeeRowDataMap, onJobComplete, toast, startDownload, updateDownload, completeDownload, clearAllDownloads]);
 
   return {
     handleDownloadResults

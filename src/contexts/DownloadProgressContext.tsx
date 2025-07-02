@@ -22,6 +22,7 @@ interface DownloadProgressContextType {
   completeDownload: (id: string) => void;
   cancelDownload: (id: string) => void;
   clearDownload: (id: string) => void;
+  clearAllDownloads: () => void;
   getActiveDownloads: () => DownloadState[];
 }
 
@@ -32,9 +33,17 @@ export const DownloadProgressProvider: React.FC<{ children: React.ReactNode }> =
 
   const startDownload = useCallback((id: string, filename: string, total: number) => {
     console.log(`[DOWNLOAD PROGRESS] Starting download: ${id}, filename: ${filename}, total: ${total}`);
-    setDownloads(prev => ({
-      ...prev,
-      [id]: {
+    
+    // Clear any existing download for this ID to prevent stale state
+    setDownloads(prev => {
+      const newDownloads = { ...prev };
+      if (newDownloads[id]) {
+        console.log(`[DOWNLOAD PROGRESS] Clearing existing download state for ${id}`);
+        delete newDownloads[id];
+      }
+      
+      // Add the new download
+      newDownloads[id] = {
         id,
         filename,
         progress: 0,
@@ -44,8 +53,10 @@ export const DownloadProgressProvider: React.FC<{ children: React.ReactNode }> =
         isActive: true,
         canCancel: true,
         startedAt: new Date()
-      }
-    }));
+      };
+      
+      return newDownloads;
+    });
   }, []);
 
   const updateDownload = useCallback((id: string, updates: Partial<DownloadState>) => {
@@ -112,6 +123,11 @@ export const DownloadProgressProvider: React.FC<{ children: React.ReactNode }> =
     });
   }, []);
 
+  const clearAllDownloads = useCallback(() => {
+    console.log(`[DOWNLOAD PROGRESS] Clearing all download states`);
+    setDownloads({});
+  }, []);
+
   const getActiveDownloads = useCallback(() => {
     return Object.values(downloads).filter(download => download.isActive);
   }, [downloads]);
@@ -123,6 +139,7 @@ export const DownloadProgressProvider: React.FC<{ children: React.ReactNode }> =
     completeDownload,
     cancelDownload,
     clearDownload,
+    clearAllDownloads,
     getActiveDownloads
   };
 
