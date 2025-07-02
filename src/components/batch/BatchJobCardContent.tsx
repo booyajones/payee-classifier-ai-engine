@@ -1,9 +1,11 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, Trash2 } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Download, Trash2, Loader2 } from 'lucide-react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
+import { useDownloadProgress } from '@/contexts/DownloadProgressContext';
 
 interface BatchJobCardContentProps {
   job: BatchJob;
@@ -20,6 +22,11 @@ const BatchJobCardContent = ({
 }: BatchJobCardContentProps) => {
   const payeeCount = payeeRowData?.uniquePayeeNames?.length || 0;
   const { total, completed, failed } = job.request_counts;
+  const { downloads } = useDownloadProgress();
+  
+  // Check for active download for this job
+  const downloadId = `batch-${job.id}`;
+  const activeDownload = downloads[downloadId];
   
   const getProgressPercentage = () => {
     if (total === 0) return 0;
@@ -76,14 +83,33 @@ const BatchJobCardContent = ({
         </div>
       )}
 
+      {/* Download Progress - Show if there's an active download */}
+      {activeDownload && activeDownload.isActive && (
+        <div className="space-y-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+              <span className="font-medium">Downloading...</span>
+            </div>
+            <span className="text-muted-foreground">{Math.round(activeDownload.progress)}%</span>
+          </div>
+          <Progress value={activeDownload.progress} className="h-2" />
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>{activeDownload.stage}</span>
+            <span>{activeDownload.processed}/{activeDownload.total} items</span>
+          </div>
+        </div>
+      )}
+
       {/* Download Button - Show for completed OR 100% done jobs */}
-      {isEffectivelyComplete && (
+      {isEffectivelyComplete && !activeDownload?.isActive && (
         <div className="flex justify-end">
           <Button 
             onClick={onDownload} 
             size="sm" 
             className="flex items-center gap-2"
             variant={isStuckFinalizing ? "outline" : "default"}
+            disabled={activeDownload?.isActive}
           >
             <Download className="h-4 w-4" />
             {isStuckFinalizing ? "Force Download" : "Download Results"}

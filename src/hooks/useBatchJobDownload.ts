@@ -34,9 +34,11 @@ export const useBatchJobDownload = ({
 
     try {
       console.log(`[BATCH DOWNLOAD] Starting download for job ${job.id}`);
+      console.log(`[BATCH DOWNLOAD] Download ID: ${downloadId}, Filename: ${filename}, Total payees: ${totalPayees}`);
       
       // Start the download progress tracking
       startDownload(downloadId, filename, totalPayees);
+      console.log(`[BATCH DOWNLOAD] Download progress tracking started`);
       
       // Check if results are already processed for instant download
       const hasPreProcessed = await AutomaticResultProcessor.hasPreProcessedResults(job.id);

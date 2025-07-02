@@ -5,9 +5,9 @@ import { BatchJob, getBatchJobResults } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData, RowMapping } from '@/lib/rowMapping';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
 import { processEnhancedBatchResults } from '@/services/batchProcessor';
-// import { PreGeneratedFileService } from '@/lib/storage/preGeneratedFileService';
 import { saveClassificationResultsWithValidation } from '@/lib/database/enhancedClassificationService';
-// import { logger } from '@/lib/logging/logger';
+import { AutomaticResultProcessor } from './automaticResultProcessor';
+import { EnhancedFileGenerationService } from './enhancedFileGenerationService';
 
 export interface RetroactiveProcessingResult {
   jobId: string;
@@ -191,6 +191,147 @@ export class RetroactiveBatchProcessor {
     }
 
     return results;
+  }
+
+  /**
+   * Process all existing completed batch jobs that don't have pre-processed results
+   */
+  static async processExistingJobs(): Promise<{ processed: number; skipped: number; errors: number }> {
+    console.log('[RETROACTIVE] Starting retroactive processing of existing batch jobs');
+    
+    try {
+      // Get all completed batch jobs
+      const { data: jobs, error } = await supabase
+        .from('batch_jobs')
+        .select('*')
+        .eq('status', 'completed')
+        .order('completed_at_timestamp', { ascending: false });
+
+      if (error) {
+        throw new Error(`Failed to fetch completed jobs: ${error.message}`);
+      }
+
+      if (!jobs || jobs.length === 0) {
+        console.log('[RETROACTIVE] No completed jobs found');
+        return { processed: 0, skipped: 0, errors: 0 };
+      }
+
+      console.log(`[RETROACTIVE] Found ${jobs.length} completed jobs to check`);
+      
+      let processed = 0;
+      let skipped = 0;
+      let errors = 0;
+
+      for (const jobData of jobs) {
+        try {
+          // Check if this job already has pre-processed results
+          const hasPreProcessed = await AutomaticResultProcessor.hasPreProcessedResults(jobData.id);
+          
+          if (hasPreProcessed) {
+            console.log(`[RETROACTIVE] Skipping job ${jobData.id} - already has pre-processed results`);
+            skipped++;
+            continue;
+          }
+
+          console.log(`[RETROACTIVE] Processing job ${jobData.id}`);
+          
+          // Process the results automatically
+          const batchJob = {
+            id: jobData.id,
+            status: jobData.status,
+            created_at: jobData.created_at_timestamp,
+            request_counts: {
+              total: jobData.request_counts_total,
+              completed: jobData.request_counts_completed,
+              failed: jobData.request_counts_failed
+            },
+            metadata: jobData.metadata,
+            output_file_id: jobData.output_file_id
+          } as BatchJob;
+          
+          const success = await AutomaticResultProcessor.processCompletedBatch(batchJob);
+          
+          if (success) {
+            // Also generate files for instant downloads
+            await EnhancedFileGenerationService.processCompletedJob(batchJob);
+            processed++;
+            console.log(`[RETROACTIVE] Successfully processed job ${jobData.id}`);
+          } else {
+            errors++;
+            console.error(`[RETROACTIVE] Failed to process job ${jobData.id}`);
+          }
+          
+        } catch (error) {
+          errors++;
+          console.error(`[RETROACTIVE] Error processing job ${jobData.id}:`, error);
+        }
+      }
+
+      console.log(`[RETROACTIVE] Completed: processed=${processed}, skipped=${skipped}, errors=${errors}`);
+      
+      return { processed, skipped, errors };
+      
+    } catch (error) {
+      console.error('[RETROACTIVE] Failed to process existing jobs:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if a specific job has instant download available
+   */
+  static async hasInstantDownload(jobId: string): Promise<boolean> {
+    try {
+      // Check if it has pre-processed results
+      const hasPreProcessed = await AutomaticResultProcessor.hasPreProcessedResults(jobId);
+      
+      if (hasPreProcessed) {
+        return true;
+      }
+
+      // Check if it has pre-generated files
+      const { data: job } = await supabase
+        .from('batch_jobs')
+        .select('csv_file_url, excel_file_url')
+        .eq('id', jobId)
+        .single();
+
+      return !!(job?.csv_file_url || job?.excel_file_url);
+      
+    } catch (error) {
+      console.error(`[RETROACTIVE] Error checking instant download for job ${jobId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Get download type for UI display
+   */
+  static async getDownloadType(jobId: string): Promise<'instant' | 'processing' | 'unavailable'> {
+    try {
+      const { data: job } = await supabase
+        .from('batch_jobs')
+        .select('status, csv_file_url, excel_file_url')
+        .eq('id', jobId)
+        .single();
+
+      if (!job) {
+        return 'unavailable';
+      }
+
+      if (job.status !== 'completed') {
+        return 'unavailable';
+      }
+
+      // Check for instant download capability
+      const hasInstant = await this.hasInstantDownload(jobId);
+      
+      return hasInstant ? 'instant' : 'processing';
+      
+    } catch (error) {
+      console.error(`[RETROACTIVE] Error getting download type for job ${jobId}:`, error);
+      return 'unavailable';
+    }
   }
 }
 

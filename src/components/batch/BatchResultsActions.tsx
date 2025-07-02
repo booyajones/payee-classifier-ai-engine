@@ -89,6 +89,7 @@ const BatchResultsActions = ({
         processingSummary={processingSummary}
         fileSizeBytes={fileStatus.fileSizeBytes}
         fileGeneratedAt={fileStatus.fileGeneratedAt}
+        jobId={jobId}
       />
     </>
   );
