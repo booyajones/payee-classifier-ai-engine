@@ -57,6 +57,19 @@ export class BackgroundFileGenerationService {
    */
   private static async processQueue(): Promise<void> {
     try {
+      // First, reset any items stuck in processing for more than 10 minutes
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      await supabase
+        .from('file_generation_queue')
+        .update({
+          status: 'pending',
+          retry_count: 0,
+          last_error: 'Reset due to processing timeout',
+          updated_at: new Date().toISOString()
+        })
+        .eq('status', 'processing')
+        .lt('updated_at', tenMinutesAgo);
+
       // Get pending queue items
       const { data: queueItems, error } = await supabase
         .from('file_generation_queue')
@@ -64,7 +77,7 @@ export class BackgroundFileGenerationService {
         .eq('status', 'pending')
         .lt('retry_count', this.MAX_RETRIES)
         .order('created_at', { ascending: true })
-        .limit(5);
+        .limit(3); // Reduced from 5 to 3 for more reliable processing
 
       if (error) {
         productionLogger.error('Failed to fetch queue items', error, 'BACKGROUND_FILE_GEN');
@@ -79,9 +92,16 @@ export class BackgroundFileGenerationService {
 
       productionLogger.info(`Processing ${queueItems.length} queue items`, undefined, 'BACKGROUND_FILE_GEN');
 
-      // Process each queue item
+      // Process each queue item with error isolation
       for (const item of queueItems) {
-        await this.processQueueItem(item);
+        try {
+          await this.processQueueItem(item);
+          // Add small delay between items to prevent overwhelming
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (itemError) {
+          productionLogger.error(`Failed to process item ${item.id}`, itemError, 'BACKGROUND_FILE_GEN');
+          // Continue with next item even if one fails
+        }
       }
     } catch (error) {
       productionLogger.error('Error processing file generation queue', error, 'BACKGROUND_FILE_GEN');

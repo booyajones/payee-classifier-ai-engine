@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import FileGenerationFixer from '@/components/debug/FileGenerationFixer';
 import FileGenerationMonitor from '@/components/monitoring/FileGenerationMonitor';
+import EmergencyFileFixPanel from '@/components/emergency/EmergencyFileFixPanel';
 
 
 interface BatchJobContainerProps {
@@ -81,6 +82,9 @@ const BatchJobContainer = ({
     <div className="space-y-4">
       {/* Show file generation monitor */}
       <FileGenerationMonitor />
+      
+      {/* Show emergency fix panel if system is stalled */}
+      {(stalledJobs.length > 0 || completedJobsWithoutFiles.length > 3) && <EmergencyFileFixPanel />}
       
       {/* Show file generation fixer if completed jobs exist */}
       {completedJobsWithoutFiles.length > 0 && <FileGenerationFixer />}
