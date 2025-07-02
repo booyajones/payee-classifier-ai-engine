@@ -36,16 +36,16 @@ const BatchJobContainer = ({
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
   const { toast } = useToast();
 
-  console.log('[BATCH CONTAINER] Rendering with', jobs.length, 'jobs, isLoaded: true');
+  // Container rendering with job count tracking
 
   const handleRefreshAll = async () => {
     setIsRefreshingAll(true);
     try {
-      console.log('[BATCH CONTAINER] Refreshing all jobs manually');
+      // Refreshing all jobs manually
       const refreshPromises = jobs.map(job => onRefresh(job.id, false));
       await Promise.all(refreshPromises);
     } catch (error) {
-      console.error('[BATCH CONTAINER] Error refreshing all jobs:', error);
+      // Error refreshing jobs - will be handled by individual refresh handlers
     } finally {
       setIsRefreshingAll(false);
     }

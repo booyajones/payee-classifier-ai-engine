@@ -135,6 +135,39 @@ export type Database = {
         }
         Relationships: []
       }
+      file_generation_queue: {
+        Row: {
+          batch_job_id: string
+          created_at: string | null
+          id: string
+          last_error: string | null
+          processed_at: string | null
+          retry_count: number | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          batch_job_id: string
+          created_at?: string | null
+          id?: string
+          last_error?: string | null
+          processed_at?: string | null
+          retry_count?: number | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          batch_job_id?: string
+          created_at?: string | null
+          id?: string
+          last_error?: string | null
+          processed_at?: string | null
+          retry_count?: number | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       payee_classifications: {
         Row: {
           ai_duplicate_reasoning: string | null
