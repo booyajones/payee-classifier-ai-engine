@@ -6,6 +6,8 @@ import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
 import { EnhancedFileGenerationService } from '@/lib/services/enhancedFileGenerationService';
 import { processDownloadResults, saveProcessedResults } from '@/hooks/batch/downloadProcessor';
 import { useToast } from '@/hooks/use-toast';
+import { useDownloadProgress } from '@/contexts/DownloadProgressContext';
+import { AutomaticResultProcessor } from '@/lib/services/automaticResultProcessor';
 
 interface UseBatchJobDownloadProps {
   payeeRowDataMap: Record<string, PayeeRowData>;
@@ -17,6 +19,7 @@ export const useBatchJobDownload = ({
   onJobComplete
 }: UseBatchJobDownloadProps) => {
   const { toast } = useToast();
+  const { startDownload, updateDownload, completeDownload, clearDownload } = useDownloadProgress();
 
   const handleDownloadResults = useCallback(async (job: BatchJob) => {
     const payeeData = payeeRowDataMap[job.id];
@@ -25,8 +28,75 @@ export const useBatchJobDownload = ({
       return;
     }
 
+    const downloadId = `batch-${job.id}`;
+    const filename = `batch-results-${job.id.substring(0, 8)}.csv`;
+    const totalPayees = payeeData.uniquePayeeNames.length;
+
     try {
       console.log(`[BATCH DOWNLOAD] Starting download for job ${job.id}`);
+      
+      // Start the download progress tracking
+      startDownload(downloadId, filename, totalPayees);
+      
+      // Check if results are already processed for instant download
+      const hasPreProcessed = await AutomaticResultProcessor.hasPreProcessedResults(job.id);
+      
+      if (hasPreProcessed) {
+        console.log(`[BATCH DOWNLOAD] Using pre-processed results for instant download of job ${job.id}`);
+        
+        updateDownload(downloadId, { 
+          stage: 'Loading pre-processed results', 
+          progress: 50,
+          processed: totalPayees,
+          total: totalPayees 
+        });
+        
+        // Get pre-processed results
+        const preProcessedResults = await AutomaticResultProcessor.getPreProcessedResults(job.id);
+        
+        if (preProcessedResults) {
+          updateDownload(downloadId, { 
+            stage: 'Finalizing download', 
+            progress: 90 
+          });
+          
+          // Convert database results to PayeeClassification format
+          const finalClassifications: PayeeClassification[] = preProcessedResults.map(r => ({
+            id: r.id,
+            payeeName: r.payee_name,
+            result: r.classification as any,
+            timestamp: new Date(r.created_at)
+          }));
+          
+          const summary: BatchProcessingResult = {
+            results: finalClassifications,
+            successCount: finalClassifications.length,
+            failureCount: 0,
+            originalFileData: payeeData.originalFileData
+          };
+          
+          // Complete the download progress
+          completeDownload(downloadId);
+          
+          // Complete the job with pre-processed results
+          onJobComplete(finalClassifications, summary, job.id);
+          
+          toast({
+            title: "Instant Download Complete",
+            description: `⚡ Loaded ${finalClassifications.length} pre-processed results instantly!`,
+          });
+          
+          return;
+        }
+      }
+      
+      // Fallback to full processing if no pre-processed results available
+      updateDownload(downloadId, { 
+        stage: 'Downloading from OpenAI', 
+        progress: 5,
+        processed: 0,
+        total: totalPayees 
+      });
 
       const { finalClassifications, summary } = await processDownloadResults(
         {
@@ -37,20 +107,46 @@ export const useBatchJobDownload = ({
         },
         (processed, total, percentage) => {
           console.log(`[BATCH DOWNLOAD] Progress: ${processed}/${total} (${percentage}%)`);
+          updateDownload(downloadId, {
+            stage: percentage < 50 ? 'Processing classifications' : 'Applying keyword exclusions',
+            progress: Math.min(70, 20 + (percentage * 0.5)), // Progress from 20% to 70%
+            processed,
+            total
+          });
         }
       );
+
+      // Update progress for database save
+      updateDownload(downloadId, { 
+        stage: 'Saving to database', 
+        progress: 75,
+        processed: finalClassifications.length,
+        total: totalPayees 
+      });
 
       // Save results to database
       const saveResult = await saveProcessedResults(finalClassifications, job.id);
       
       if (!saveResult.success) {
         console.error('[BATCH DOWNLOAD] Database save failed:', saveResult.error);
+        updateDownload(downloadId, { 
+          error: saveResult.error || "Database save failed",
+          isActive: false,
+          canCancel: false 
+        });
         toast({
           title: "Warning",
           description: saveResult.error || "Database save failed",
           variant: "destructive",
         });
+        return;
       }
+
+      // Update progress for file generation
+      updateDownload(downloadId, { 
+        stage: 'Generating download files', 
+        progress: 85 
+      });
 
       // Enhanced automatic file generation for instant future downloads
       console.log(`[BATCH DOWNLOAD] Triggering enhanced file generation for job ${job.id}`);
@@ -62,6 +158,9 @@ export const useBatchJobDownload = ({
         console.warn(`[BATCH DOWNLOAD] File generation failed for job ${job.id}:`, fileGenResult.error);
       }
 
+      // Complete the download progress
+      completeDownload(downloadId);
+
       // Complete the job
       onJobComplete(finalClassifications, summary, job.id);
 
@@ -72,13 +171,18 @@ export const useBatchJobDownload = ({
 
     } catch (error) {
       console.error('[BATCH DOWNLOAD] Download failed:', error);
+      updateDownload(downloadId, { 
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+        isActive: false,
+        canCancel: false 
+      });
       toast({
         title: "Download Failed",
         description: error instanceof Error ? error.message : "Unknown error occurred",
         variant: "destructive",
       });
     }
-  }, [payeeRowDataMap, onJobComplete, toast]);
+  }, [payeeRowDataMap, onJobComplete, toast, startDownload, updateDownload, completeDownload]);
 
   return {
     handleDownloadResults

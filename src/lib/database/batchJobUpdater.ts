@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { EnhancedFileGenerationService } from '@/lib/services/enhancedFileGenerationService';
+import { AutomaticResultProcessor } from '@/lib/services/automaticResultProcessor';
 
 /**
  * Service for updating batch job status and properties
@@ -45,19 +46,30 @@ export class BatchJobUpdater {
         
         console.log(`[BATCH JOB UPDATER] Successfully updated batch job ${batchJob.id} status to ${batchJob.status}`);
         
-        // Enhanced automatic file generation when job completes
+        // Enhanced automatic processing when job completes
         if (batchJob.status === 'completed' && batchJob.request_counts.completed > 0) {
-          console.log(`[BATCH JOB UPDATER] Job ${batchJob.id} completed, triggering enhanced file generation`);
+          console.log(`[BATCH JOB UPDATER] Job ${batchJob.id} completed, triggering automatic result processing`);
           
-          // Use enhanced service for more reliable file generation
-          EnhancedFileGenerationService.processCompletedJob(batchJob).then(result => {
-            if (result.success) {
-              console.log(`[BATCH JOB UPDATER] Enhanced file generation completed for ${batchJob.id}`);
+          // Process and store results automatically for instant downloads
+          AutomaticResultProcessor.processCompletedBatch(batchJob).then(success => {
+            if (success) {
+              console.log(`[BATCH JOB UPDATER] Automatic result processing completed for ${batchJob.id}`);
+              
+              // Then generate download files
+              EnhancedFileGenerationService.processCompletedJob(batchJob).then(result => {
+                if (result.success) {
+                  console.log(`[BATCH JOB UPDATER] Enhanced file generation completed for ${batchJob.id}`);
+                } else {
+                  console.error(`[BATCH JOB UPDATER] Enhanced file generation failed for ${batchJob.id}:`, result.error);
+                }
+              }).catch(error => {
+                console.error(`[BATCH JOB UPDATER] Enhanced file generation error for ${batchJob.id}:`, error);
+              });
             } else {
-              console.error(`[BATCH JOB UPDATER] Enhanced file generation failed for ${batchJob.id}:`, result.error);
+              console.error(`[BATCH JOB UPDATER] Automatic result processing failed for ${batchJob.id}`);
             }
           }).catch(error => {
-            console.error(`[BATCH JOB UPDATER] Enhanced file generation error for ${batchJob.id}:`, error);
+            console.error(`[BATCH JOB UPDATER] Automatic result processing error for ${batchJob.id}:`, error);
           });
         }
         

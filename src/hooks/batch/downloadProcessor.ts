@@ -12,9 +12,15 @@ export async function processDownloadResults(
   
   console.log(`[BATCH DOWNLOAD] Downloading results for ${uniquePayeeNames.length} unique payees from ${payeeData.originalFileData.length} original rows`);
   
+  // Start with initial progress
+  onProgress(0, uniquePayeeNames.length, 0);
+  
   // Download raw results from OpenAI
   const rawResults = await getBatchJobResults(job, uniquePayeeNames);
   console.log(`[BATCH DOWNLOAD] Downloaded ${rawResults.length} raw results from OpenAI`);
+  
+  // Progress after download
+  onProgress(0, uniquePayeeNames.length, 10);
 
   // Process results with enhanced validation and progress tracking
   const { finalClassifications, summary } = await processEnhancedBatchResults({
@@ -22,10 +28,17 @@ export async function processDownloadResults(
     uniquePayeeNames,
     payeeData,
     job,
-    onProgress
+    onProgress: (processed, total, percentage) => {
+      // Forward progress but adjust the percentage to account for download step
+      const adjustedPercentage = 10 + (percentage * 0.8); // 10% to 90%
+      onProgress(processed, total, adjustedPercentage);
+    }
   });
 
   console.log(`[BATCH DOWNLOAD] Enhanced processing complete: ${finalClassifications.length} unique classifications`);
+  
+  // Final progress
+  onProgress(uniquePayeeNames.length, uniquePayeeNames.length, 90);
   
   return { finalClassifications, summary };
 }
