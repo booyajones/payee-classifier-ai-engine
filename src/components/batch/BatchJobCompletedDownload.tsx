@@ -1,6 +1,6 @@
 import React from 'react';
-import { Button } from '@/components/ui/button';
-import { Download, Loader2, Zap, Clock } from 'lucide-react';
+import { Zap } from 'lucide-react';
+import DirectDatabaseDownload from './DirectDatabaseDownload';
 
 interface DownloadStatus {
   status: 'instant' | 'processing' | 'unavailable' | 'checking';
@@ -9,15 +9,17 @@ interface DownloadStatus {
 }
 
 interface BatchJobCompletedDownloadProps {
+  jobId: string;
   downloadStatus: DownloadStatus;
   activeDownload: {
     isActive: boolean;
   } | undefined;
-  onDownload: () => void;
+  onDownload?: () => void;
   onForceDownload?: () => void;
 }
 
 const BatchJobCompletedDownload = ({ 
+  jobId,
   downloadStatus, 
   activeDownload, 
   onDownload,
@@ -31,15 +33,10 @@ const BatchJobCompletedDownload = ({
           <span className="text-sm font-medium text-green-700">✅ CSV Ready - Click Download</span>
         </div>
         
-        <Button 
-          onClick={onDownload} 
-          size="sm" 
-          className="flex items-center gap-2"
-          disabled={activeDownload?.isActive}
-        >
-          <Download className="h-4 w-4" />
-          Download CSV
-        </Button>
+        <DirectDatabaseDownload 
+          jobId={jobId}
+          className="text-sm px-3 py-1"
+        />
       </div>
       
       <div className="text-xs text-green-600 font-medium">
