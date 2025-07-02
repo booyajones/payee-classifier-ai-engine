@@ -5,7 +5,7 @@ import { RotateCcw, Download, Clock } from "lucide-react";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import DownloadStatusDisplay from './DownloadStatusDisplay';
 import { useFileStatus } from '@/hooks/useFileStatus';
-import { useDownloadHandler } from '@/hooks/useDownloadHandler';
+import { useEnhancedDownloadWithNaming } from '@/hooks/useEnhancedDownloadWithNaming';
 
 interface BatchResultsActionsProps {
   batchResults: PayeeClassification[];
@@ -23,7 +23,7 @@ const BatchResultsActions = ({
   jobId
 }: BatchResultsActionsProps) => {
   const { fileStatus, isChecking, hasPreGeneratedFiles } = useFileStatus(jobId);
-  const { handleDownload, isGenerating } = useDownloadHandler(
+  const { handleDownload, isGenerating } = useEnhancedDownloadWithNaming(
     fileStatus,
     () => {}, // setFileStatus not needed in this refactored version
     jobId,

@@ -11,6 +11,49 @@ export class EnhancedFileGenerationService {
   private static retryDelay = 2000; // 2 seconds
 
   /**
+   * Background service to automatically process all completed jobs without files
+   */
+  static async processAllCompletedJobsInBackground(): Promise<void> {
+    try {
+      logger.info('Starting background processing of completed jobs', undefined, this.context);
+
+      // Find completed jobs without files
+      const { data: jobs, error } = await supabase
+        .from('batch_jobs')
+        .select('*')
+        .eq('status', 'completed')
+        .or('csv_file_url.is.null,excel_file_url.is.null')
+        .gt('request_counts_completed', 0)
+        .order('completed_at_timestamp', { ascending: false })
+        .limit(10); // Process 10 at a time to avoid overwhelming
+
+      if (error || !jobs || jobs.length === 0) {
+        logger.info('No completed jobs need background processing', undefined, this.context);
+        return;
+      }
+
+      logger.info(`Processing ${jobs.length} completed jobs in background`, undefined, this.context);
+
+      // Process jobs with limited concurrency
+      const processingPromises = jobs.map(async (jobData) => {
+        try {
+          const batchJob = this.convertToBatchJob(jobData);
+          await this.processCompletedJob(batchJob);
+          logger.info(`Background processed job ${jobData.id}`, undefined, this.context);
+        } catch (error) {
+          logger.error(`Failed to background process job ${jobData.id}`, { error }, this.context);
+        }
+      });
+
+      await Promise.allSettled(processingPromises);
+      logger.info('Background processing of completed jobs finished', undefined, this.context);
+
+    } catch (error) {
+      logger.error('Error in background processing service', { error }, this.context);
+    }
+  }
+
+  /**
    * Process a newly completed job with enhanced reliability
    */
   static async processCompletedJob(job: BatchJob): Promise<{

@@ -7,7 +7,7 @@ import { PayeeRowData } from '@/lib/rowMapping';
 import BatchJobList from './BatchJobList';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import ProcessExistingJobsButton from './ProcessExistingJobsButton';
+
 
 interface BatchJobContainerProps {
   jobs: BatchJob[];
@@ -85,19 +85,15 @@ const BatchJobContainer = ({
             )}
           </div>
         </div>
-        <div className="flex gap-2">
-          <ProcessExistingJobsButton onProcessingComplete={handleRefreshAll} />
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefreshAll}
-            disabled={isRefreshingAll}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshingAll ? 'animate-spin' : ''}`} />
-            Refresh All
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefreshAll}
+          disabled={isRefreshingAll}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshingAll ? 'animate-spin' : ''}`} />
+          Refresh All
+        </Button>
       </div>
 
       {stalledJobs.length > 0 && (

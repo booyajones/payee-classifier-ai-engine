@@ -3,6 +3,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { UnifiedProgressProvider } from "@/contexts/UnifiedProgressContext";
 import { DownloadProgressProvider } from "@/contexts/DownloadProgressContext";
 import { useIndexState } from "@/hooks/useIndexState";
+import { useBackgroundJobProcessor } from "@/hooks/useBackgroundJobProcessor";
 import AppHeader from "@/components/layout/AppHeader";
 import AppFooter from "@/components/layout/AppFooter";
 import MainTabs from "@/components/navigation/MainTabs";
@@ -19,6 +20,9 @@ const Index = () => {
     handleJobDelete,
     handleKeySet
   } = useIndexState();
+  
+  // Automatically process existing completed jobs in background
+  useBackgroundJobProcessor();
   
   console.log('Index state:', { hasApiKey, batchResultsLength: batchResults.length });
 

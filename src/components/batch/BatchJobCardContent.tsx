@@ -152,8 +152,8 @@ const BatchJobCardContent = ({
                 </>
               ) : (
                 <>
-                  <Clock className="h-4 w-4 text-gray-600" />
-                  <span className="text-sm font-medium text-gray-700">Status unknown</span>
+                  <Clock className="h-4 w-4 text-orange-600" />
+                  <span className="text-sm font-medium text-orange-700">⏳ Auto-Processing...</span>
                 </>
               )}
             </div>
