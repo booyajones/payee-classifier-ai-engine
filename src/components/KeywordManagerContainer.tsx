@@ -15,6 +15,7 @@ import {
 } from "@/lib/database/exclusionKeywordService";
 import KeywordManagerHeader from "./KeywordManagerHeader";
 import KeywordManagerContent from "./KeywordManagerContent";
+import DuplicateTestRunner from "@/components/testing/DuplicateTestRunner";
 
 const KeywordManagerContainer = () => {
   const [comprehensiveKeywords, setComprehensiveKeywords] = useState<string[]>([]);
@@ -306,6 +307,11 @@ const KeywordManagerContainer = () => {
         onCancelEdit={handleCancelEdit}
         onEditingValueChange={setEditingValue}
       />
+      
+      {/* Testing Section - Development/Debugging */}
+      <div className="border-t pt-6">
+        <DuplicateTestRunner />
+      </div>
     </div>
   );
 };
