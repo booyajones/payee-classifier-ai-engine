@@ -10,7 +10,7 @@ import { productionLogger } from '@/lib/logging/productionLogger';
 export class BackgroundFileGenerationService {
   private static isRunning = false;
   private static intervalId: NodeJS.Timeout | null = null;
-  private static readonly POLL_INTERVAL = 30000; // 30 seconds
+  private static readonly POLL_INTERVAL = 15000; // 15 seconds - faster polling
   private static readonly MAX_RETRIES = 3;
 
   /**
@@ -57,9 +57,9 @@ export class BackgroundFileGenerationService {
    */
   private static async processQueue(): Promise<void> {
     try {
-      // First, reset any items stuck in processing for more than 10 minutes
-      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-      await supabase
+      // First, reset any items stuck in processing for more than 5 minutes
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const { data: stalledItems } = await supabase
         .from('file_generation_queue')
         .update({
           status: 'pending',
@@ -68,7 +68,12 @@ export class BackgroundFileGenerationService {
           updated_at: new Date().toISOString()
         })
         .eq('status', 'processing')
-        .lt('updated_at', tenMinutesAgo);
+        .lt('updated_at', fiveMinutesAgo)
+        .select('id');
+
+      if (stalledItems && stalledItems.length > 0) {
+        productionLogger.warn(`Reset ${stalledItems.length} stalled items`, undefined, 'BACKGROUND_FILE_GEN');
+      }
 
       // Get pending queue items
       const { data: queueItems, error } = await supabase
@@ -77,7 +82,7 @@ export class BackgroundFileGenerationService {
         .eq('status', 'pending')
         .lt('retry_count', this.MAX_RETRIES)
         .order('created_at', { ascending: true })
-        .limit(3); // Reduced from 5 to 3 for more reliable processing
+        .limit(2); // Process 2 at a time for better reliability
 
       if (error) {
         productionLogger.error('Failed to fetch queue items', error, 'BACKGROUND_FILE_GEN');

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, Zap, RefreshCw, Play, CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { EmergencyFileGenerationService } from '@/lib/services/emergencyFileGenerationService';
+import { ForceFileGenerationService } from '@/lib/services/forceFileGenerationService';
 import { productionLogger } from '@/lib/logging/productionLogger';
 
 const EmergencyFileFixPanel = () => {
@@ -68,11 +69,11 @@ const EmergencyFileFixPanel = () => {
   const handleForceProcess = async () => {
     setIsForceProcessing(true);
     try {
-      const result = await EmergencyFileGenerationService.forceProcessPending();
+      const result = await ForceFileGenerationService.forceProcessAllPending();
       
       if (result.success) {
         toast({
-          title: "Force Processing Initiated",
+          title: "Force Processing Complete",
           description: result.message,
         });
         await fetchEmergencyStatus(); // Refresh status

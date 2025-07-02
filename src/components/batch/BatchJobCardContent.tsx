@@ -4,6 +4,8 @@ import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import { useDownloadProgress } from '@/contexts/DownloadProgressContext';
 import { InstantDownloadService } from '@/lib/services/instantDownloadService';
+import { ForceFileGenerationService } from '@/lib/services/forceFileGenerationService';
+import { useToast } from '@/hooks/use-toast';
 import BatchJobProgress from './BatchJobProgress';
 import BatchJobRequestCounts from './BatchJobRequestCounts';
 import BatchJobStuckWarning from './BatchJobStuckWarning';
@@ -25,6 +27,7 @@ const BatchJobCardContent = ({
   onDownload
 }: BatchJobCardContentProps) => {
   const { downloads } = useDownloadProgress();
+  const { toast } = useToast();
   
   // Check for active download for this job
   const downloadId = `batch-${job.id}`;
@@ -58,6 +61,44 @@ const BatchJobCardContent = ({
     }
   }, [job.id, job.status]);
 
+  // Force download handler
+  const handleForceDownload = async () => {
+    try {
+      toast({
+        title: "Force Generating Files",
+        description: "Generating files immediately...",
+      });
+
+      const result = await ForceFileGenerationService.forceGenerateFiles(job.id);
+      
+      if (result.success) {
+        toast({
+          title: "Files Generated",
+          description: result.message,
+        });
+        
+        // Update download status
+        setDownloadStatus({
+          status: 'instant',
+          hasFiles: !!(result.csvUrl && result.excelUrl),
+          hasResults: true
+        });
+        
+        // Trigger the regular download
+        onDownload();
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error) {
+      productionLogger.error('Force download failed', error, 'BATCH_UI');
+      toast({
+        title: "Force Generation Failed",
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="space-y-3">
       <BatchJobProgress job={job} />
@@ -70,6 +111,7 @@ const BatchJobCardContent = ({
           downloadStatus={downloadStatus}
           activeDownload={activeDownload}
           onDownload={onDownload}
+          onForceDownload={handleForceDownload}
         />
       )}
       

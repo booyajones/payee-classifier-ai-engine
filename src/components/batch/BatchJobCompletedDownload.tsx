@@ -14,12 +14,14 @@ interface BatchJobCompletedDownloadProps {
     isActive: boolean;
   } | undefined;
   onDownload: () => void;
+  onForceDownload?: () => void;
 }
 
 const BatchJobCompletedDownload = ({ 
   downloadStatus, 
   activeDownload, 
-  onDownload 
+  onDownload,
+  onForceDownload
 }: BatchJobCompletedDownloadProps) => {
   return (
     <div className="space-y-2 p-3 bg-muted/30 border border-border rounded-lg">
@@ -48,19 +50,34 @@ const BatchJobCompletedDownload = ({
           )}
         </div>
         
-        <Button 
-          onClick={onDownload} 
-          size="sm" 
-          className="flex items-center gap-2"
-          variant={downloadStatus.status === 'instant' ? "default" : "outline"}
-          disabled={activeDownload?.isActive || downloadStatus.status === 'checking'}
-        >
-          {downloadStatus.status === 'instant' ? (
-            <><Zap className="h-4 w-4" />Instant Download</>
-          ) : (
-            <><Download className="h-4 w-4" />Download</>
+        <div className="flex gap-2">
+          <Button 
+            onClick={onDownload} 
+            size="sm" 
+            className="flex items-center gap-2"
+            variant={downloadStatus.status === 'instant' ? "default" : "outline"}
+            disabled={activeDownload?.isActive || downloadStatus.status === 'checking'}
+          >
+            {downloadStatus.status === 'instant' ? (
+              <><Zap className="h-4 w-4" />Instant Download</>
+            ) : (
+              <><Download className="h-4 w-4" />Download</>
+            )}
+          </Button>
+          
+          {downloadStatus.status === 'processing' && onForceDownload && (
+            <Button 
+              onClick={onForceDownload}
+              size="sm" 
+              variant="destructive"
+              className="flex items-center gap-2"
+              disabled={activeDownload?.isActive}
+            >
+              <Zap className="h-4 w-4" />
+              Force Generate
+            </Button>
           )}
-        </Button>
+        </div>
       </div>
       
       {downloadStatus.status === 'processing' && (
