@@ -8,8 +8,6 @@ import BatchJobList from './BatchJobList';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import FileGenerationFixer from '@/components/debug/FileGenerationFixer';
-import FileGenerationMonitor from '@/components/monitoring/FileGenerationMonitor';
-import EmergencyFileFixPanel from '@/components/emergency/EmergencyFileFixPanel';
 
 
 interface BatchJobContainerProps {
@@ -72,7 +70,7 @@ const BatchJobContainer = ({
     );
   }
 
-  // Check if any completed jobs are missing files
+  // Only show file generation fixer for truly completed jobs that have processed data
   const completedJobsWithoutFiles = jobs.filter(job => 
     job.status === 'completed' && 
     job.request_counts.completed > 0
@@ -80,13 +78,7 @@ const BatchJobContainer = ({
 
   return (
     <div className="space-y-4">
-      {/* Show file generation monitor */}
-      <FileGenerationMonitor />
-      
-      {/* Show emergency fix panel if system is stalled */}
-      {(stalledJobs.length > 0 || completedJobsWithoutFiles.length > 3) && <EmergencyFileFixPanel />}
-      
-      {/* Show file generation fixer if completed jobs exist */}
+      {/* Only show file generation fixer for truly completed jobs with missing files */}
       {completedJobsWithoutFiles.length > 0 && <FileGenerationFixer />}
       
       <div className="flex items-center justify-between">

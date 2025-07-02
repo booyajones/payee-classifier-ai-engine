@@ -42,7 +42,7 @@ const BatchJobCardContent = ({
   
   productionLogger.debug(`Job ${job.id.substring(0,8)}: activeDownload status`, { activeDownload, downloadStatus }, 'BATCH_UI');
   
-  // Check download status for completed jobs
+  // Check download status only for truly completed jobs
   useEffect(() => {
     if (job.status === 'completed') {
       InstantDownloadService.hasInstantDownload(job.id)
@@ -58,6 +58,9 @@ const BatchJobCardContent = ({
           productionLogger.error('Error checking download status', error, 'BATCH_UI');
           setDownloadStatus({ status: 'unavailable', hasFiles: false, hasResults: false });
         });
+    } else {
+      // For non-completed jobs, show processing status
+      setDownloadStatus({ status: 'checking', hasFiles: false, hasResults: false });
     }
   }, [job.id, job.status]);
 
