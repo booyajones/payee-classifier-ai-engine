@@ -2,6 +2,7 @@ import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeRowData } from "@/lib/rowMapping";
 import { handleError, showErrorToast } from "@/lib/errorHandler";
 import { useToast } from "@/hooks/use-toast";
+import { productionLogger } from '@/lib/logging/productionLogger';
 
 export const createActionHandlers = (
   jobs: BatchJob[],
@@ -16,7 +17,7 @@ export const createActionHandlers = (
   // Enhanced manual refresh with stall detection
   const handleRefreshJob = async (jobId: string, silent: boolean = false) => {
     try {
-      console.log(`[BATCH ACTIONS] Starting enhanced refresh for job ${jobId}${silent ? ' (silent)' : ''}`);
+      productionLogger.debug(`Starting enhanced refresh for job ${jobId}${silent ? ' (silent)' : ''}`, undefined, 'BATCH_ACTIONS');
       
       // Comprehensive input validation
       if (!jobId || typeof jobId !== 'string') {
@@ -30,11 +31,11 @@ export const createActionHandlers = (
       // Check if job exists in our jobs list
       const job = jobs.find(j => j.id === jobId);
       if (!job) {
-        console.warn(`[BATCH ACTIONS] Job ${jobId} not found in current jobs list, proceeding with refresh anyway`);
+        productionLogger.warn(`Job ${jobId} not found in current jobs list, proceeding with refresh anyway`, undefined, 'BATCH_ACTIONS');
       } else {
         // Pre-check for stalled jobs before refresh
         if (detectStalledJob(job)) {
-          console.warn(`[BATCH ACTIONS] Job ${jobId} appears stalled before refresh`);
+          productionLogger.warn(`Job ${jobId} appears stalled before refresh`, undefined, 'BATCH_ACTIONS');
           toast({
             title: "Potentially Stalled Job",
             description: `Job ${jobId.substring(0, 8)}... may be stalled. Refreshing to verify status...`,
@@ -47,7 +48,7 @@ export const createActionHandlers = (
       // Call refresh with proper error handling
       await refreshSpecificJob(jobId, () => baseHandleRefreshJob(jobId, silent));
       
-      console.log(`[BATCH ACTIONS] Enhanced refresh completed successfully for job ${jobId}`);
+      productionLogger.info(`Enhanced refresh completed successfully for job ${jobId}`, undefined, 'BATCH_ACTIONS');
       
       if (!silent) {
         toast({
@@ -57,7 +58,7 @@ export const createActionHandlers = (
       }
       
     } catch (error) {
-      console.error(`[BATCH ACTIONS] Enhanced refresh error for job ${jobId}:`, error);
+      productionLogger.error(`Enhanced refresh error for job ${jobId}`, error, 'BATCH_ACTIONS');
       
       const appError = handleError(error, 'Job Refresh');
       
@@ -72,7 +73,7 @@ export const createActionHandlers = (
   // Enhanced download with validation and error handling
   const handleDownloadResults = async (job: BatchJob) => {
     try {
-      console.log(`[BATCH ACTIONS] Starting enhanced download for job ${job.id}`);
+      productionLogger.debug(`Starting enhanced download for job ${job.id}`, undefined, 'BATCH_ACTIONS');
       
       // Comprehensive input validation
       if (!job || typeof job !== 'object') {
@@ -94,12 +95,12 @@ export const createActionHandlers = (
       
       // Check if we have payee data for this job
       if (!payeeRowDataMap[job.id]) {
-        console.warn(`[BATCH ACTIONS] No payee data found for job ${job.id}, proceeding with download anyway`);
+        productionLogger.warn(`No payee data found for job ${job.id}, proceeding with download anyway`, undefined, 'BATCH_ACTIONS');
       }
       
       await baseHandleDownloadResults(job);
       
-      console.log(`[BATCH ACTIONS] Enhanced download completed successfully for job ${job.id}`);
+      productionLogger.info(`Enhanced download completed successfully for job ${job.id}`, undefined, 'BATCH_ACTIONS');
       
       toast({
         title: "Download Complete",
@@ -107,7 +108,7 @@ export const createActionHandlers = (
       });
       
     } catch (error) {
-      console.error(`[BATCH ACTIONS] Enhanced download error for job ${job?.id}:`, error);
+      productionLogger.error(`Enhanced download error for job ${job?.id}`, error, 'BATCH_ACTIONS');
       
       const appError = handleError(error, 'Results Download');
       showErrorToast(appError, 'Results Download');
@@ -119,7 +120,7 @@ export const createActionHandlers = (
   // Enhanced cancel job with validation and stall handling
   const handleCancelJobWithValidation = async (jobId: string) => {
     try {
-      console.log(`[BATCH ACTIONS] Starting enhanced cancellation for job ${jobId}`);
+      productionLogger.debug(`Starting enhanced cancellation for job ${jobId}`, undefined, 'BATCH_ACTIONS');
       
       // Comprehensive input validation
       if (!jobId || typeof jobId !== 'string') {
@@ -138,7 +139,7 @@ export const createActionHandlers = (
 
       // Special handling for stalled jobs
       if (detectStalledJob(job)) {
-        console.log(`[BATCH ACTIONS] Cancelling stalled job ${jobId}`);
+        productionLogger.info(`Cancelling stalled job ${jobId}`, undefined, 'BATCH_ACTIONS');
         toast({
           title: "Cancelling Stalled Job",
           description: `Cancelling job ${jobId.substring(0, 8)}... that appears to be stalled. You can retry with a new batch.`,
@@ -148,7 +149,7 @@ export const createActionHandlers = (
       
       await handleCancelJob(jobId);
       
-      console.log(`[BATCH ACTIONS] Enhanced cancellation completed successfully for job ${jobId}`);
+      productionLogger.info(`Enhanced cancellation completed successfully for job ${jobId}`, undefined, 'BATCH_ACTIONS');
       
       toast({
         title: "Job Cancelled",
@@ -156,7 +157,7 @@ export const createActionHandlers = (
       });
       
     } catch (error) {
-      console.error(`[BATCH ACTIONS] Enhanced cancellation error for job ${jobId}:`, error);
+      productionLogger.error(`Enhanced cancellation error for job ${jobId}`, error, 'BATCH_ACTIONS');
       
       const appError = handleError(error, 'Job Cancellation');
       showErrorToast(appError, 'Job Cancellation');

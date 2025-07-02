@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { productionLogger } from '@/lib/logging/productionLogger';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import { useDownloadProgress } from '@/contexts/DownloadProgressContext';
@@ -36,14 +37,14 @@ const BatchJobCardContent = ({
     hasResults: boolean;
   }>({ status: 'checking', hasFiles: false, hasResults: false });
   
-  console.log(`[BATCH JOB CARD] Job ${job.id.substring(0,8)}: activeDownload =`, activeDownload, 'downloadStatus =', downloadStatus);
+  productionLogger.debug(`Job ${job.id.substring(0,8)}: activeDownload status`, { activeDownload, downloadStatus }, 'BATCH_UI');
   
   // Check download status for completed jobs
   useEffect(() => {
     if (job.status === 'completed') {
       InstantDownloadService.hasInstantDownload(job.id)
         .then(status => {
-          console.log(`[BATCH JOB CARD] Download status for ${job.id.substring(0,8)}:`, status);
+          productionLogger.debug(`Download status for ${job.id.substring(0,8)}`, status, 'BATCH_UI');
           setDownloadStatus({
             status: status.status,
             hasFiles: status.hasFiles,
@@ -51,7 +52,7 @@ const BatchJobCardContent = ({
           });
         })
         .catch(error => {
-          console.error(`[BATCH JOB CARD] Error checking download status:`, error);
+          productionLogger.error('Error checking download status', error, 'BATCH_UI');
           setDownloadStatus({ status: 'unavailable', hasFiles: false, hasResults: false });
         });
     }

@@ -8,6 +8,7 @@ import BatchJobList from './BatchJobList';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import FileGenerationFixer from '@/components/debug/FileGenerationFixer';
+import FileGenerationMonitor from '@/components/monitoring/FileGenerationMonitor';
 
 
 interface BatchJobContainerProps {
@@ -78,6 +79,9 @@ const BatchJobContainer = ({
 
   return (
     <div className="space-y-4">
+      {/* Show file generation monitor */}
+      <FileGenerationMonitor />
+      
       {/* Show file generation fixer if completed jobs exist */}
       {completedJobsWithoutFiles.length > 0 && <FileGenerationFixer />}
       

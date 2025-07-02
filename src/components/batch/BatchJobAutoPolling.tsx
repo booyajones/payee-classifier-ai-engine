@@ -1,6 +1,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
+import { productionLogger } from '@/lib/logging/productionLogger';
 
 interface UseBatchJobAutoPollingProps {
   jobs: BatchJob[];
@@ -25,7 +26,7 @@ export const useBatchJobAutoPolling = ({
       delete pollTimeouts.current[jobId];
     }
     isPollingRef.current.delete(jobId);
-    // Removed console.log for performance
+    productionLogger.debug('Cleanup polling for job', { jobId }, 'BATCH_POLLING');
   }, []);
 
   const hasJobChanged = useCallback((job: BatchJob): boolean => {
@@ -117,7 +118,7 @@ export const useBatchJobAutoPolling = ({
       ['validating', 'in_progress', 'finalizing'].includes(job.status)
     );
 
-    // Check for active jobs that need polling
+    productionLogger.debug(`Auto-polling: checking ${activeJobs.length} active jobs`, undefined, 'BATCH_POLLING');
 
     // Start polling for new active jobs
     for (const job of activeJobs) {
