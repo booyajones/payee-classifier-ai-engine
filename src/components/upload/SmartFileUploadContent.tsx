@@ -7,7 +7,7 @@ import EnhancedUploadProgressDisplay from './EnhancedUploadProgressDisplay';
 import UploadSuccessDisplay from './UploadSuccessDisplay';
 import UploadErrorDisplay from './UploadErrorDisplay';
 import ProgressIndicator from '../ui/progress-indicator';
-import DuplicateDetectionResults from '../duplicate/DuplicateDetectionResults';
+import { DuplicateDetectionResults } from '../duplicate';
 
 interface SmartFileUploadContentProps {
   uploadState: UploadState;
