@@ -287,6 +287,7 @@ export const useSmartFileUpload = () => {
     uploadState,
     setUploadState,
     errorMessage,
+    setErrorMessage,
     suggestions,
     fileData,
     fileHeaders,

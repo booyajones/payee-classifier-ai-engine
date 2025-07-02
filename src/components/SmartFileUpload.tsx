@@ -22,6 +22,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
     uploadState,
     setUploadState,
     errorMessage,
+    setErrorMessage,
     fileData,
     fileHeaders,
     selectedPayeeColumn,
@@ -38,9 +39,26 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
     UPLOAD_ID
   } = useSmartFileUpload();
 
-  // Simplified core handler for now
-  const coreHandleColumnSelect = async () => {
-    console.log('Column select handled - simplified version');
+  // Core batch job creation handler
+  const coreHandleColumnSelect = async (payeeRowData: PayeeRowData) => {
+    console.log('Creating batch job with payee data:', payeeRowData.uniquePayeeNames.length);
+    
+    try {
+      setUploadState('processing');
+      updateProgress(UPLOAD_ID, 'Creating batch job...', 70);
+      
+      // Create the batch job via callback
+      onBatchJobCreated(null, payeeRowData);
+      
+      updateProgress(UPLOAD_ID, 'Batch job created successfully!', 100);
+      completeProgress(UPLOAD_ID, 'Ready for processing!');
+      setUploadState('complete');
+      
+    } catch (error) {
+      console.error('Failed to create batch job:', error);
+      setUploadState('error');
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to create batch job');
+    }
   };
 
   // Debug logging for main component
@@ -77,7 +95,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
     }
 
     console.log('Payee column validated successfully, proceeding with batch creation');
-    await coreHandleColumnSelect();
+    await coreHandleColumnSelect(payeeRowData);
   };
 
   const isProcessing = uploadState === 'processing';

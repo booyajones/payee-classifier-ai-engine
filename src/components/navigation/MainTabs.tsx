@@ -6,11 +6,16 @@ import SingleClassificationForm from "@/components/SingleClassificationForm";
 
 import SmartFileUpload from "@/components/SmartFileUpload";
 import KeywordExclusionManager from "@/components/KeywordExclusionManager";
+import BatchJobManager from "@/components/BatchJobManager";
 
 import OptimizedVirtualizedTable from "@/components/table/OptimizedVirtualizedTable";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { useTableSorting } from "@/hooks/useTableSorting";
 import { useAppStore } from "@/stores/appStore";
+import { useBatchJobStore } from "@/stores/batchJobStore";
+import { createBatchJob } from "@/lib/openai/trueBatchAPI";
+import { useToast } from "@/hooks/use-toast";
+import { useBatchJobPersistence } from "@/hooks/useBatchJobPersistence";
 
 interface MainTabsProps {
   allResults: PayeeClassification[];
@@ -22,6 +27,9 @@ interface MainTabsProps {
 const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: MainTabsProps) => {
   console.log('MainTabs rendering, props:', { allResultsLength: allResults.length });
   const { activeTab, setActiveTab } = useAppStore();
+  const { addJob, setPayeeData } = useBatchJobStore();
+  const { toast } = useToast();
+  const { saveBatchJob } = useBatchJobPersistence();
   console.log('MainTabs activeTab:', activeTab);
 
   // Generate original columns from results data - memoized to prevent rerenders
@@ -56,6 +64,42 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
     console.log('View details for payee:', result.payeeName);
   };
 
+  // Handler for batch job creation
+  const handleBatchJobCreated = async (batchJob: any, payeeRowData: any) => {
+    console.log('Creating new batch job with payee data:', payeeRowData.uniquePayeeNames.length);
+    
+    try {
+      // Create the actual OpenAI batch job
+      const newBatchJob = await createBatchJob(
+        payeeRowData.uniquePayeeNames,
+        `Payee classification for ${payeeRowData.uniquePayeeNames.length} payees`
+      );
+      
+      // Add to the batch job store
+      addJob(newBatchJob);
+      setPayeeData(newBatchJob.id, payeeRowData);
+      
+      // Save to database
+      await saveBatchJob(newBatchJob, payeeRowData);
+      
+      toast({
+        title: "Batch Job Created",
+        description: `Created job ${newBatchJob.id.slice(0, 8)}... for ${payeeRowData.uniquePayeeNames.length} payees`,
+      });
+      
+      // Switch to jobs tab
+      setActiveTab('jobs');
+      
+    } catch (error) {
+      console.error('Failed to create batch job:', error);
+      toast({
+        title: "Job Creation Failed",
+        description: error instanceof Error ? error.message : 'Failed to create job',
+        variant: "destructive"
+      });
+    }
+  };
+
   // Generate columns from results data - memoized to prevent rerenders
   const generateColumns = useMemo(() => {
     if (allResults.length === 0) {
@@ -79,7 +123,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
   
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-      <TabsList className="grid w-full grid-cols-4">
+      <TabsList className="grid w-full grid-cols-5">
         <TabsTrigger value="single" className="flex items-center gap-2">
           <Play className="h-4 w-4" />
           Single
@@ -87,6 +131,10 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
         <TabsTrigger value="upload" className="flex items-center gap-2">
           <Upload className="h-4 w-4" />
           Upload
+        </TabsTrigger>
+        <TabsTrigger value="jobs" className="flex items-center gap-2">
+          <Users className="h-4 w-4" />
+          Jobs
         </TabsTrigger>
         <TabsTrigger value="results" className="flex items-center gap-2">
           <Eye className="h-4 w-4" />
@@ -105,16 +153,17 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
 
       <TabsContent value="upload" className="mt-6">
         <SmartFileUpload 
-          onBatchJobCreated={(batchJob, payeeRowData) => {
-            console.log('Batch job created from upload:', batchJob?.id);
-            setActiveTab('batch');
-          }}
+          onBatchJobCreated={handleBatchJobCreated}
           onProcessingComplete={(results, summary, jobId) => {
             console.log('Processing complete:', results.length, jobId);
             onComplete(results, summary);
             setActiveTab('results');
           }}
         />
+      </TabsContent>
+
+      <TabsContent value="jobs" className="mt-6">
+        <BatchJobManager />
       </TabsContent>
 
       <TabsContent value="results" className="mt-6">
