@@ -208,7 +208,13 @@ export async function getKeywordCategories(): Promise<string[]> {
       return [];
     }
 
-    const categories = [...new Set(data?.map(item => item.category) || [])];
+    // Get unique categories, filter out null/undefined, and sort
+    const categories = [...new Set(
+      data?.map(item => item.category)
+        .filter(category => category && typeof category === 'string' && category.trim())
+        .map(category => category.trim()) || []
+    )];
+    
     return categories.sort();
   } catch (error) {
     console.error('Error loading keyword categories:', error);

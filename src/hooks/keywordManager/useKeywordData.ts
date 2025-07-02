@@ -20,9 +20,10 @@ export const useKeywordData = () => {
       const allKeywordData = await loadAllExclusionKeywords();
       setAllKeywords(allKeywordData);
       
-      // Load categories
+      // Load categories and ensure 'all' is first
       const categoryData = await getKeywordCategories();
-      setCategories(['all', ...categoryData]);
+      const uniqueCategories = Array.from(new Set(categoryData));
+      setCategories(['all', ...uniqueCategories]);
       
       console.log(`[KEYWORD EXCLUSION MANAGER] Loaded ${allKeywordData.length} total keywords with ${categoryData.length} categories`);
     } catch (error) {

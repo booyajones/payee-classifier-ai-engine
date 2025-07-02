@@ -16,8 +16,12 @@ export const useKeywordOperations = () => {
     allKeywords: ExclusionKeyword[],
     reloadKeywords: () => Promise<void>
   ) => {
+    // Normalize inputs
+    const normalizedKeyword = keyword.trim().toLowerCase();
+    const normalizedCategory = category.trim().toLowerCase();
+    
     // Check if keyword already exists
-    if (allKeywords.some(k => k.keyword.toLowerCase() === keyword.toLowerCase())) {
+    if (allKeywords.some(k => k.keyword.toLowerCase() === normalizedKeyword)) {
       toast({
         title: "Duplicate Keyword",
         description: "This keyword already exists",
@@ -27,7 +31,7 @@ export const useKeywordOperations = () => {
     }
 
     try {
-      const result = await addCustomExclusionKeyword(keyword, category);
+      const result = await addCustomExclusionKeyword(keyword.trim(), normalizedCategory);
       
       if (result.success) {
         clearCustomKeywordsCache();

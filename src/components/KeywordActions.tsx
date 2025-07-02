@@ -61,7 +61,7 @@ const KeywordActions = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="custom">Custom</SelectItem>
-              {categories.map((category) => (
+              {categories.filter(cat => cat !== 'custom').map((category) => (
                 <SelectItem key={category} value={category}>
                   {category.charAt(0).toUpperCase() + category.slice(1)}
                 </SelectItem>
