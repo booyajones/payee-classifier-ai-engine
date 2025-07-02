@@ -177,55 +177,12 @@ export const useBatchJobDownload = ({
       // Complete the download progress
       completeDownload(downloadId);
 
-      // AUTO-GENERATE AND DOWNLOAD CSV FILE IMMEDIATELY
-      try {
-        console.log(`[BATCH DOWNLOAD] Auto-generating CSV download for ${finalClassifications.length} results`);
-        
-        // Create CSV content with all classification data
-        const csvHeaders = [
-          'payeeName', 'classification', 'confidence', 'sicCode', 'sicDescription', 
-          'processingTier', 'reasoning', 'keywordExclusion', 'matchedKeywords'
-        ];
-        
-        const csvHeader = csvHeaders.map(col => `"${col}"`).join(',') + '\n';
-        const csvRows = finalClassifications.map(result => {
-          return [
-            result.payeeName || '',
-            result.result.classification || '',
-            result.result.confidence || '',
-            result.result.sicCode || '',
-            result.result.sicDescription || '',
-            result.result.processingTier || '',
-            result.result.reasoning || '',
-            result.result.keywordExclusion?.isExcluded ? 'Yes' : 'No',
-            result.result.keywordExclusion?.matchedKeywords?.join('; ') || ''
-          ].map(value => `"${String(value).replace(/"/g, '""')}"`).join(',');
-        }).join('\n');
-        
-        const csvContent = csvHeader + csvRows;
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = window.URL.createObjectURL(blob);
-        
-        // Create and trigger download
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `payee_classifications_${job.id.substring(0, 8)}_${Date.now()}.csv`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-        
-        console.log(`[BATCH DOWNLOAD] CSV file auto-downloaded successfully`);
-      } catch (csvError) {
-        console.error('[BATCH DOWNLOAD] CSV generation failed:', csvError);
-      }
-
       // Complete the job
       onJobComplete(finalClassifications, summary, job.id);
 
       toast({
-        title: "CSV Downloaded",
-        description: `✅ Downloaded ${finalClassifications.length} payee classifications to your Downloads folder.`,
+        title: "Processing Complete",
+        description: `✅ Successfully processed ${finalClassifications.length} payee classifications. Click the Download CSV button to save results.`,
       });
 
     } catch (error) {
