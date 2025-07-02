@@ -62,7 +62,7 @@ const BatchJobManager = () => {
               if (updatedJob.status === 'completed') {
                 toast({
                   title: "Batch Job Completed",
-                  description: `Job ${job.id.slice(0, 8)}... has finished processing`,
+                  description: `${updatedJob.metadata?.job_name || `Job ${job.id.slice(0, 8)}...`} has finished processing`,
                 });
               }
             }
