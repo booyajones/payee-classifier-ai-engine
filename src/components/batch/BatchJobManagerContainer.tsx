@@ -30,7 +30,10 @@ const BatchJobManagerContainer = () => {
     updateJob(updatedJob);
     
     // Show toast notification for significant status changes
-    if (['completed', 'failed', 'expired', 'cancelled'].includes(updatedJob.status)) {
+    // Only show toasts for valid OpenAI batch job IDs (length > 20 and starts with "batch_")
+    if (['completed', 'failed', 'expired', 'cancelled'].includes(updatedJob.status) && 
+        updatedJob.id.startsWith('batch_') && 
+        updatedJob.id.length > 20) {
       toast({
         title: "Job Status Updated",
         description: `Job ${updatedJob.id.slice(0, 8)}... is now ${updatedJob.status}`,
