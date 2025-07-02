@@ -6,7 +6,7 @@ import SingleClassificationForm from "@/components/SingleClassificationForm";
 
 import SmartFileUpload from "@/components/SmartFileUpload";
 import KeywordExclusionManager from "@/components/KeywordExclusionManager";
-import BatchJobManager from "@/components/BatchJobManager";
+import BatchJobManagerContainer from "@/components/batch/BatchJobManagerContainer";
 
 
 import OptimizedVirtualizedTable from "@/components/table/OptimizedVirtualizedTable";
@@ -167,7 +167,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
       </TabsContent>
 
       <TabsContent value="jobs" className="mt-6">
-        <BatchJobManager />
+        <BatchJobManagerContainer />
       </TabsContent>
 
       <TabsContent value="results" className="mt-6">
