@@ -21,6 +21,39 @@ const DirectDatabaseDownload = ({ jobId, className }: DirectDatabaseDownloadProp
 
     setIsDownloading(true);
     try {
+      // First check if we have a pre-generated CSV stored directly in the database
+      const { data: fileRecord, error: fileError } = await supabase
+        .from('batch_job_files')
+        .select('csv_data')
+        .eq('job_id', jobId)
+        .single();
+
+      if (fileError) {
+        console.error('Failed to fetch batch job file record', fileError);
+      }
+
+      if (fileRecord && fileRecord.csv_data) {
+        const binary = atob(fileRecord.csv_data as unknown as string);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `complete_results_${jobId.substring(0, 8)}_${Date.now()}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast({
+          title: 'Complete Download Successful',
+          description: '✅ Downloaded CSV from database blob',
+        });
+        return;
+      }
+
       console.log(`[COMPLETE DOWNLOAD] Fetching complete job data for ${jobId}`);
       
       // Step 1: Fetch the complete batch job with original file data and row mappings
