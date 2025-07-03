@@ -6,6 +6,8 @@ interface AppState {
   hasApiKey: boolean;
   isLoading: boolean;
   error: string | null;
+  tabHistory: string[];
+  previousTab: string | null;
 }
 
 interface AppActions {
@@ -25,9 +27,15 @@ export const useAppStore = create<AppState & AppActions>()(
         hasApiKey: false,
         isLoading: false,
         error: null,
+        tabHistory: ['single'],
+        previousTab: null,
 
         // Actions
-        setActiveTab: (tab) => set({ activeTab: tab }),
+        setActiveTab: (tab) => set((state) => ({
+          activeTab: tab,
+          previousTab: state.activeTab,
+          tabHistory: [...state.tabHistory.slice(-4), tab] // Keep last 5 tabs
+        })),
         setHasApiKey: (hasKey) => set({ hasApiKey: hasKey }),
         setLoading: (loading) => set({ isLoading: loading }),
         setError: (error) => set({ error }),
@@ -35,7 +43,10 @@ export const useAppStore = create<AppState & AppActions>()(
       }),
       {
         name: 'app-store',
-        partialize: (state) => ({ activeTab: state.activeTab })
+        partialize: (state) => ({ 
+          activeTab: state.activeTab,
+          tabHistory: state.tabHistory 
+        })
       }
     )
   )

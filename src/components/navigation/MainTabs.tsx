@@ -1,10 +1,15 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Upload, Play, TestTube, Users, Eye, Activity } from "lucide-react";
 import SingleClassificationForm from "@/components/SingleClassificationForm";
 import HealthCheckPanel from "@/components/testing/HealthCheckPanel";
 import ImplementationSummary from "@/components/testing/ImplementationSummary";
+import BreadcrumbNavigation from "@/components/ui/breadcrumb-navigation";
+import LoadingSpinner from "@/components/ui/loading-spinner";
+import { useEnhancedNotifications } from "@/components/ui/enhanced-notifications";
+import useKeyboardShortcuts from "@/hooks/useKeyboardShortcuts";
+import CelebrationAnimation from "@/components/ui/celebration-animation";
 
 import SmartFileUpload from "@/components/SmartFileUpload";
 import KeywordExclusionManager from "@/components/KeywordExclusionManager";
@@ -33,7 +38,13 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
   const { addJob, setPayeeData } = useBatchJobStore();
   const { toast } = useToast();
   const { saveBatchJob } = useBatchJobPersistence();
+  const { showSuccess, showError, showInfo } = useEnhancedNotifications();
+  const [isTabLoading, setIsTabLoading] = React.useState(false);
+  const [showCelebration, setShowCelebration] = React.useState(false);
   console.log('MainTabs activeTab:', activeTab);
+
+  // Setup keyboard shortcuts
+  useKeyboardShortcuts();
 
   // Generate original columns from results data - memoized to prevent rerenders
   const getOriginalColumns = useMemo(() => {
@@ -51,10 +62,25 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
     sortedResults
   } = useTableSorting(allResults, getOriginalColumns);
 
-  // Handler for tab changes
-  const handleTabChange = (tab: string) => {
+  // Handler for tab changes with loading state
+  const handleTabChange = async (tab: string) => {
     console.log('Tab changed:', tab);
+    setIsTabLoading(true);
+    
+    // Simulate brief loading for smooth UX
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
     setActiveTab(tab);
+    setIsTabLoading(false);
+    
+    // Show helpful info for new users
+    if (tab === 'upload') {
+      showInfo(
+        "Upload File", 
+        "Select a CSV or Excel file with payee names to start batch processing",
+        { actionLabel: "Learn More" }
+      );
+    }
   };
 
   // Handler for single classification results
@@ -88,21 +114,28 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
       // Save to database
       await saveBatchJob(newBatchJob, payeeRowData);
       
-      toast({
-        title: "Batch Job Created",
-        description: `Created job ${newBatchJob.id.slice(0, 8)}... for ${payeeRowData.uniquePayeeNames.length} payees`,
-      });
+      showSuccess(
+        "Batch Job Created Successfully!",
+        `Processing ${payeeRowData.uniquePayeeNames.length} payees`,
+        {
+          action: () => setActiveTab('jobs'),
+          actionLabel: "View Jobs"
+        }
+      );
       
       // Switch to jobs tab
       setActiveTab('jobs');
       
     } catch (error) {
       console.error('Failed to create batch job:', error);
-      toast({
-        title: "Job Creation Failed",
-        description: error instanceof Error ? error.message : 'Failed to create job',
-        variant: "destructive"
-      });
+      showError(
+        "Job Creation Failed",
+        error instanceof Error ? error.message : 'Failed to create batch job',
+        {
+          retry: () => handleBatchJobCreated(batchJob, payeeRowData),
+          retryLabel: "Try Again"
+        }
+      );
     }
   };
 
@@ -126,65 +159,122 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
   }, [allResults.length]);
 
   console.log('MainTabs about to render tabs with activeTab:', activeTab);
+
+  // Generate breadcrumb items based on active tab
+  const breadcrumbItems = [
+    { 
+      label: {
+        single: 'Single Classification',
+        upload: 'File Upload',
+        jobs: 'Batch Jobs',
+        keywords: 'Keyword Management',
+        health: 'System Health'
+      }[activeTab] || 'Dashboard',
+      active: true
+    }
+  ];
   
   return (
-    <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-      <TabsList className="grid w-full grid-cols-5">
-        <TabsTrigger value="single" className="flex items-center gap-2">
-          <Play className="h-4 w-4" />
-          Single
-        </TabsTrigger>
-        <TabsTrigger value="upload" className="flex items-center gap-2">
-          <Upload className="h-4 w-4" />
-          Upload
-        </TabsTrigger>
-        <TabsTrigger value="jobs" className="flex items-center gap-2">
-          <Users className="h-4 w-4" />
-          Jobs
-        </TabsTrigger>
-        <TabsTrigger value="keywords" className="flex items-center gap-2">
-          <FileText className="h-4 w-4" />
-          Keywords
-        </TabsTrigger>
-        <TabsTrigger value="health" className="flex items-center gap-2">
-          <Activity className="h-4 w-4" />
-          Health
-        </TabsTrigger>
-      </TabsList>
+    <div className="w-full space-y-4">
+      {/* Breadcrumb Navigation */}
+      <BreadcrumbNavigation items={breadcrumbItems} />
+      
+      {/* Celebration Animation */}
+      <CelebrationAnimation 
+        show={showCelebration}
+        title="🎉 Job Completed!"
+        description="Your batch processing is complete and ready for download"
+        onComplete={() => setShowCelebration(false)}
+      />
+      
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        <TabsList className="grid w-full grid-cols-5" role="tablist">
+          <TabsTrigger 
+            value="single" 
+            className="flex items-center gap-2"
+            aria-label="Single Classification (Alt+1)"
+          >
+            <Play className="h-4 w-4" />
+            Single
+          </TabsTrigger>
+          <TabsTrigger 
+            value="upload" 
+            className="flex items-center gap-2"
+            aria-label="File Upload (Alt+2)"
+          >
+            <Upload className="h-4 w-4" />
+            Upload
+          </TabsTrigger>
+          <TabsTrigger 
+            value="jobs" 
+            className="flex items-center gap-2"
+            aria-label="Batch Jobs (Alt+3)"
+          >
+            <Users className="h-4 w-4" />
+            Jobs
+          </TabsTrigger>
+          <TabsTrigger 
+            value="keywords" 
+            className="flex items-center gap-2"
+            aria-label="Keyword Management (Alt+4)"
+          >
+            <FileText className="h-4 w-4" />
+            Keywords
+          </TabsTrigger>
+          <TabsTrigger 
+            value="health" 
+            className="flex items-center gap-2"
+            aria-label="System Health (Alt+5)"
+          >
+            <Activity className="h-4 w-4" />
+            Health
+          </TabsTrigger>
+        </TabsList>
 
-      <TabsContent value="single" className="mt-6">
-        <SingleClassificationForm onClassify={handleSingleClassify} />
-      </TabsContent>
+        {/* Tab Loading State */}
+        {isTabLoading && (
+          <div className="flex justify-center py-8">
+            <LoadingSpinner size="lg" text="Loading..." />
+          </div>
+        )}
 
+        {!isTabLoading && (
+          <>
+            <TabsContent value="single" className="mt-6" role="tabpanel">
+              <SingleClassificationForm onClassify={handleSingleClassify} />
+            </TabsContent>
 
-      <TabsContent value="upload" className="mt-6">
-        <SmartFileUpload 
-          onBatchJobCreated={handleBatchJobCreated}
-          onProcessingComplete={(results, summary, jobId) => {
-            console.log('Processing complete:', results.length, jobId);
-            onComplete(results, summary);
-            setActiveTab('jobs');
-          }}
-        />
-      </TabsContent>
+            <TabsContent value="upload" className="mt-6" role="tabpanel">
+              <SmartFileUpload 
+                onBatchJobCreated={handleBatchJobCreated}
+                onProcessingComplete={(results, summary, jobId) => {
+                  console.log('Processing complete:', results.length, jobId);
+                  onComplete(results, summary);
+                  setShowCelebration(true);
+                  setTimeout(() => setActiveTab('jobs'), 1500);
+                }}
+              />
+            </TabsContent>
 
-      <TabsContent value="jobs" className="mt-6">
-        <BatchJobManagerContainer />
-      </TabsContent>
+            <TabsContent value="jobs" className="mt-6" role="tabpanel">
+              <BatchJobManagerContainer />
+            </TabsContent>
 
+            <TabsContent value="keywords" className="mt-6" role="tabpanel">
+              <KeywordExclusionManager />
+            </TabsContent>
 
-      <TabsContent value="keywords" className="mt-6">
-        <KeywordExclusionManager />
-      </TabsContent>
+            <TabsContent value="health" className="mt-6" role="tabpanel">
+              <div className="space-y-6">
+                <ImplementationSummary />
+                <HealthCheckPanel />
+              </div>
+            </TabsContent>
+          </>
+        )}
+      </Tabs>
+    </div>
 
-      <TabsContent value="health" className="mt-6">
-        <div className="space-y-6">
-          <ImplementationSummary />
-          <HealthCheckPanel />
-        </div>
-      </TabsContent>
-
-    </Tabs>
   );
 };
 

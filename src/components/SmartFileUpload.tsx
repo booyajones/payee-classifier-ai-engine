@@ -4,6 +4,7 @@ import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
 import { PayeeRowData } from '@/lib/rowMapping';
 import { useSmartFileUpload } from '@/hooks/useSmartFileUpload';
+import { useEnhancedNotifications } from '@/components/ui/enhanced-notifications';
 
 import SmartFileUploadHeader from './upload/SmartFileUploadHeader';
 import SmartFileUploadContent from './upload/SmartFileUploadContent';
@@ -17,6 +18,7 @@ interface SmartFileUploadProps {
 
 const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileUploadProps) => {
   const hasError = () => false; // Simplified for now
+  const { showSuccess, showError, showLoading } = useEnhancedNotifications();
   
   const {
     uploadState,
@@ -45,6 +47,8 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
     
     try {
       setUploadState('processing');
+      const dismissLoading = showLoading('Creating Batch Job', 'Processing your file...');
+      
       updateProgress(UPLOAD_ID, 'Creating batch job...', 70);
       
       // Create the batch job via callback
@@ -54,10 +58,26 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
       completeProgress(UPLOAD_ID, 'Ready for processing!');
       setUploadState('complete');
       
+      dismissLoading();
+      showSuccess(
+        'File Uploaded Successfully!', 
+        `${payeeRowData.uniquePayeeNames.length} unique payees ready for processing`
+      );
+      
     } catch (error) {
       console.error('Failed to create batch job:', error);
       setUploadState('error');
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to create batch job');
+      const errorMsg = error instanceof Error ? error.message : 'Failed to create batch job';
+      setErrorMessage(errorMsg);
+      
+      showError(
+        'Upload Failed',
+        errorMsg,
+        {
+          retry: () => coreHandleColumnSelect(payeeRowData),
+          retryLabel: 'Try Again'
+        }
+      );
     }
   };
 

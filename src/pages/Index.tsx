@@ -7,6 +7,7 @@ import AppHeader from "@/components/layout/AppHeader";
 import AppFooter from "@/components/layout/AppFooter";
 import MainTabs from "@/components/navigation/MainTabs";
 import ApiKeySetupPage from "@/components/setup/ApiKeySetupPage";
+import KeyboardShortcutsHelp from "@/components/ui/keyboard-shortcuts-help";
 
 const Index = () => {
   console.log('Index component rendering');
@@ -59,6 +60,9 @@ const Index = () => {
           </main>
 
           <AppFooter />
+          
+          {/* Keyboard Shortcuts Help */}
+          <KeyboardShortcutsHelp />
         </div>
       </ErrorBoundary>
     </UnifiedProgressProvider>
