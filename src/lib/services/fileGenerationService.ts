@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { BatchProcessingResult, PayeeClassification } from '@/lib/types';
 import * as XLSX from 'xlsx';
+import { mapResultsToOriginalRows } from '@/lib/rowMapping/resultMapper';
 
 export class FileGenerationService {
   /**
@@ -19,11 +20,19 @@ export class FileGenerationService {
       console.log(`[PRE-GEN] Generating files for job ${jobId}`);
 
       // Generate CSV content
-      const csvContent = this.generateCSVContent(batchResult.results, batchResult.originalFileData);
+      const csvContent = this.generateCSVContent(
+        batchResult.results,
+        batchResult.originalFileData,
+        (batchResult as any).rowMappings || []
+      );
       const csvBlob = new Blob([csvContent], { type: 'text/csv' });
 
       // Generate Excel content
-      const excelBlob = this.generateExcelContent(batchResult.results, batchResult.originalFileData);
+      const excelBlob = this.generateExcelContent(
+        batchResult.results,
+        batchResult.originalFileData,
+        (batchResult as any).rowMappings || []
+      );
 
       // Upload CSV to storage
       const csvFileName = `batch-${jobId}-results.csv`;
@@ -99,7 +108,8 @@ export class FileGenerationService {
    */
   private static generateCSVContent(
     classifications: PayeeClassification[],
-    originalFileData: any[]
+    originalFileData: any[],
+    rowMappings: any[]
   ): string {
     if (!originalFileData || originalFileData.length === 0) {
       // Fallback: just export classifications
@@ -118,43 +128,68 @@ export class FileGenerationService {
       ).join('\n');
     }
 
-    // Enhanced: merge original data with classifications
-    const originalHeaders = Object.keys(originalFileData[0] || {});
-    const enhancedHeaders = [
-      ...originalHeaders,
-      'AI_Classification',
-      'AI_Confidence',
-      'AI_SIC_Code',
-      'AI_SIC_Description',
-      'AI_Reasoning'
-    ];
-
-    // Create classification lookup
-    const classificationMap = new Map();
-    classifications.forEach(c => {
-      classificationMap.set(c.payeeName, c);
-    });
-
-    const rows = originalFileData.map(row => {
-      const payeeName = Object.values(row).find(val => 
-        classifications.some(c => c.payeeName === val)
-      ) as string;
-      
-      const classification = classificationMap.get(payeeName);
-      
-      return [
-        ...originalHeaders.map(header => row[header] || ''),
-        classification?.result.classification || '',
-        classification?.result.confidence?.toString() || '',
-        classification?.result.sicCode || '',
-        classification?.result.sicDescription || '',
-        classification?.result.reasoning || ''
+    // Use row mappings to restore original order and columns
+    if (!rowMappings || rowMappings.length === 0) {
+      console.warn('[PRE-GEN] No row mappings provided, falling back to basic merge');
+      const originalHeaders = Object.keys(originalFileData[0] || {});
+      const enhancedHeaders = [
+        ...originalHeaders,
+        'AI_Classification',
+        'AI_Confidence',
+        'AI_SIC_Code',
+        'AI_SIC_Description',
+        'AI_Reasoning'
       ];
-    });
 
-    return [enhancedHeaders, ...rows].map(row => 
-      row.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(',')
-    ).join('\n');
+      // Create classification lookup
+      const classificationMap = new Map();
+      classifications.forEach(c => {
+        classificationMap.set(c.payeeName, c);
+      });
+
+      const rows = originalFileData.map(row => {
+        const payeeName = Object.values(row).find(val =>
+          classifications.some(c => c.payeeName === val)
+        ) as string;
+
+        const classification = classificationMap.get(payeeName);
+
+        return [
+          ...originalHeaders.map(header => row[header] || ''),
+          classification?.result.classification || '',
+          classification?.result.confidence?.toString() || '',
+          classification?.result.sicCode || '',
+          classification?.result.sicDescription || '',
+          classification?.result.reasoning || ''
+        ];
+      });
+
+      return [enhancedHeaders, ...rows]
+        .map(row => row.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+    }
+
+    const payeeRowData = {
+      uniquePayeeNames: classifications.map(c => c.payeeName),
+      uniqueNormalizedNames: classifications.map(c => c.payeeName),
+      originalFileData,
+      rowMappings,
+      standardizationStats: {
+        totalProcessed: classifications.length,
+        changesDetected: 0,
+        averageStepsPerName: 0,
+        mostCommonSteps: []
+      }
+    };
+
+    const mappedResults = mapResultsToOriginalRows(classifications, payeeRowData);
+
+    const headers = Object.keys(mappedResults[0] || {});
+    const rows = mappedResults.map(row => headers.map(h => row[h] ?? ''));
+
+    return [headers, ...rows]
+      .map(row => row.map(cell => `"${(cell ?? '').toString().replace(/"/g, '""')}"`).join(','))
+      .join('\n');
   }
 
   /**
@@ -162,12 +197,17 @@ export class FileGenerationService {
    */
   private static generateExcelContent(
     classifications: PayeeClassification[],
-    originalFileData: any[]
+    originalFileData: any[],
+    rowMappings: any[]
   ): Blob {
     const workbook = XLSX.utils.book_new();
 
     // Create main results worksheet
-    const csvContent = this.generateCSVContent(classifications, originalFileData);
+    const csvContent = this.generateCSVContent(
+      classifications,
+      originalFileData,
+      rowMappings
+    );
     const rows = csvContent.split('\n').map(row => {
       const cells = [];
       let current = '';
