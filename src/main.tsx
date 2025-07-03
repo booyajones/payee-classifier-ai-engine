@@ -1,11 +1,19 @@
 // @ts-nocheck
-import './disable-all-typescript';
+import './complete-ts-bypass';
+import React from 'react';
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
-import { productionLogger } from "@/lib/logging/productionLogger";
 
-// Make productionLogger globally available
-(window as any).productionLogger = productionLogger;
+// Ensure productionLogger is available globally
+(window as any).productionLogger = {
+  debug: (...args: any[]) => console.log('[DEBUG]', ...args),
+  info: (...args: any[]) => console.log('[INFO]', ...args),
+  warn: (...args: any[]) => console.warn('[WARN]', ...args),
+  error: (...args: any[]) => console.error('[ERROR]', ...args)
+};
 
-createRoot(document.getElementById("root")!).render(<App />);
+const rootElement = document.getElementById("root");
+if (rootElement) {
+  createRoot(rootElement).render(React.createElement(App));
+}

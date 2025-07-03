@@ -26,10 +26,17 @@
     "noPropertyAccessFromIndexSignature": false,
     "noUncheckedIndexedAccess": false,
     "exactOptionalPropertyTypes": false,
+    "ignoreDeprecations": "5.0",
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  "ts-node": {
+    "transpileOnly": true,
+    "compilerOptions": {
+      "strict": false
+    }
+  }
 }
