@@ -177,17 +177,62 @@ export class BatchJobUpdater {
       
       // Generate download files
       const fileResult = await EnhancedFileGenerationService.processCompletedJob(batchJob);
-      
+
       if (!fileResult.success) {
         productionLogger.error(`File generation failed for ${batchJob.id}: ${fileResult.error}`, null, 'BATCH_JOB_UPDATER');
         return false;
       }
-      
+
+      // Verify that files were actually written
+      const verified = await this.verifyFileCreation(batchJob.id);
+
+      if (!verified) {
+        productionLogger.error(`File verification failed for ${batchJob.id}`, null, 'BATCH_JOB_UPDATER');
+        return false;
+      }
+
       productionLogger.info(`Synchronous processing successful for ${batchJob.id}`, null, 'BATCH_JOB_UPDATER');
       return true;
       
     } catch (error) {
       productionLogger.error(`Synchronous processing failed for ${batchJob.id}`, error, 'BATCH_JOB_UPDATER');
+      return false;
+    }
+  }
+
+  /**
+   * Verify that generated files are accessible or recorded
+   */
+  private static async verifyFileCreation(jobId: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('batch_jobs')
+        .select('csv_file_url, excel_file_url')
+        .eq('id', jobId)
+        .single();
+
+      const csvUrl = data?.csv_file_url as string | undefined;
+      const excelUrl = data?.excel_file_url as string | undefined;
+
+      if (!error && csvUrl && excelUrl) {
+        const checks = await Promise.all([
+          fetch(csvUrl, { method: 'HEAD' }).then(r => r.ok).catch(() => false),
+          fetch(excelUrl, { method: 'HEAD' }).then(r => r.ok).catch(() => false)
+        ]);
+        if (checks.every(Boolean)) {
+          return true;
+        }
+      }
+
+      const { data: fileData, error: fileError } = await supabase
+        .from('batch_job_files')
+        .select('id')
+        .eq('batch_job_id', jobId)
+        .maybeSingle();
+
+      return !fileError && !!fileData;
+    } catch (error) {
+      productionLogger.error(`File verification query failed for ${jobId}`, error, 'BATCH_JOB_UPDATER');
       return false;
     }
   }
