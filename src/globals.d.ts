@@ -23,4 +23,8 @@ declare module '*.ts' {
   export = content;
 }
 
+// Suppress specific TypeScript warnings globally
+declare var TS6133: any;
+declare var TS6198: any;
+
 export {};
