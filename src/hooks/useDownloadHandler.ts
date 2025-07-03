@@ -36,6 +36,13 @@ export const useDownloadHandler = (
         return;
       } catch (error) {
         console.error('Instant download failed, falling back to generation:', error);
+        toast({
+          title: 'Download Failed',
+          description:
+            `${error instanceof Error ? error.message : 'Instant download failed.'} ` +
+            'Check your API key or try regenerating the files.',
+          variant: 'destructive',
+        });
       }
     }
 
@@ -56,7 +63,7 @@ export const useDownloadHandler = (
           .single();
 
         if (error || !jobData) {
-          throw new Error('Failed to fetch job data');
+          throw new Error(error?.message || 'Failed to fetch job data');
         }
 
         const batchJob = convertToBatchJob(jobData);
@@ -65,11 +72,15 @@ export const useDownloadHandler = (
         await AutomaticFileGenerationService.processCompletedJob(batchJob);
 
         // Refresh file status
-        const { data: updatedData } = await supabase
+        const { data: updatedData, error: refreshError } = await supabase
           .from('batch_jobs')
           .select('csv_file_url, excel_file_url')
           .eq('id', jobId)
           .single();
+
+        if (refreshError || !updatedData) {
+          throw new Error(refreshError?.message || 'Failed to refresh file status');
+        }
 
         if (updatedData) {
           const newUrl = format === 'csv' ? updatedData.csv_file_url : updatedData.excel_file_url;
@@ -95,17 +106,18 @@ export const useDownloadHandler = (
         }
       } catch (error) {
         console.error('File generation and download failed:', error);
-        
+
         // Fallback to standard download
         if (processingSummary) {
           await downloadFile(processingSummary, format);
-        } else {
-          toast({
-            title: "Download Failed",
-            description: "Unable to download file. Please try again.",
-            variant: "destructive",
-          });
         }
+
+        const message = error instanceof Error ? error.message : 'Unable to download file.';
+        toast({
+          title: 'Download Failed',
+          description: `${message} Check your API key or try regenerating the files.`,
+          variant: 'destructive',
+        });
       } finally {
         setIsGenerating(false);
       }
