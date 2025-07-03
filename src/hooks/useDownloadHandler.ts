@@ -36,6 +36,11 @@ export const useDownloadHandler = (
         return;
       } catch (error) {
         console.error('Instant download failed, falling back to generation:', error);
+        toast({
+          title: 'Download Failed',
+          description: error instanceof Error ? error.message : 'Download failed',
+          variant: 'destructive'
+        });
       }
     }
 
@@ -95,14 +100,14 @@ export const useDownloadHandler = (
         }
       } catch (error) {
         console.error('File generation and download failed:', error);
-        
+
         // Fallback to standard download
         if (processingSummary) {
           await downloadFile(processingSummary, format);
         } else {
           toast({
             title: "Download Failed",
-            description: "Unable to download file. Please try again.",
+            description: error instanceof Error ? error.message : 'Unable to download file.',
             variant: "destructive",
           });
         }

@@ -4,7 +4,19 @@ export class PreGeneratedFileService {
     try {
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`Failed to download file: ${response.statusText}`);
+        let message = '';
+        try {
+          message = (await response.text()).trim();
+        } catch {
+          // ignore body read errors
+        }
+        if (!message) {
+          message =
+            response.status === 401 || response.status === 403
+              ? 'Unauthorized download – check Supabase bucket permissions'
+              : `Failed to download file: ${response.statusText}`;
+        }
+        throw new Error(message);
       }
       
       const blob = await response.blob();
