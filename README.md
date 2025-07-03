@@ -71,6 +71,16 @@ VITE_SUPABASE_KEY=<your-supabase-publishable-key>
 
 An example file is provided at `.env.example`.
 
+## Running tests
+
+After installing dependencies with `npm i`, execute the test suite using:
+
+```bash
+npm test
+```
+
+This runs [Vitest](https://vitest.dev/) with React Testing Library.
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/aa593c27-4290-4aba-a8b2-135ff8cd3602) and click on Share -> Publish.
