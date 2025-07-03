@@ -87,7 +87,7 @@ const FastDownloadActions = ({
       console.error('Download failed:', error);
       toast({
         title: "Download Failed",
-        description: "Failed to download file. Please try again.",
+        description: error instanceof Error ? error.message : 'Failed to download file.',
         variant: "destructive",
       });
     }
