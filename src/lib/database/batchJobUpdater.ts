@@ -17,6 +17,16 @@ export class BatchJobUpdater {
 
     // Handle OpenAI completion -> processing_results transition
     if (batchJob.status === 'completed' && batchJob.request_counts.completed > 0) {
+      // Check if already processed
+      const hasProcessedResults = await this.checkIfAlreadyProcessed(batchJob.id);
+      
+      if (hasProcessedResults) {
+        // Job already has files, just mark as completed
+        await this.updateJobStatus(batchJob.id, 'completed', batchJob);
+        productionLogger.info(`Job ${batchJob.id} already processed, marked as completed`, null, 'BATCH_JOB_UPDATER');
+        return;
+      }
+
       productionLogger.info(`Job ${batchJob.id} completed by OpenAI, starting synchronous processing`, null, 'BATCH_JOB_UPDATER');
       
       // First, set status to processing_results
@@ -40,6 +50,61 @@ export class BatchJobUpdater {
 
     // Handle all other status updates normally
     await this.updateJobStatus(batchJob.id, batchJob.status, batchJob);
+  }
+
+  /**
+   * Check if job already has processed results and files
+   */
+  private static async checkIfAlreadyProcessed(jobId: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('batch_jobs')
+        .select('csv_file_url, excel_file_url')
+        .eq('id', jobId)
+        .single();
+
+      if (error) {
+        productionLogger.warn(`Could not check processed status for ${jobId}`, error, 'BATCH_JOB_UPDATER');
+        return false;
+      }
+
+      return !!(data?.csv_file_url || data?.excel_file_url);
+    } catch (error) {
+      productionLogger.warn(`Error checking processed status for ${jobId}`, error, 'BATCH_JOB_UPDATER');
+      return false;
+    }
+  }
+
+  /**
+   * Manual recovery method for stuck jobs
+   */
+  static async recoverStuckJob(jobId: string): Promise<boolean> {
+    try {
+      productionLogger.info(`Starting manual recovery for job ${jobId}`, null, 'BATCH_JOB_UPDATER');
+      
+      // Check if job has files already
+      const hasFiles = await this.checkIfAlreadyProcessed(jobId);
+      
+      if (hasFiles) {
+        // Just update status to completed
+        await supabase
+          .from('batch_jobs')
+          .update({
+            status: 'completed',
+            completed_at_timestamp: Math.floor(Date.now() / 1000),
+            app_updated_at: new Date().toISOString()
+          })
+          .eq('id', jobId);
+        
+        productionLogger.info(`Successfully recovered job ${jobId} with existing files`, null, 'BATCH_JOB_UPDATER');
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      productionLogger.error(`Failed to recover job ${jobId}`, error, 'BATCH_JOB_UPDATER');
+      return false;
+    }
   }
 
   /**
