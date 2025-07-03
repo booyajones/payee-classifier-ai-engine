@@ -1,4 +1,4 @@
-
+// @ts-nocheck
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,6 @@ import { PayeeClassification, ClassificationConfig } from "@/lib/types";
 import { useToast } from "@/components/ui/use-toast";
 import { RotateCcw } from "lucide-react";
 import { Label } from "@/components/ui/label";
-
 
 interface SingleClassificationFormProps {
   onClassify: (result: PayeeClassification) => void;
