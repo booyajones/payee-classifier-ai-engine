@@ -2,7 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { BatchProcessingResult, PayeeClassification } from '@/lib/types';
 import * as XLSX from 'xlsx';
 
-export class PreGeneratedFileService {
+export class FileGenerationService {
   /**
    * Generate and store CSV and Excel files for a batch job
    */
