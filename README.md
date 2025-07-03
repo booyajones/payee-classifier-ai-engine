@@ -71,3 +71,9 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Background file generation worker
+
+File generation now runs in a separate Node process. See
+[`docs/FILE_GENERATION_WORKER.md`](docs/FILE_GENERATION_WORKER.md) for details on
+running and scheduling the worker.
