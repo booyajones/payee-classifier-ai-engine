@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PreGeneratedFileService } from '@/lib/storage/preGeneratedFileService';
 import { AutomaticFileGenerationService } from '@/lib/services/automaticFileGenerationService';
+import { EnhancedFileGenerationService } from '@/lib/services/enhancedFileGenerationService';
 import { convertToBatchJob } from '@/lib/utils/batchJobConverter';
 import { useEnhancedDownload } from './useEnhancedDownload';
 import { BatchProcessingResult } from '@/lib/types';
@@ -64,34 +65,36 @@ export const useDownloadHandler = (
         // Generate files
         await AutomaticFileGenerationService.processCompletedJob(batchJob);
 
-        // Refresh file status
-        const { data: updatedData } = await supabase
-          .from('batch_jobs')
-          .select('csv_file_url, excel_file_url')
-          .eq('id', jobId)
-          .single();
-
-        if (updatedData) {
-          const newUrl = format === 'csv' ? updatedData.csv_file_url : updatedData.excel_file_url;
-          if (newUrl) {
-            const timestamp = new Date().toISOString().split('T')[0];
-            const filename = `payee_results_${timestamp}.${format === 'csv' ? 'csv' : 'xlsx'}`;
-            await PreGeneratedFileService.downloadFileFromStorage(newUrl, filename);
-            
-            toast({
-              title: "Download Complete",
-              description: `${filename} downloaded successfully`,
-            });
-            
-            // Update local state
-            setFileStatus((prev: any) => ({
-              ...prev,
-              csvUrl: updatedData.csv_file_url || prev.csvUrl,
-              excelUrl: updatedData.excel_file_url || prev.excelUrl
-            }));
-          } else {
-            throw new Error('File generation completed but no URL available');
+        // Wait for files to become available
+        const startTime = Date.now();
+        const timeoutMs = 20000; // 20 seconds
+        let status;
+        while (Date.now() - startTime < timeoutMs) {
+          status = await EnhancedFileGenerationService.getFileStatus(jobId);
+          if (status.csvUrl && status.excelUrl) {
+            break;
           }
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        if (status && status.csvUrl && status.excelUrl) {
+          const newUrl = format === 'csv' ? status.csvUrl : status.excelUrl;
+          const timestamp = new Date().toISOString().split('T')[0];
+          const filename = `payee_results_${timestamp}.${format === 'csv' ? 'csv' : 'xlsx'}`;
+          await PreGeneratedFileService.downloadFileFromStorage(newUrl, filename);
+
+          toast({
+            title: "Download Complete",
+            description: `${filename} downloaded successfully`,
+          });
+
+          setFileStatus((prev: any) => ({
+            ...prev,
+            csvUrl: status?.csvUrl || prev.csvUrl,
+            excelUrl: status?.excelUrl || prev.excelUrl
+          }));
+        } else {
+          throw new Error('Timed out waiting for file URLs');
         }
       } catch (error) {
         console.error('File generation and download failed:', error);
