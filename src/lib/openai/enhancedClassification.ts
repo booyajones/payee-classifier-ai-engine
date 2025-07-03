@@ -4,6 +4,7 @@ import { getOpenAIClient } from './client';
 import { timeoutPromise } from './utils';
 import { DEFAULT_API_TIMEOUT, CLASSIFICATION_MODEL } from './config';
 import { classifyPayeeWithAI } from './singleClassification';
+import { type SimilarityScores } from '@/lib/classification/stringMatching';
 
 export interface EnhancedClassificationResult {
   classification: 'Business' | 'Individual';
@@ -14,6 +15,7 @@ export interface EnhancedClassificationResult {
   matchingRules?: string[];
   sicCode?: string;
   sicDescription?: string;
+  similarityScores?: SimilarityScores;
 }
 
 /**
@@ -44,7 +46,8 @@ export async function enhancedClassifyPayeeWithAI(
       processingMethod: 'Enhanced OpenAI Classification with SIC Codes',
       matchingRules: ['OpenAI Enhanced Classification'],
       sicCode: result.sicCode,
-      sicDescription: result.sicDescription
+      sicDescription: result.sicDescription,
+      similarityScores: result.similarityScores
     };
   } catch (error) {
     productionLogger.error(`[ENHANCED CLASSIFICATION] Error classifying "${payeeName}":`, error);

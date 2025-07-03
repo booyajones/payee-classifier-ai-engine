@@ -3,12 +3,13 @@ import OpenAI from 'openai';
 import { getOpenAIClient } from './client';
 import { timeoutPromise } from './utils';
 import { DEFAULT_API_TIMEOUT, CLASSIFICATION_MODEL } from './config';
+import { type SimilarityScores } from '@/lib/classification/stringMatching';
 
 /**
  * Classify a single payee name using the OpenAI API with SIC code determination
  */
 export async function classifyPayeeWithAI(
-  payeeName: string, 
+  payeeName: string,
   timeout: number = DEFAULT_API_TIMEOUT
 ): Promise<{
   classification: 'Business' | 'Individual';
@@ -16,6 +17,7 @@ export async function classifyPayeeWithAI(
   reasoning: string;
   sicCode?: string;
   sicDescription?: string;
+  similarityScores?: SimilarityScores;
 }> {
   const openaiClient = getOpenAIClient();
   if (!openaiClient) {
@@ -97,12 +99,20 @@ Return JSON: {"classification": "Business|Individual", "confidence": number, "re
       
       productionLogger.debug(`[SINGLE CLASSIFICATION] Successfully classified "${payeeName}": ${result.classification} (${result.confidence}%) SIC: ${result.sicCode || 'N/A'}`);
       
+      const similarityScores =
+        typeof result.similarityScores === 'object'
+          ? result.similarityScores
+          : typeof result.similarity_scores === 'object'
+            ? result.similarity_scores
+            : undefined;
+
       return {
         classification: result.classification as 'Business' | 'Individual',
         confidence: Math.min(100, Math.max(0, result.confidence)),
         reasoning: result.reasoning,
         sicCode: result.sicCode || undefined,
-        sicDescription: result.sicDescription || undefined
+        sicDescription: result.sicDescription || undefined,
+        similarityScores
       };
     } catch (parseError) {
       productionLogger.error(`[SINGLE CLASSIFICATION] Failed to parse response for "${payeeName}":`, content);
