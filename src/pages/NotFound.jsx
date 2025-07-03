@@ -5,7 +5,9 @@ const NotFound = () => {
   const location = useLocation();
 
   useEffect(() => {
-    productionLogger.error(
+    // Use global productionLogger if available, otherwise fallback to console
+    const logger = window.productionLogger || console;
+    logger.error(
       "404 Error: User attempted to access non-existent route:",
       location.pathname
     );
