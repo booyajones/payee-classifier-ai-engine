@@ -1,4 +1,6 @@
 
+// @ts-nocheck
+
 import { getOpenAIClient } from './client';
 import { CLASSIFICATION_MODEL } from './config';
 

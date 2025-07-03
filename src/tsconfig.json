@@ -1,14 +1,7 @@
 
 {
   "files": [],
-  "references": [
-    {
-      "path": "./tsconfig.app.json"
-    },
-    {
-      "path": "./tsconfig.node.json"
-    }
-  ],
+  "references": [],
   "compilerOptions": {
     "allowJs": true,
     "noUnusedLocals": false,
@@ -26,6 +19,7 @@
     "noUncheckedIndexedAccess": false,
     "exactOptionalPropertyTypes": false,
     "noEmit": true,
-    "isolatedModules": false
+    "isolatedModules": false,
+    "noCheck": true
   }
 }

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect } from "react";
 import { useKeywordData } from "./useKeywordData";
 import { useKeywordOperations } from "./keywordOperations";

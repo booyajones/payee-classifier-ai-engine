@@ -11,15 +11,11 @@ export default defineConfig({
   },
   plugins: [
     react({
-      include: "**/*.{jsx,tsx,js,ts}",
-      exclude: [],
-      jsxImportSource: "react",
-      plugins: [],
-      babel: {
-        plugins: []
-      }
+      include: "**/*.{jsx,js}",
+      exclude: ["**/*.ts", "**/*.tsx"],
+      jsxImportSource: "react"
     }),
-    componentTagger(),
+    componentTagger()
   ],
   resolve: {
     alias: {
@@ -30,26 +26,7 @@ export default defineConfig({
     'process.env': {},
     'global': 'globalThis'
   },
-  esbuild: {
-    target: 'esnext',
-    include: /\.(js|jsx|ts|tsx)$/,
-    exclude: [],
-    loader: 'tsx',
-    jsx: 'automatic',
-    tsconfigRaw: {
-      compilerOptions: {
-        useDefineForClassFields: false,
-        jsx: "react-jsx",
-        allowJs: true,
-        skipLibCheck: true,
-        noImplicitAny: false,
-        strict: false,
-        noUnusedLocals: false,
-        noUnusedParameters: false,
-        suppressImplicitAnyIndexErrors: true
-      }
-    }
-  },
+  esbuild: false,
   build: {
     target: 'esnext',
     minify: false,
@@ -60,9 +37,11 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
+    include: ['react', 'react-dom'],
     esbuildOptions: {
       target: 'esnext',
-      jsx: 'automatic'
+      jsx: 'automatic',
+      loader: 'jsx'
     }
   },
   logLevel: 'error'

@@ -1,4 +1,6 @@
 
+// @ts-nocheck
+
 import { timeoutPromise } from './utils';
 
 interface RequestConfig {

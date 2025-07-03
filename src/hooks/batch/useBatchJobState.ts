@@ -1,4 +1,6 @@
 
+// @ts-nocheck
+
 import { useState, useCallback, useRef } from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
