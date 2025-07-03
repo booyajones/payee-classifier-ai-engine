@@ -77,8 +77,8 @@ export class RetroactiveBatchProcessor {
       };
 
       // Import and use the actual file generation service
-      const { PreGeneratedFileService } = await import('./preGeneratedFileService');
-      const fileResult = await PreGeneratedFileService.generateAndStoreFiles(job.id, batchResult);
+      const { FileGenerationService } = await import('./fileGenerationService');
+      const fileResult = await FileGenerationService.generateAndStoreFiles(job.id, batchResult);
 
       if (fileResult.error) {
         throw new Error(`File generation failed: ${fileResult.error}`);
