@@ -20,7 +20,7 @@ const MAX_HEIGHT = 600; // Maximum table height
 
 // Define enhanced columns that include SIC fields - FIXED VERSION
 const getEnhancedColumns = (originalColumns: Array<{ key: string; label: string; isOriginal: boolean }>) => {
-  console.log('[TABLE COLUMNS] Original columns:', originalColumns);
+  productionLogger.debug('[TABLE COLUMNS] Original columns:', originalColumns);
   
   const classificationColumns = [
     { key: 'classification', label: 'Classification', isOriginal: false },
@@ -35,7 +35,7 @@ const getEnhancedColumns = (originalColumns: Array<{ key: string; label: string;
   ];
   
   const enhancedColumns = [...originalColumns, ...classificationColumns];
-  console.log('[TABLE COLUMNS] Enhanced columns with SIC:', enhancedColumns);
+  productionLogger.debug('[TABLE COLUMNS] Enhanced columns with SIC:', enhancedColumns);
   
   return enhancedColumns;
 };
@@ -58,10 +58,10 @@ const VirtualizedTable = React.memo(({
   React.useEffect(() => {
     const businessResults = results.filter(r => r.result.classification === 'Business');
     const sicResults = results.filter(r => r.result.sicCode);
-    console.log(`[TABLE DEBUG] Total results: ${results.length}, Business: ${businessResults.length}, With SIC: ${sicResults.length}`);
+    productionLogger.debug(`[TABLE DEBUG] Total results: ${results.length}, Business: ${businessResults.length}, With SIC: ${sicResults.length}`);
     
     if (sicResults.length > 0) {
-      console.log('[TABLE DEBUG] Sample SIC data:', sicResults.slice(0, 3).map(r => ({
+      productionLogger.debug('[TABLE DEBUG] Sample SIC data:', sicResults.slice(0, 3).map(r => ({
         payee: r.payeeName,
         sicCode: r.result.sicCode,
         sicDescription: r.result.sicDescription

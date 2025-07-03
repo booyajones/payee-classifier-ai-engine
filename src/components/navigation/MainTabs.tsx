@@ -26,12 +26,12 @@ interface MainTabsProps {
 }
 
 const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: MainTabsProps) => {
-  console.log('MainTabs rendering, props:', { allResultsLength: allResults.length });
+  productionLogger.debug('MainTabs rendering, props:', { allResultsLength: allResults.length });
   const { activeTab, setActiveTab } = useAppStore();
   const { addJob, setPayeeData } = useBatchJobStore();
   const { toast } = useToast();
   const { saveBatchJob } = useBatchJobPersistence();
-  console.log('MainTabs activeTab:', activeTab);
+  productionLogger.debug('MainTabs activeTab:', activeTab);
 
   // Generate original columns from results data - memoized to prevent rerenders
   const getOriginalColumns = useMemo(() => {
@@ -51,23 +51,23 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
 
   // Handler for tab changes
   const handleTabChange = (tab: string) => {
-    console.log('Tab changed:', tab);
+    productionLogger.debug('Tab changed:', tab);
     setActiveTab(tab);
   };
 
   // Handler for single classification results
   const handleSingleClassify = (result: PayeeClassification) => {
-    console.log('Single classification result:', result.payeeName);
+    productionLogger.debug('Single classification result:', result.payeeName);
   };
 
   // Handler for viewing result details
   const handleViewDetails = (result: PayeeClassification) => {
-    console.log('View details for payee:', result.payeeName);
+    productionLogger.debug('View details for payee:', result.payeeName);
   };
 
   // Handler for batch job creation
   const handleBatchJobCreated = async (batchJob: any, payeeRowData: any) => {
-    console.log('Creating new batch job with payee data:', payeeRowData.uniquePayeeNames.length);
+    productionLogger.debug('Creating new batch job with payee data:', payeeRowData.uniquePayeeNames.length);
     
     try {
       // Create the actual OpenAI batch job
@@ -95,7 +95,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
       setActiveTab('jobs');
       
     } catch (error) {
-      console.error('Failed to create batch job:', error);
+      productionLogger.error('Failed to create batch job:', error);
       toast({
         title: "Job Creation Failed",
         description: error instanceof Error ? error.message : 'Failed to create job',
@@ -123,7 +123,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
     return originalColumns;
   }, [allResults.length]);
 
-  console.log('MainTabs about to render tabs with activeTab:', activeTab);
+  productionLogger.debug('MainTabs about to render tabs with activeTab:', activeTab);
   
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
@@ -155,7 +155,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
         <SmartFileUpload 
           onBatchJobCreated={handleBatchJobCreated}
           onProcessingComplete={(results, summary, jobId) => {
-            console.log('Processing complete:', results.length, jobId);
+            productionLogger.debug('Processing complete:', results.length, jobId);
             onComplete(results, summary);
             setActiveTab('jobs');
           }}

@@ -18,7 +18,7 @@ export function normalizeForDuplicateDetection(text: string): string {
     .replace(/\s+/g, ' ')
     .trim();
   
-  console.log(`[ENHANCED NORMALIZATION] "${text}" → "${normalized}"`);
+  productionLogger.debug(`[ENHANCED NORMALIZATION] "${text}" → "${normalized}"`);
   
   return normalized;
 }
@@ -30,11 +30,11 @@ export function isSameEntity(name1: string, name2: string): boolean {
   const norm1 = normalizeForDuplicateDetection(name1);
   const norm2 = normalizeForDuplicateDetection(name2);
   
-  console.log(`[SAME ENTITY CHECK] "${name1}" -> "${norm1}" vs "${name2}" -> "${norm2}"`);
+  productionLogger.debug(`[SAME ENTITY CHECK] "${name1}" -> "${norm1}" vs "${name2}" -> "${norm2}"`);
   
   // Direct match after normalization
   if (norm1 === norm2) {
-    console.log(`[SAME ENTITY CHECK] ✅ EXACT MATCH after normalization`);
+    productionLogger.debug(`[SAME ENTITY CHECK] ✅ EXACT MATCH after normalization`);
     return true;
   }
   
@@ -52,7 +52,7 @@ export function isSameEntity(name1: string, name2: string): boolean {
     if (coreTokens1.length > 0 && coreTokens2.length > 0) {
       const coreMatch = coreTokens1.join(' ') === coreTokens2.join(' ');
       if (coreMatch) {
-        console.log(`[SAME ENTITY CHECK] ✅ CORE TOKENS MATCH: "${coreTokens1.join(' ')}" = "${coreTokens2.join(' ')}"`);
+        productionLogger.debug(`[SAME ENTITY CHECK] ✅ CORE TOKENS MATCH: "${coreTokens1.join(' ')}" = "${coreTokens2.join(' ')}"`);
         return true;
       }
     }
@@ -63,11 +63,11 @@ export function isSameEntity(name1: string, name2: string): boolean {
     const [shorter, longer] = tokens1.length < tokens2.length ? [tokens1, tokens2] : [tokens2, tokens1];
     const hasAllTokens = shorter.every(token => longer.includes(token));
     if (hasAllTokens && shorter.length > 0) {
-      console.log(`[SAME ENTITY CHECK] ✅ SUBSET MATCH: shorter "${shorter.join(' ')}" found in longer "${longer.join(' ')}"`);
+      productionLogger.debug(`[SAME ENTITY CHECK] ✅ SUBSET MATCH: shorter "${shorter.join(' ')}" found in longer "${longer.join(' ')}"`);
       return true;
     }
   }
   
-  console.log(`[SAME ENTITY CHECK] ❌ NO MATCH FOUND`);
+  productionLogger.debug(`[SAME ENTITY CHECK] ❌ NO MATCH FOUND`);
   return false;
 }

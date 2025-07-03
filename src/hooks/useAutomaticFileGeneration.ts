@@ -13,7 +13,7 @@ export const useAutomaticFileGeneration = (enabled: boolean = true) => {
       try {
         await AutomaticFileGenerationService.processAllCompletedJobsWithoutFiles();
       } catch (error) {
-        console.error('[AUTO FILE GENERATION] Background processing failed:', error);
+        productionLogger.error('[AUTO FILE GENERATION] Background processing failed:', error);
       }
     };
 

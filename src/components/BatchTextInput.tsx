@@ -44,12 +44,12 @@ const BatchTextInput = ({
 
     try {
       const names = payeeNames.split("\n").map(name => name.trim()).filter(name => name !== "");
-      console.log(`[BATCH TEXT INPUT] Creating batch job for ${names.length} names:`, names);
+      productionLogger.debug(`[BATCH TEXT INPUT] Creating batch job for ${names.length} names:`, names);
       
       const { generateContextualBatchJobName } = await import('@/lib/services/batchJobNameGenerator');
       const jobName = generateContextualBatchJobName(names.length, 'text');
       const batchJob = await createBatchJob(names, `Text input batch: ${names.length} payees`, jobName);
-      console.log(`[BATCH TEXT INPUT] Batch job created:`, batchJob);
+      productionLogger.debug(`[BATCH TEXT INPUT] Batch job created:`, batchJob);
 
       onBatchJobCreated(batchJob, names);
 
@@ -58,7 +58,7 @@ const BatchTextInput = ({
         description: `Successfully submitted ${names.length} payees for batch processing`,
       });
     } catch (error) {
-      console.error("Batch job creation error:", error);
+      productionLogger.error("Batch job creation error:", error);
       toast({
         title: "Batch Job Creation Error",
         description: error instanceof Error ? error.message : "An error occurred while creating the batch job.",

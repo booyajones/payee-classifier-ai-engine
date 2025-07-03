@@ -25,10 +25,10 @@ export function generateEnrichedOutput(
   }>();
 
   // Process duplicate pairs to build relationships
-  console.log(`[GROUP MANAGER] Processing ${processedPairs.length} pairs to build duplicate relationships`);
+  productionLogger.debug(`[GROUP MANAGER] Processing ${processedPairs.length} pairs to build duplicate relationships`);
   for (const pair of processedPairs) {
     if (pair.is_duplicate) {
-      console.log(`[GROUP MANAGER] ✅ DUPLICATE PAIR: "${pair.record1.payee_name}" (${pair.record1.payee_id}) = "${pair.record2.payee_name}" (${pair.record2.payee_id}) - Score: ${pair.final_duplicate_score}%`);
+      productionLogger.debug(`[GROUP MANAGER] ✅ DUPLICATE PAIR: "${pair.record1.payee_name}" (${pair.record1.payee_id}) = "${pair.record2.payee_name}" (${pair.record2.payee_id}) - Score: ${pair.final_duplicate_score}%`);
       
       // Record2 is a duplicate of Record1 (canonical)
       duplicateMap.set(pair.record2.payee_id, {
@@ -42,9 +42,9 @@ export function generateEnrichedOutput(
     }
   }
   
-  console.log(`[GROUP MANAGER] Built duplicate map with ${duplicateMap.size} duplicate relationships`);
+  productionLogger.debug(`[GROUP MANAGER] Built duplicate map with ${duplicateMap.size} duplicate relationships`);
   for (const [payeeId, info] of duplicateMap.entries()) {
-    console.log(`[GROUP MANAGER] - ${payeeId} is duplicate of ${info.duplicate_of} (${info.final_duplicate_score}%)`);
+    productionLogger.debug(`[GROUP MANAGER] - ${payeeId} is duplicate of ${info.duplicate_of} (${info.final_duplicate_score}%)`);
   }
 
   // Generate output for each original record

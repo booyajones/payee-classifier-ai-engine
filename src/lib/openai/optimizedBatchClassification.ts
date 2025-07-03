@@ -23,7 +23,7 @@ const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
  */
 function normalizeForCache(name: string): string {
   if (!name || typeof name !== 'string') {
-    console.warn('[CACHE] Invalid name for caching:', name);
+    productionLogger.warn('[CACHE] Invalid name for caching:', name);
     return '';
   }
   return name.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -55,7 +55,7 @@ function getCachedResult(name: string): CachedResult | null {
   const cached = classificationCache.get(normalized);
   
   if (cached && isCacheValid(cached)) {
-    console.log(`[CACHE] Using cached result for "${name}"`);
+    productionLogger.debug(`[CACHE] Using cached result for "${name}"`);
     return cached;
   }
   
@@ -71,7 +71,7 @@ function getCachedResult(name: string): CachedResult | null {
  */
 function setCachedResult(name: string, result: CachedResult): void {
   if (!name || typeof name !== 'string' || !result) {
-    console.warn('[CACHE] Invalid data for caching:', { name, result });
+    productionLogger.warn('[CACHE] Invalid data for caching:', { name, result });
     return;
   }
   
@@ -112,7 +112,7 @@ async function withRetry<T>(
       }
       
       const delay = baseDelay * Math.pow(2, attempt);
-      console.log(`[RETRY] Attempt ${attempt + 1} failed, retrying in ${delay}ms:`, error);
+      productionLogger.debug(`[RETRY] Attempt ${attempt + 1} failed, retrying in ${delay}ms:`, error);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -147,7 +147,7 @@ function validateApiResponse(content: string, expectedCount: number): any[] {
     throw new Error('Invalid API response: empty or non-string content');
   }
 
-  console.log(`[VALIDATION] Raw API response:`, content);
+  productionLogger.debug(`[VALIDATION] Raw API response:`, content);
   
   // Clean the response - remove markdown formatting
   const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -156,7 +156,7 @@ function validateApiResponse(content: string, expectedCount: number): any[] {
   try {
     parsed = JSON.parse(cleanContent);
   } catch (parseError) {
-    console.error(`[VALIDATION] JSON parse error:`, parseError);
+    productionLogger.error(`[VALIDATION] JSON parse error:`, parseError);
     throw new Error(`Failed to parse API response as JSON: ${parseError}`);
   }
 
@@ -174,7 +174,7 @@ function validateApiResponse(content: string, expectedCount: number): any[] {
     throw new Error('No valid classifications array found in response');
   }
 
-  console.log(`[VALIDATION] Extracted ${classifications.length} classifications, expected ${expectedCount}`);
+  productionLogger.debug(`[VALIDATION] Extracted ${classifications.length} classifications, expected ${expectedCount}`);
 
   // Validate each classification object
   const validatedClassifications = classifications.slice(0, expectedCount).map((item, index) => {
@@ -216,11 +216,11 @@ export async function optimizedBatchClassification(
   reasoning: string;
   source: 'cache' | 'api';
 }>> {
-  console.log(`[OPTIMIZED] Starting classification of ${payeeNames.length} payees`);
+  productionLogger.debug(`[OPTIMIZED] Starting classification of ${payeeNames.length} payees`);
 
   // Input validation
   if (!Array.isArray(payeeNames)) {
-    console.error('[OPTIMIZED] Invalid input: payeeNames is not an array');
+    productionLogger.error('[OPTIMIZED] Invalid input: payeeNames is not an array');
     return [];
   }
 
@@ -232,7 +232,7 @@ export async function optimizedBatchClassification(
   // Filter and validate names
   const validNames = payeeNames.filter(name => name && typeof name === 'string' && name.trim());
   if (validNames.length === 0) {
-    console.warn('[OPTIMIZED] No valid names to process');
+    productionLogger.warn('[OPTIMIZED] No valid names to process');
     return [];
   }
 
@@ -261,12 +261,12 @@ export async function optimizedBatchClassification(
         uncachedNames.push(name);
       }
     } catch (error) {
-      console.error(`[OPTIMIZED] Cache error for "${name}":`, error);
+      productionLogger.error(`[OPTIMIZED] Cache error for "${name}":`, error);
       uncachedNames.push(name);
     }
   }
 
-  console.log(`[OPTIMIZED] Cache: ${results.length} hits, ${uncachedNames.length} need API`);
+  productionLogger.debug(`[OPTIMIZED] Cache: ${results.length} hits, ${uncachedNames.length} need API`);
 
   // Step 2: Process uncached names in batches
   if (uncachedNames.length > 0) {
@@ -274,7 +274,7 @@ export async function optimizedBatchClassification(
       const batchNames = uncachedNames.slice(i, i + OPTIMIZED_BATCH_SIZE);
       const batchNumber = Math.floor(i / OPTIMIZED_BATCH_SIZE) + 1;
       
-      console.log(`[OPTIMIZED] Processing batch ${batchNumber} with ${batchNames.length} names`);
+      productionLogger.debug(`[OPTIMIZED] Processing batch ${batchNumber} with ${batchNames.length} names`);
       
       try {
         const batchResults = await withRetry(async () => {
@@ -337,10 +337,10 @@ ${batchNames.map((name, idx) => `${idx + 1}. "${name}"`).join('\n')}`;
                 timestamp: Date.now()
               });
             } catch (cacheError) {
-              console.warn(`[OPTIMIZED] Failed to cache result for "${originalName}":`, cacheError);
+              productionLogger.warn(`[OPTIMIZED] Failed to cache result for "${originalName}":`, cacheError);
             }
             
-            console.log(`[OPTIMIZED] Classified "${originalName}": ${result.classification} (${result.confidence}%)`);
+            productionLogger.debug(`[OPTIMIZED] Classified "${originalName}": ${result.classification} (${result.confidence}%)`);
           }
         });
         
@@ -355,7 +355,7 @@ ${batchNames.map((name, idx) => `${idx + 1}. "${name}"`).join('\n')}`;
         }
         
       } catch (error) {
-        console.error(`[OPTIMIZED] Batch ${batchNumber} failed:`, error);
+        productionLogger.error(`[OPTIMIZED] Batch ${batchNumber} failed:`, error);
         
         // Create fallback results for this batch
         batchNames.forEach(name => {
@@ -371,13 +371,13 @@ ${batchNames.map((name, idx) => `${idx + 1}. "${name}"`).join('\n')}`;
   const orderedResults = validNames.map(name => {
     const result = results.find(r => r.payeeName === name);
     if (!result) {
-      console.warn(`[OPTIMIZED] Missing result for "${name}", creating fallback`);
+      productionLogger.warn(`[OPTIMIZED] Missing result for "${name}", creating fallback`);
       return createFallbackResult(name, 'No result found');
     }
     return result;
   });
   
-  console.log(`[OPTIMIZED] Completed: ${orderedResults.length} total, ${results.filter(r => r.source === 'cache').length} cached, ${results.filter(r => r.source === 'api').length} from API`);
+  productionLogger.debug(`[OPTIMIZED] Completed: ${orderedResults.length} total, ${results.filter(r => r.source === 'cache').length} cached, ${results.filter(r => r.source === 'api').length} from API`);
   return orderedResults;
 }
 
@@ -386,7 +386,7 @@ ${batchNames.map((name, idx) => `${idx + 1}. "${name}"`).join('\n')}`;
  */
 export function clearClassificationCache(): void {
   classificationCache.clear();
-  console.log('[CACHE] Classification cache cleared');
+  productionLogger.debug('[CACHE] Classification cache cleared');
 }
 
 /**

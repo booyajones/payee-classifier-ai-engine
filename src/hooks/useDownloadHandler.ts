@@ -36,7 +36,7 @@ export const useDownloadHandler = (
         });
         return;
       } catch (error) {
-        console.error('Instant download failed, falling back to generation:', error);
+        productionLogger.error('Instant download failed, falling back to generation:', error);
         toast({
           title: 'Download Failed',
           description: error instanceof Error ? error.message : 'Download failed',
@@ -102,7 +102,7 @@ export const useDownloadHandler = (
           throw new Error('Timed out waiting for file URLs');
         }
       } catch (error) {
-        console.error('File generation and download failed:', error);
+        productionLogger.error('File generation and download failed:', error);
 
         // Fallback to standard download
         if (processingSummary) {

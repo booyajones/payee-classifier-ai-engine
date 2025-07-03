@@ -105,11 +105,11 @@ const SmartFileUploadContent = ({
       {uploadState === 'complete' && duplicateDetectionResults && (
         <DuplicateDetectionResults
           result={duplicateDetectionResults}
-          onAcceptGroup={(groupId) => console.log('Accept group:', groupId)}
-          onRejectGroup={(groupId) => console.log('Reject group:', groupId)}
-          onAcceptMember={(groupId, payeeId) => console.log('Accept member:', payeeId)}
-          onRejectMember={(groupId, payeeId) => console.log('Reject member:', payeeId)}
-          onExportResults={() => console.log('Export results')}
+          onAcceptGroup={(groupId) => productionLogger.debug('Accept group:', groupId)}
+          onRejectGroup={(groupId) => productionLogger.debug('Reject group:', groupId)}
+          onAcceptMember={(groupId, payeeId) => productionLogger.debug('Accept member:', payeeId)}
+          onRejectMember={(groupId, payeeId) => productionLogger.debug('Reject member:', payeeId)}
+          onExportResults={() => productionLogger.debug('Export results')}
           onProceedWithProcessing={() => onDuplicateReviewComplete?.()}
         />
       )}

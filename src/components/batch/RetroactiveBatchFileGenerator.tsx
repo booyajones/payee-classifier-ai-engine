@@ -91,7 +91,7 @@ const RetroactiveBatchFileGenerator = ({ jobs, onComplete }: RetroactiveBatchFil
 
       onComplete(results);
     } catch (error) {
-      console.error('Bulk processing failed:', error);
+      productionLogger.error('Bulk processing failed:', error);
       toast({
         title: "Processing Failed",
         description: error instanceof Error ? error.message : "Unknown error occurred",

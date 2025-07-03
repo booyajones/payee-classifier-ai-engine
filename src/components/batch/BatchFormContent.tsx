@@ -20,7 +20,7 @@ interface BatchFormContentProps {
 }
 
 const BatchFormContent = (props: BatchFormContentProps) => {
-  console.log(`[BATCH FORM CONTENT] Rendering with ${props.batchJobs.length} jobs`);
+  productionLogger.debug(`[BATCH FORM CONTENT] Rendering with ${props.batchJobs.length} jobs`);
 
   return (
     <div className="space-y-6">

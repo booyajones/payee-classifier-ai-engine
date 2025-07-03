@@ -9,7 +9,7 @@ import MainTabs from "@/components/navigation/MainTabs";
 import ApiKeySetupPage from "@/components/setup/ApiKeySetupPage";
 
 const Index = () => {
-  console.log('Index component rendering');
+  productionLogger.debug('Index component rendering');
   const {
     batchResults,
     batchSummary,
@@ -22,7 +22,7 @@ const Index = () => {
   // Automatically process existing completed jobs in background
   useBackgroundJobProcessor();
   
-  console.log('Index state:', { hasApiKey, batchResultsLength: batchResults.length });
+  productionLogger.debug('Index state:', { hasApiKey, batchResultsLength: batchResults.length });
 
   if (!hasApiKey) {
     return (

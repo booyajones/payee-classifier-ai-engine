@@ -17,10 +17,10 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
     maxRetries: 2, 
     baseDelay: 1000,
     onRetry: (attempt, error) => {
-      console.log(`[JOB REFRESH] Retry attempt ${attempt}: ${error.message}`);
+      productionLogger.debug(`[JOB REFRESH] Retry attempt ${attempt}: ${error.message}`);
     },
     onMaxRetriesReached: (error) => {
-      console.error(`[JOB REFRESH] Max retries reached: ${error.message}`);
+      productionLogger.error(`[JOB REFRESH] Max retries reached: ${error.message}`);
     }
   });
 
@@ -35,7 +35,7 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
     const hasNoProgress = job.request_counts.completed === 0 && job.request_counts.total > 0;
     const isTakingTooLong = timeSinceCreated > thirtyMinutes;
     
-    console.log(`[STALL DETECTION] Job ${job.id}: progress=${job.request_counts.completed}/${job.request_counts.total}, time=${Math.round(timeSinceCreated/60000)}min, stalled=${hasNoProgress && isTakingTooLong}`);
+    productionLogger.debug(`[STALL DETECTION] Job ${job.id}: progress=${job.request_counts.completed}/${job.request_counts.total}, time=${Math.round(timeSinceCreated/60000)}min, stalled=${hasNoProgress && isTakingTooLong}`);
     
     return hasNoProgress && isTakingTooLong;
   };
@@ -43,13 +43,13 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
   const handleRefreshJob = async (jobId: string, silent: boolean = false) => {
     setRefreshingJobs(prev => new Set(prev).add(jobId));
     try {
-      console.log(`[JOB REFRESH] Refreshing job ${jobId} with stall detection`);
+      productionLogger.debug(`[JOB REFRESH] Refreshing job ${jobId} with stall detection`);
       const updatedJob = await refreshJobWithRetry(jobId);
-      console.log(`[JOB REFRESH] Job ${jobId} status: ${updatedJob.status}, progress: ${updatedJob.request_counts.completed}/${updatedJob.request_counts.total}`);
+      productionLogger.debug(`[JOB REFRESH] Job ${jobId} status: ${updatedJob.status}, progress: ${updatedJob.request_counts.completed}/${updatedJob.request_counts.total}`);
       
       // Check if job appears stalled
       if (detectStalledJob(updatedJob)) {
-        console.warn(`[JOB REFRESH] STALLED JOB DETECTED: ${jobId}`);
+        productionLogger.warn(`[JOB REFRESH] STALLED JOB DETECTED: ${jobId}`);
         toast({
           title: "⚠️ Stalled Job Detected",
           description: `Job ${jobId.substring(0, 8)}... appears stuck with no progress after 30+ minutes. Consider canceling and retrying.`,
@@ -62,7 +62,7 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
       try {
         await BatchJobUpdater.updateBatchJobStatus(updatedJob);
       } catch (updateError) {
-        console.warn(`[JOB REFRESH] Database update failed for ${jobId}:`, updateError);
+        productionLogger.warn(`[JOB REFRESH] Database update failed for ${jobId}:`, updateError);
         // Don't fail the whole refresh if database update fails
       }
       
@@ -77,7 +77,7 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
       }
     } catch (error) {
       const appError = handleError(error, 'Job Status Refresh');
-      console.error(`[JOB REFRESH] Error refreshing job ${jobId}:`, error);
+      productionLogger.error(`[JOB REFRESH] Error refreshing job ${jobId}:`, error);
       
       // Check for specific API issues that might indicate stalled jobs
       if (error instanceof Error) {

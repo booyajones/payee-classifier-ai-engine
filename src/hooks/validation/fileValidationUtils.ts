@@ -30,7 +30,7 @@ export const validateBasicFileProperties = (file: File, options: ValidationOptio
     allowedTypes = ['.xlsx', '.xls', '.csv']
   } = options;
 
-  console.log(`[FILE VALIDATION] Validating file: ${file.name}`);
+  productionLogger.debug(`[FILE VALIDATION] Validating file: ${file.name}`);
 
   // Basic file checks
   if (!file) {

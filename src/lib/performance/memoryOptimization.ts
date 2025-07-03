@@ -61,11 +61,11 @@ export class MemoryOptimizer {
    */
   static suggestGarbageCollection(): void {
     if (this.isMemoryPressureHigh() && (window as any).gc) {
-      console.log('[MEMORY] Suggesting garbage collection due to high memory pressure');
+      productionLogger.debug('[MEMORY] Suggesting garbage collection due to high memory pressure');
       try {
         (window as any).gc();
       } catch (error) {
-        console.warn('[MEMORY] Manual GC not available:', error);
+        productionLogger.warn('[MEMORY] Manual GC not available:', error);
       }
     }
   }
@@ -113,23 +113,23 @@ export class MemoryOptimizer {
    */
   static createMemoryMonitor(operationName: string) {
     const startStats = this.getMemoryStats();
-    console.log(`[MEMORY] ${operationName} started - Memory usage: ${(startStats.usedJSHeapSize / 1024 / 1024).toFixed(2)}MB`);
+    productionLogger.debug(`[MEMORY] ${operationName} started - Memory usage: ${(startStats.usedJSHeapSize / 1024 / 1024).toFixed(2)}MB`);
     
     return {
       checkpoint: (checkpointName: string) => {
         const currentStats = this.getMemoryStats();
         const memoryDiff = currentStats.usedJSHeapSize - startStats.usedJSHeapSize;
-        console.log(`[MEMORY] ${operationName} - ${checkpointName}: +${(memoryDiff / 1024 / 1024).toFixed(2)}MB (${currentStats.memoryPressure} pressure)`);
+        productionLogger.debug(`[MEMORY] ${operationName} - ${checkpointName}: +${(memoryDiff / 1024 / 1024).toFixed(2)}MB (${currentStats.memoryPressure} pressure)`);
         
         if (currentStats.memoryPressure === 'high') {
-          console.warn(`[MEMORY] High memory pressure detected during ${operationName}`);
+          productionLogger.warn(`[MEMORY] High memory pressure detected during ${operationName}`);
         }
       },
       
       finish: () => {
         const endStats = this.getMemoryStats();
         const totalMemoryDiff = endStats.usedJSHeapSize - startStats.usedJSHeapSize;
-        console.log(`[MEMORY] ${operationName} completed - Total memory change: ${(totalMemoryDiff / 1024 / 1024).toFixed(2)}MB`);
+        productionLogger.debug(`[MEMORY] ${operationName} completed - Total memory change: ${(totalMemoryDiff / 1024 / 1024).toFixed(2)}MB`);
         
         this.suggestGarbageCollection();
       }

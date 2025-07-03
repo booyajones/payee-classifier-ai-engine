@@ -99,23 +99,23 @@ export const validateConfig = (): boolean => {
   
   // Validate file limits
   if (config.FILE_LIMITS.MAX_FILE_SIZE <= 0) {
-    console.error('Invalid MAX_FILE_SIZE configuration');
+    productionLogger.error('Invalid MAX_FILE_SIZE configuration');
     return false;
   }
   
   // Validate performance settings
   if (config.PERFORMANCE.VIRTUALIZATION_THRESHOLD <= 0) {
-    console.error('Invalid VIRTUALIZATION_THRESHOLD configuration');
+    productionLogger.error('Invalid VIRTUALIZATION_THRESHOLD configuration');
     return false;
   }
   
   // Validate API settings
   if (config.API.BATCH_JOB_TIMEOUT <= 0) {
-    console.error('Invalid BATCH_JOB_TIMEOUT configuration');
+    productionLogger.error('Invalid BATCH_JOB_TIMEOUT configuration');
     return false;
   }
   
-  console.log('[CONFIG] Configuration validation passed');
+  productionLogger.debug('[CONFIG] Configuration validation passed');
   return true;
 };
 

@@ -28,12 +28,12 @@ export const useDuplicateDetectionExecution = (
     }));
 
     try {
-      console.log(`[DUPLICATE DETECTION HOOK] Starting detection for ${records.length} records`);
+      productionLogger.debug(`[DUPLICATE DETECTION HOOK] Starting detection for ${records.length} records`);
       
       const detectionConfig = config ? { ...state.config, ...config } : state.config;
       const result = await detectDuplicates(records, detectionConfig);
       
-      console.log(`[DUPLICATE DETECTION HOOK] Detection completed:`, result.statistics);
+      productionLogger.debug(`[DUPLICATE DETECTION HOOK] Detection completed:`, result.statistics);
       
       setState(prev => ({
         ...prev,
@@ -50,7 +50,7 @@ export const useDuplicateDetectionExecution = (
       return result;
 
     } catch (error) {
-      console.error('[DUPLICATE DETECTION HOOK] Detection failed:', error);
+      productionLogger.error('[DUPLICATE DETECTION HOOK] Detection failed:', error);
       
       const errorMessage = error instanceof Error ? error.message : 'Duplicate detection failed';
       

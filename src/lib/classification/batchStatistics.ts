@@ -47,8 +47,8 @@ export function logBatchStatistics(
   stats: EnhancedBatchStatistics,
   results: PayeeClassification[]
 ): void {
-  console.log(`[V3 Batch] Completed processing ${results.length} payees in ${stats.processingTime}ms`);
-  console.log(`[V3 Batch] Business: ${stats.businessCount}, Individual: ${stats.individualCount}, Excluded: ${stats.excludedCount}`);
-  console.log(`[V3 Batch] Average confidence: ${stats.averageConfidence.toFixed(1)}%`);
-  console.log(`[V3 Batch] NO FAILURES - 100% success rate achieved!`);
+  productionLogger.debug(`[V3 Batch] Completed processing ${results.length} payees in ${stats.processingTime}ms`);
+  productionLogger.debug(`[V3 Batch] Business: ${stats.businessCount}, Individual: ${stats.individualCount}, Excluded: ${stats.excludedCount}`);
+  productionLogger.debug(`[V3 Batch] Average confidence: ${stats.averageConfidence.toFixed(1)}%`);
+  productionLogger.debug(`[V3 Batch] NO FAILURES - 100% success rate achieved!`);
 }

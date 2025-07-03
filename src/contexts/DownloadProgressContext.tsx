@@ -32,13 +32,13 @@ export const DownloadProgressProvider: React.FC<{ children: React.ReactNode }> =
   const [downloads, setDownloads] = useState<Record<string, DownloadState>>({});
 
   const startDownload = useCallback((id: string, filename: string, total: number) => {
-    console.log(`[DOWNLOAD PROGRESS] Starting download: ${id}, filename: ${filename}, total: ${total}`);
+    productionLogger.debug(`[DOWNLOAD PROGRESS] Starting download: ${id}, filename: ${filename}, total: ${total}`);
     
     // Clear any existing download for this ID to prevent stale state
     setDownloads(prev => {
       const newDownloads = { ...prev };
       if (newDownloads[id]) {
-        console.log(`[DOWNLOAD PROGRESS] Clearing existing download state for ${id}`);
+        productionLogger.debug(`[DOWNLOAD PROGRESS] Clearing existing download state for ${id}`);
         delete newDownloads[id];
       }
       
@@ -60,11 +60,11 @@ export const DownloadProgressProvider: React.FC<{ children: React.ReactNode }> =
   }, []);
 
   const updateDownload = useCallback((id: string, updates: Partial<DownloadState>) => {
-    console.log(`[DOWNLOAD PROGRESS] Updating download: ${id}`, updates);
+    productionLogger.debug(`[DOWNLOAD PROGRESS] Updating download: ${id}`, updates);
     setDownloads(prev => {
       const current = prev[id];
       if (!current) {
-        console.warn(`[DOWNLOAD PROGRESS] No download found for ID: ${id}`);
+        productionLogger.warn(`[DOWNLOAD PROGRESS] No download found for ID: ${id}`);
         return prev;
       }
 
@@ -85,13 +85,13 @@ export const DownloadProgressProvider: React.FC<{ children: React.ReactNode }> =
         }
       };
       
-      console.log(`[DOWNLOAD PROGRESS] Updated download state for ${id}:`, newState[id]);
+      productionLogger.debug(`[DOWNLOAD PROGRESS] Updated download state for ${id}:`, newState[id]);
       return newState;
     });
   }, []);
 
   const completeDownload = useCallback((id: string) => {
-    console.log(`[DOWNLOAD PROGRESS] Completing download: ${id}`);
+    productionLogger.debug(`[DOWNLOAD PROGRESS] Completing download: ${id}`);
     updateDownload(id, {
       progress: 100,
       stage: 'Complete',
@@ -101,7 +101,7 @@ export const DownloadProgressProvider: React.FC<{ children: React.ReactNode }> =
 
     // Auto-clear completed downloads after 10 seconds
     setTimeout(() => {
-      console.log(`[DOWNLOAD PROGRESS] Auto-clearing completed download: ${id}`);
+      productionLogger.debug(`[DOWNLOAD PROGRESS] Auto-clearing completed download: ${id}`);
       clearDownload(id);
     }, 10000);
   }, [updateDownload]);
@@ -124,7 +124,7 @@ export const DownloadProgressProvider: React.FC<{ children: React.ReactNode }> =
   }, []);
 
   const clearAllDownloads = useCallback(() => {
-    console.log(`[DOWNLOAD PROGRESS] Clearing all download states`);
+    productionLogger.debug(`[DOWNLOAD PROGRESS] Clearing all download states`);
     setDownloads({});
   }, []);
 

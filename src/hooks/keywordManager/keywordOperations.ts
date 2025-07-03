@@ -51,7 +51,7 @@ export const useKeywordOperations = () => {
         return false;
       }
     } catch (error) {
-      console.error('Error adding keyword:', error);
+      productionLogger.error('Error adding keyword:', error);
       toast({
         title: "Error",
         description: "Failed to add keyword",
@@ -88,7 +88,7 @@ export const useKeywordOperations = () => {
         return false;
       }
     } catch (error) {
-      console.error('Error updating keyword:', error);
+      productionLogger.error('Error updating keyword:', error);
       toast({
         title: "Error",
         description: "Failed to update keyword",
@@ -124,7 +124,7 @@ export const useKeywordOperations = () => {
         return false;
       }
     } catch (error) {
-      console.error('Error deleting keyword:', error);
+      productionLogger.error('Error deleting keyword:', error);
       toast({
         title: "Error",
         description: "Failed to delete keyword",

@@ -22,7 +22,7 @@ const DuplicateTestRunner = () => {
   const runAllTests = async () => {
     setIsRunning(true);
     try {
-      console.log('[TEST RUNNER] Starting comprehensive tests...');
+      productionLogger.debug('[TEST RUNNER] Starting comprehensive tests...');
       
       // Run duplicate detection tests
       const dupResults = await runDuplicateTests();
@@ -32,9 +32,9 @@ const DuplicateTestRunner = () => {
       const excResults = await runExclusionTests();
       setExclusionResults(excResults);
       
-      console.log('[TEST RUNNER] All tests completed');
+      productionLogger.debug('[TEST RUNNER] All tests completed');
     } catch (error) {
-      console.error('[TEST RUNNER] Test execution failed:', error);
+      productionLogger.error('[TEST RUNNER] Test execution failed:', error);
     } finally {
       setIsRunning(false);
     }

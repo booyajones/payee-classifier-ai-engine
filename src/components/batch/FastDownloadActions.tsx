@@ -49,7 +49,7 @@ const FastDownloadActions = ({
       setFileStatus(status);
       setLastChecked(new Date());
     } catch (error) {
-      console.error('Error checking file status:', error);
+      productionLogger.error('Error checking file status:', error);
     }
   };
 
@@ -84,7 +84,7 @@ const FastDownloadActions = ({
         description: `${filename} downloaded successfully`,
       });
     } catch (error) {
-      console.error('Download failed:', error);
+      productionLogger.error('Download failed:', error);
       toast({
         title: "Download Failed",
         description: error instanceof Error ? error.message : 'Failed to download file.',
@@ -115,7 +115,7 @@ const FastDownloadActions = ({
         throw new Error(result.error || 'Generation failed');
       }
     } catch (error) {
-      console.error('File generation failed:', error);
+      productionLogger.error('File generation failed:', error);
       toast({
         title: "Generation Failed",
         description: error instanceof Error ? error.message : 'Unknown error occurred',

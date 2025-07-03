@@ -31,7 +31,7 @@ export class PreGeneratedFileService {
       
       window.URL.revokeObjectURL(downloadUrl);
     } catch (error) {
-      console.error('Download failed:', error);
+      productionLogger.error('Download failed:', error);
       throw error;
     }
   }

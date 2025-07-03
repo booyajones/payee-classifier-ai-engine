@@ -66,15 +66,15 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error(`[ERROR BOUNDARY ${this.state.errorId}] Component error caught:`, error, errorInfo);
+    productionLogger.error(`[ERROR BOUNDARY ${this.state.errorId}] Component error caught:`, error, errorInfo);
     
     // Report specific error patterns
     if (error.message.includes('Maximum call stack size exceeded')) {
-      console.error('[ERROR BOUNDARY] Stack overflow detected - possible infinite loop');
+      productionLogger.error('[ERROR BOUNDARY] Stack overflow detected - possible infinite loop');
     }
     
     if (error.message.includes('Cannot read properties of undefined')) {
-      console.error('[ERROR BOUNDARY] Undefined property access detected');
+      productionLogger.error('[ERROR BOUNDARY] Undefined property access detected');
     }
     
     this.setState({ error, errorInfo });

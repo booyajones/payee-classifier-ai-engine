@@ -16,7 +16,7 @@ export const useBatchJobActionsHandler = () => {
         description: `Successfully cancelled job ${jobId.slice(0, 8)}...`,
       });
     } catch (error) {
-      console.error('Failed to cancel job:', error);
+      productionLogger.error('Failed to cancel job:', error);
       toast({
         title: "Cancel Failed",
         description: error instanceof Error ? error.message : 'Failed to cancel job',
@@ -39,7 +39,7 @@ export const useBatchJobActionsHandler = () => {
         description: `Permanently removed job ${jobId.slice(0, 8)}...`,
       });
     } catch (error) {
-      console.error('Failed to delete job:', error);
+      productionLogger.error('Failed to delete job:', error);
       toast({
         title: "Delete Failed",
         description: error instanceof Error ? error.message : 'Failed to delete job',

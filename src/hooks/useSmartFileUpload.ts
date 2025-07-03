@@ -46,7 +46,7 @@ export const useSmartFileUpload = () => {
 
   // Debug logging utility
   const debugLog = (message: string, data?: any) => {
-    console.log(`[SMART UPLOAD DEBUG] ${message}`, data || '');
+    productionLogger.debug(`[SMART UPLOAD DEBUG] ${message}`, data || '');
   };
 
   const getSuggestions = (errorCode: string): string[] => {

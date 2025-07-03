@@ -10,15 +10,15 @@ export const useBatchJobCancellation = (onJobUpdate: (job: BatchJob) => void) =>
   const { execute: cancelJobWithRetry } = useApiRetry(cancelBatchJob, {
     maxRetries: 2,
     onRetry: (attempt, error) => {
-      console.log(`[CANCELLATION] Retry attempt ${attempt} for job cancellation: ${error.message}`);
+      productionLogger.debug(`[CANCELLATION] Retry attempt ${attempt} for job cancellation: ${error.message}`);
     }
   });
 
   const handleCancelJob = async (jobId: string) => {
     try {
-      console.log(`[CANCELLATION] Cancelling job ${jobId}`);
+      productionLogger.debug(`[CANCELLATION] Cancelling job ${jobId}`);
       const cancelledJob = await cancelJobWithRetry(jobId);
-      console.log(`[CANCELLATION] Job ${jobId} cancelled successfully, new status:`, cancelledJob.status);
+      productionLogger.debug(`[CANCELLATION] Job ${jobId} cancelled successfully, new status:`, cancelledJob.status);
       onJobUpdate(cancelledJob);
       
       toast({
@@ -27,13 +27,13 @@ export const useBatchJobCancellation = (onJobUpdate: (job: BatchJob) => void) =>
       });
     } catch (error) {
       const appError = handleError(error, 'Job Cancellation');
-      console.error(`[CANCELLATION] Error cancelling job ${jobId}:`, error);
+      productionLogger.error(`[CANCELLATION] Error cancelling job ${jobId}:`, error);
       showErrorToast(appError, 'Job Cancellation');
     }
   };
 
   const handleCancelDownload = (jobId: string) => {
-    console.log(`[DOWNLOAD CANCELLATION] Cancelling download for job ${jobId}`);
+    productionLogger.debug(`[DOWNLOAD CANCELLATION] Cancelling download for job ${jobId}`);
     
     toast({
       title: "Download Cancelled",

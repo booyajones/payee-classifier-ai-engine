@@ -41,7 +41,7 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
 
   // Core batch job creation handler
   const coreHandleColumnSelect = async (payeeRowData: PayeeRowData) => {
-    console.log('Creating batch job with payee data:', payeeRowData.uniquePayeeNames.length);
+    productionLogger.debug('Creating batch job with payee data:', payeeRowData.uniquePayeeNames.length);
     
     try {
       setUploadState('processing');
@@ -55,46 +55,46 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
       setUploadState('complete');
       
     } catch (error) {
-      console.error('Failed to create batch job:', error);
+      productionLogger.error('Failed to create batch job:', error);
       setUploadState('error');
       setErrorMessage(error instanceof Error ? error.message : 'Failed to create batch job');
     }
   };
 
   // Debug logging for main component
-  console.log('Smart upload rendering:', { uploadState, hasFileData: !!fileData });
+  productionLogger.debug('Smart upload rendering:', { uploadState, hasFileData: !!fileData });
 
   const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
-      console.log('No file selected');
+      productionLogger.debug('No file selected');
       return;
     }
-    console.log('File selected for processing:', file.name);
+    productionLogger.debug('File selected for processing:', file.name);
     await handleFileSelect(file);
   };
 
   const handleColumnSelect = async () => {
-    console.log('Column selection initiated');
+    productionLogger.debug('Column selection initiated');
 
     if (!selectedPayeeColumn) {
-      console.error('No column selected - cannot proceed');
+      productionLogger.error('No column selected - cannot proceed');
       return;
     }
 
     if (!fileData || fileData.length === 0) {
-      console.error('No file data available - cannot proceed');
+      productionLogger.error('No file data available - cannot proceed');
       return;
     }
 
     // Validate the payee column first
     const payeeRowData = await validatePayeeColumn();
     if (!payeeRowData) {
-      console.error('Payee column validation failed');
+      productionLogger.error('Payee column validation failed');
       return;
     }
 
-    console.log('Payee column validated successfully, proceeding with batch creation');
+    productionLogger.debug('Payee column validated successfully, proceeding with batch creation');
     await coreHandleColumnSelect(payeeRowData);
   };
 
