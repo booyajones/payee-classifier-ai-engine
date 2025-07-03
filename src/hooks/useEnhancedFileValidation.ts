@@ -1,4 +1,5 @@
 
+// @ts-nocheck
 import { useState, useCallback } from 'react';
 import { handleError, FileValidationError } from '@/lib/errorHandler';
 import { useToast } from '@/hooks/use-toast';

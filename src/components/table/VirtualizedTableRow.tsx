@@ -3,20 +3,23 @@ import { memo } from 'react';
 import { TableCell } from './TableCell';
 
 interface VirtualizedTableRowProps {
-  rowIndex: number;
-  data: any[];
+  result?: any;
+  index?: number;
   style: React.CSSProperties;
   columns: any[];
+  onViewDetails?: (result: any) => void;
+  rowIndex?: number;
+  data?: any[];
 }
 
 export const VirtualizedTableRow = memo(
-  ({ rowIndex, data, style, columns }: VirtualizedTableRowProps) => {
-    const row = data[rowIndex];
+  ({ result, index, rowIndex, data, style, columns, onViewDetails }: VirtualizedTableRowProps) => {
+    const row = result || (data && data[rowIndex || index || 0]);
 
     return (
       <div className="table-row" style={style}>
-        {columns.map((column, index) => (
-          <TableCell key={`${rowIndex}-${column.key}`} value={row[column.key]} column={column} />
+        {columns.map((column) => (
+          <TableCell key={`${index || rowIndex}-${column.key}`} value={row[column.key]} column={column} />
         ))}
       </div>
     );

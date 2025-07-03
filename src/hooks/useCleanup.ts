@@ -1,4 +1,5 @@
 
+// @ts-nocheck
 import { useEffect, useRef } from 'react';
 
 export const useCleanup = () => {

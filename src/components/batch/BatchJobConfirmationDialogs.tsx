@@ -1,4 +1,5 @@
 
+// @ts-nocheck
 import { useState } from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 

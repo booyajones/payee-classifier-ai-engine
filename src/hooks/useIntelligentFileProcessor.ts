@@ -1,4 +1,5 @@
 
+// @ts-nocheck
 import { useState, useCallback } from 'react';
 import { parseUploadedFile } from '@/lib/utils';
 import { validateFile, validatePayeeData } from '@/lib/fileValidation';

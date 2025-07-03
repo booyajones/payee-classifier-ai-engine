@@ -4,7 +4,7 @@ import { FixedSizeList as List } from 'react-window';
 import { Table, TableBody } from '@/components/ui/table';
 import { PayeeClassification } from '@/lib/types';
 import ClassificationTableHeader from './TableHeader';
-import VirtualizedTableRow from './VirtualizedTableRow';
+import { VirtualizedTableRow } from './VirtualizedTableRow';
 
 interface VirtualizedTableProps {
   results: PayeeClassification[];

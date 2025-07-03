@@ -2,6 +2,20 @@
 // @ts-nocheck
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
+export interface DownloadState {
+  id: string;
+  filename: string;
+  progress: number;
+  stage: string;
+  processed: number;
+  total: number;
+  isActive: boolean;
+  canCancel: boolean;
+  error?: string;
+  startedAt: Date;
+  estimatedTimeRemaining?: number;
+}
+
 interface DownloadProgress {
   jobId: string;
   progress: number;
@@ -13,9 +27,13 @@ interface DownloadProgress {
 
 interface DownloadProgressContextType {
   downloads: Record<string, DownloadProgress>;
-  startDownload: (jobId: string, total: number) => void;
+  startDownload: (jobId: string, filename: string, total: number) => void;
+  updateDownload: (id: string, updates: Partial<DownloadState>) => void;
   updateProgress: (jobId: string, progress: number, stage: string, processed: number) => void;
   completeDownload: (jobId: string) => void;
+  cancelDownload: (id: string) => void;
+  clearDownload: (id: string) => void;
+  clearAllDownloads: () => void;
   getActiveDownloads: () => DownloadProgress[];
 }
 
@@ -24,7 +42,7 @@ const DownloadProgressContext = createContext<DownloadProgressContextType | unde
 export const DownloadProgressProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [downloads, setDownloads] = useState<Record<string, DownloadProgress>>({});
 
-  const startDownload = useCallback((jobId: string, total: number) => {
+  const startDownload = useCallback((jobId: string, filename: string, total: number) => {
     setDownloads((prev: any) => ({
       ...prev,
       [jobId]: {
@@ -59,6 +77,32 @@ export const DownloadProgressProvider: React.FC<{ children: React.ReactNode }> =
     });
   }, []);
 
+  const updateDownload = useCallback((id: string, updates: Partial<DownloadState>) => {
+    setDownloads((prev: any) => ({
+      ...prev,
+      [id]: { ...prev[id], ...updates }
+    }));
+  }, []);
+
+  const cancelDownload = useCallback((id: string) => {
+    setDownloads((prev: any) => ({
+      ...prev,
+      [id]: { ...prev[id], isActive: false, canCancel: false }
+    }));
+  }, []);
+
+  const clearDownload = useCallback((id: string) => {
+    setDownloads((prev: any) => {
+      const newDownloads = { ...prev };
+      delete newDownloads[id];
+      return newDownloads;
+    });
+  }, []);
+
+  const clearAllDownloads = useCallback(() => {
+    setDownloads({});
+  }, []);
+
   const getActiveDownloads = useCallback(() => {
     return Object.values(downloads).filter(download => download.isActive);
   }, [downloads]);
@@ -67,8 +111,12 @@ export const DownloadProgressProvider: React.FC<{ children: React.ReactNode }> =
     <DownloadProgressContext.Provider value={{
       downloads,
       startDownload,
+      updateDownload,
       updateProgress,
       completeDownload,
+      cancelDownload,
+      clearDownload,
+      clearAllDownloads,
       getActiveDownloads
     }}>
       {children}
