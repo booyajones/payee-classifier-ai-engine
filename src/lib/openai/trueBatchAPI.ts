@@ -83,7 +83,7 @@ export async function createBatchJob(
     const { generateContextualBatchJobName } = await import('@/lib/services/batchJobNameGenerator');
     const finalJobName = jobName || generateContextualBatchJobName(payeeNames.length, 'file');
     
-    console.log(`[TRUE BATCH API] Creating batch job "${finalJobName}" for ${payeeNames.length} payees with SIC codes using model: ${CLASSIFICATION_MODEL}`);
+    productionLogger.debug(`[TRUE BATCH API] Creating batch job "${finalJobName}" for ${payeeNames.length} payees with SIC codes using model: ${CLASSIFICATION_MODEL}`);
     
     // Create batch requests in JSONL format with enhanced SIC code system prompt
     const batchRequests = payeeNames.map((name, index) => ({
@@ -141,7 +141,7 @@ Example responses:
       purpose: 'batch'
     });
     
-    console.log(`[TRUE BATCH API] Created input file with SIC code support: ${file.id}`);
+    productionLogger.debug(`[TRUE BATCH API] Created input file with SIC code support: ${file.id}`);
     
     // Create the batch job
     const batch = await client.batches.create({
@@ -155,7 +155,7 @@ Example responses:
       }
     });
     
-    console.log(`[TRUE BATCH API] Created batch job with SIC codes: ${batch.id}`);
+    productionLogger.debug(`[TRUE BATCH API] Created batch job with SIC codes: ${batch.id}`);
     
     return {
       id: batch.id,
@@ -238,7 +238,7 @@ export async function getBatchJobResults(
   return makeAPIRequest(async () => {
     const client = getOpenAIClient();
     
-    console.log(`[TRUE BATCH API] Retrieving SIC code results from file: ${batchJob.output_file_id}`);
+    productionLogger.debug(`[TRUE BATCH API] Retrieving SIC code results from file: ${batchJob.output_file_id}`);
     
     // Get the output file content
     const fileContent = await client.files.content(batchJob.output_file_id!);
@@ -253,13 +253,13 @@ export async function getBatchJobResults(
         try {
           return JSON.parse(line);
         } catch (error) {
-          console.error('[TRUE BATCH API] Error parsing result line:', line, error);
+          productionLogger.error('[TRUE BATCH API] Error parsing result line:', line, error);
           return null;
         }
       })
       .filter(result => result !== null);
     
-    console.log(`[TRUE BATCH API] Parsed ${results.length} results with SIC code support`);
+    productionLogger.debug(`[TRUE BATCH API] Parsed ${results.length} results with SIC code support`);
     logMemoryUsage('getBatchJobResults');
     
     // Map results back to payee names with SIC code extraction
@@ -305,7 +305,7 @@ export async function getBatchJobResults(
           const parsed = JSON.parse(content);
           
           // Debug SIC code extraction
-          console.log(`[SIC EXTRACTION] Payee: "${name}" | Classification: ${parsed.classification} | SIC: ${parsed.sicCode || 'None'} | Description: ${parsed.sicDescription || 'None'}`);
+          productionLogger.debug(`[SIC EXTRACTION] Payee: "${name}" | Classification: ${parsed.classification} | SIC: ${parsed.sicCode || 'None'} | Description: ${parsed.sicDescription || 'None'}`);
           
           return {
             payeeName: name,
@@ -318,7 +318,7 @@ export async function getBatchJobResults(
           };
         }
       } catch (error) {
-        console.error(`[TRUE BATCH API] Error parsing result for ${name}:`, error);
+        productionLogger.error(`[TRUE BATCH API] Error parsing result for ${name}:`, error);
       }
       
       return {
@@ -334,7 +334,7 @@ export async function getBatchJobResults(
     // Log SIC code statistics
     const businessResults = classificationResults.filter(r => r.classification === 'Business');
     const sicResults = classificationResults.filter(r => r.sicCode);
-    console.log(`[TRUE BATCH API] SIC Code Statistics: ${sicResults.length}/${businessResults.length} businesses have SIC codes`);
+    productionLogger.debug(`[TRUE BATCH API] SIC Code Statistics: ${sicResults.length}/${businessResults.length} businesses have SIC codes`);
     
     return classificationResults;
   }, { timeout: 120000, retries: 2 });
@@ -386,7 +386,7 @@ export async function pollBatchJob(
   onProgress?: (job: BatchJob) => void,
   pollInterval: number = 5000
 ): Promise<BatchJob> {
-  console.log(`[TRUE BATCH API] Starting to poll batch job: ${batchId}`);
+  productionLogger.debug(`[TRUE BATCH API] Starting to poll batch job: ${batchId}`);
   
   while (true) {
     const job = await checkBatchJobStatus(batchId);
@@ -395,7 +395,7 @@ export async function pollBatchJob(
       onProgress(job);
     }
     
-    console.log(`[TRUE BATCH API] Batch job ${batchId} status: ${job.status}`);
+    productionLogger.debug(`[TRUE BATCH API] Batch job ${batchId} status: ${job.status}`);
     
     if (['completed', 'failed', 'expired', 'cancelled'].includes(job.status)) {
       return job;

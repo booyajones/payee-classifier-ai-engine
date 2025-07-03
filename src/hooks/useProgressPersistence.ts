@@ -44,7 +44,7 @@ export const useProgressPersistence = () => {
         setProgressStates(data.current || {});
         setProgressHistory(data.history || {});
         
-        console.log('[PROGRESS PERSISTENCE] Loaded persisted progress:', Object.keys(data.current || {}));
+        productionLogger.debug('[PROGRESS PERSISTENCE] Loaded persisted progress:', Object.keys(data.current || {}));
         
         // Check for any incomplete operations that need recovery
         const incompleteOperations = Object.values(data.current || {}).filter(
@@ -59,7 +59,7 @@ export const useProgressPersistence = () => {
         }
       }
     } catch (error) {
-      console.warn('[PROGRESS PERSISTENCE] Failed to load persisted progress:', error);
+      productionLogger.warn('[PROGRESS PERSISTENCE] Failed to load persisted progress:', error);
     }
   }, [toast]);
 
@@ -68,7 +68,7 @@ export const useProgressPersistence = () => {
       const data = { current, history, timestamp: Date.now() };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (error) {
-      console.warn('[PROGRESS PERSISTENCE] Failed to persist progress:', error);
+      productionLogger.warn('[PROGRESS PERSISTENCE] Failed to persist progress:', error);
       
       // If storage is full, try to clean up and retry
       cleanupOldProgress();
@@ -144,7 +144,7 @@ export const useProgressPersistence = () => {
       return updated;
     });
 
-    console.log(`[PROGRESS PERSISTENCE] Updated progress for ${id}: ${percentage}% - ${message}${estimatedTimeRemaining ? ` (ETA: ${Math.round(estimatedTimeRemaining / 1000)}s)` : ''}`);
+    productionLogger.debug(`[PROGRESS PERSISTENCE] Updated progress for ${id}: ${percentage}% - ${message}${estimatedTimeRemaining ? ` (ETA: ${Math.round(estimatedTimeRemaining / 1000)}s)` : ''}`);
   }, [persistProgress, progressStates]);
 
   const completeProgress = useCallback((id: string, finalMessage: string = 'Completed') => {
@@ -181,7 +181,7 @@ export const useProgressPersistence = () => {
       return updated;
     });
     
-    console.log(`[PROGRESS PERSISTENCE] Cleared progress for ${id}`);
+    productionLogger.debug(`[PROGRESS PERSISTENCE] Cleared progress for ${id}`);
   }, [persistProgress]);
 
   const getProgress = useCallback((id: string): ProgressState | null => {
@@ -229,7 +229,7 @@ export const useProgressPersistence = () => {
           return updatedHistory;
         });
         
-        console.log('[PROGRESS PERSISTENCE] Cleaned up old progress data');
+        productionLogger.debug('[PROGRESS PERSISTENCE] Cleaned up old progress data');
       }
       
       return updated;

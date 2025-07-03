@@ -10,7 +10,7 @@ let currentToken: string | null = null;
  */
 export function initializeOpenAI(apiKey?: string, rememberKey?: boolean): OpenAI {
   if (apiKey && apiKey.trim() !== '') {
-    console.log("Initializing OpenAI client with provided API key");
+    productionLogger.debug("Initializing OpenAI client with provided API key");
     
     // Validate API key format
     if (!apiKey.startsWith('sk-')) {
@@ -25,9 +25,9 @@ export function initializeOpenAI(apiKey?: string, rememberKey?: boolean): OpenAI
     if (rememberKey) {
       try {
         currentToken = storeApiKey(apiKey.trim());
-        console.log("API key saved to secure storage");
+        productionLogger.debug("API key saved to secure storage");
       } catch (error) {
-        console.error("Failed to save API key:", error);
+        productionLogger.error("Failed to save API key:", error);
         // Continue without saving if storage fails
       }
     }
@@ -37,7 +37,7 @@ export function initializeOpenAI(apiKey?: string, rememberKey?: boolean): OpenAI
   
   // Try to get from secure storage
   if (hasSavedApiKey()) {
-    console.log("Attempting to load saved OpenAI API key");
+    productionLogger.debug("Attempting to load saved OpenAI API key");
     
     // Get all stored keys and try to find a valid one
     const metadata = JSON.parse(localStorage.getItem('secure_api_key_token_map') || '{}');
@@ -45,7 +45,7 @@ export function initializeOpenAI(apiKey?: string, rememberKey?: boolean): OpenAI
       try {
         const savedKey = getApiKey(token);
         if (savedKey && savedKey.startsWith('sk-')) {
-          console.log("Using saved OpenAI API key from secure storage");
+          productionLogger.debug("Using saved OpenAI API key from secure storage");
           currentToken = token;
           
           openaiClient = new OpenAI({
@@ -55,7 +55,7 @@ export function initializeOpenAI(apiKey?: string, rememberKey?: boolean): OpenAI
           return openaiClient;
         }
       } catch (error) {
-        console.error("Failed to retrieve API key with token:", token, error);
+        productionLogger.error("Failed to retrieve API key with token:", token, error);
         // Try next token
       }
     }
@@ -73,7 +73,7 @@ export function getOpenAIClient(): OpenAI {
     try {
       return initializeOpenAI();
     } catch (error) {
-      console.error("Failed to initialize from saved key:", error);
+      productionLogger.error("Failed to initialize from saved key:", error);
       throw new Error("OpenAI client not initialized. Please set your API key first.");
     }
   }
@@ -111,7 +111,7 @@ export function clearOpenAIKeys(): void {
   localStorage.removeItem('openai_api_key');
   
   openaiClient = null;
-  console.log("OpenAI client and saved keys cleared");
+  productionLogger.debug("OpenAI client and saved keys cleared");
 }
 
 /**
@@ -128,7 +128,7 @@ export async function testOpenAIConnection(): Promise<boolean> {
     });
     return true;
   } catch (error) {
-    console.error("OpenAI connection test failed:", error);
+    productionLogger.error("OpenAI connection test failed:", error);
     return false;
   }
 }

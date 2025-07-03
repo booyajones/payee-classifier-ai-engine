@@ -22,7 +22,7 @@ export const useBatchJobPolling = (
     // Don't start if already polling
     if (pollingStates[jobId]?.isPolling) return;
 
-    console.log(`[POLLING] Manual refresh for job ${jobId}`);
+    productionLogger.debug(`[POLLING] Manual refresh for job ${jobId}`);
     
     setPollingStates(prev => ({
       ...prev,
@@ -50,7 +50,7 @@ export const useBatchJobPolling = (
         const hasProgressChange = !lastUpdate || Math.abs(lastUpdate.progress - currentProgress) > 1;
         
         if (hasStatusChange || hasProgressChange) {
-          console.log(`[POLLING] Meaningful change detected for job ${jobId.slice(-8)}: status=${job.status}, progress=${currentProgress.toFixed(1)}%`);
+          productionLogger.debug(`[POLLING] Meaningful change detected for job ${jobId.slice(-8)}: status=${job.status}, progress=${currentProgress.toFixed(1)}%`);
           lastUpdateRef.current[jobId] = { status: job.status, progress: currentProgress };
         }
       }
@@ -66,7 +66,7 @@ export const useBatchJobPolling = (
         }
       }));
     } catch (error) {
-      console.error(`[POLLING] Error refreshing job ${jobId}:`, error);
+      productionLogger.error(`[POLLING] Error refreshing job ${jobId}:`, error);
       
       setPollingStates(prev => ({
         ...prev,

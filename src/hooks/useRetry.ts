@@ -68,7 +68,7 @@ export const useRetry = <T extends any[], R>(
           const appError = handleError(error, 'Retry operation');
           
           if (attemptNumber < maxRetries && shouldRetry(appError)) {
-            console.log(`[RETRY] Attempt ${attemptNumber + 1} failed, retrying...`, {
+            productionLogger.debug(`[RETRY] Attempt ${attemptNumber + 1} failed, retrying...`, {
               error: appError.message,
               nextAttempt: attemptNumber + 2,
               maxRetries: maxRetries + 1

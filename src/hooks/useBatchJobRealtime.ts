@@ -6,7 +6,7 @@ import { emitBatchJobUpdate } from './batch/useBatchJobEventEmitter';
 
 export const useBatchJobRealtime = (onJobUpdate: (job: BatchJob) => void) => {
   useEffect(() => {
-    console.log('[BATCH REALTIME] Setting up real-time subscription for batch_jobs table');
+    productionLogger.debug('[BATCH REALTIME] Setting up real-time subscription for batch_jobs table');
     
     const channel = supabase
       .channel('batch-jobs-changes')
@@ -18,7 +18,7 @@ export const useBatchJobRealtime = (onJobUpdate: (job: BatchJob) => void) => {
           table: 'batch_jobs'
         },
         (payload) => {
-          console.log('[BATCH REALTIME] Received batch job update:', payload);
+          productionLogger.debug('[BATCH REALTIME] Received batch job update:', payload);
           
           if (payload.new) {
             // Convert database format to BatchJob format
@@ -42,7 +42,7 @@ export const useBatchJobRealtime = (onJobUpdate: (job: BatchJob) => void) => {
               errors: payload.new.errors || {}
             };
             
-            console.log('[BATCH REALTIME] Calling onJobUpdate with real-time data');
+            productionLogger.debug('[BATCH REALTIME] Calling onJobUpdate with real-time data');
             onJobUpdate(updatedJob);
             
             // Emit update event to refresh UI
@@ -51,11 +51,11 @@ export const useBatchJobRealtime = (onJobUpdate: (job: BatchJob) => void) => {
         }
       )
       .subscribe((status) => {
-        console.log('[BATCH REALTIME] Subscription status:', status);
+        productionLogger.debug('[BATCH REALTIME] Subscription status:', status);
       });
 
     return () => {
-      console.log('[BATCH REALTIME] Cleaning up real-time subscription');
+      productionLogger.debug('[BATCH REALTIME] Cleaning up real-time subscription');
       supabase.removeChannel(channel);
     };
   }, [onJobUpdate]);

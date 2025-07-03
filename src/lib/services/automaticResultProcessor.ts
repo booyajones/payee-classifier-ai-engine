@@ -15,7 +15,7 @@ export class AutomaticResultProcessor {
    */
   static async processCompletedBatch(batchJob: BatchJob): Promise<boolean> {
     try {
-      console.log(`[AUTO PROCESSOR] Starting automatic processing for completed job ${batchJob.id}`);
+      productionLogger.debug(`[AUTO PROCESSOR] Starting automatic processing for completed job ${batchJob.id}`);
       
       // Check if results already exist for this job
       const { data: existingResults, error: checkError } = await supabase
@@ -25,19 +25,19 @@ export class AutomaticResultProcessor {
         .limit(1);
         
       if (checkError) {
-        console.error(`[AUTO PROCESSOR] Error checking existing results for job ${batchJob.id}:`, checkError);
+        productionLogger.error(`[AUTO PROCESSOR] Error checking existing results for job ${batchJob.id}:`, checkError);
         return false;
       }
       
       if (existingResults && existingResults.length > 0) {
-        console.log(`[AUTO PROCESSOR] Results already exist for job ${batchJob.id}, skipping processing`);
+        productionLogger.debug(`[AUTO PROCESSOR] Results already exist for job ${batchJob.id}, skipping processing`);
         return true;
       }
       
       // Get the payee data from the batch job
       const payeeData = await this.reconstructPayeeData(batchJob);
       if (!payeeData) {
-        console.error(`[AUTO PROCESSOR] Could not reconstruct payee data for job ${batchJob.id}`);
+        productionLogger.error(`[AUTO PROCESSOR] Could not reconstruct payee data for job ${batchJob.id}`);
         return false;
       }
       
@@ -50,7 +50,7 @@ export class AutomaticResultProcessor {
           onJobComplete: () => {} // Not needed for automatic processing
         },
         (processed, total, percentage) => {
-          console.log(`[AUTO PROCESSOR] Processing job ${batchJob.id}: ${processed}/${total} (${percentage}%)`);
+          productionLogger.debug(`[AUTO PROCESSOR] Processing job ${batchJob.id}: ${processed}/${total} (${percentage}%)`);
         }
       );
       
@@ -58,15 +58,15 @@ export class AutomaticResultProcessor {
       const saveResult = await saveProcessedResults(finalClassifications, batchJob.id);
       
       if (!saveResult.success) {
-        console.error(`[AUTO PROCESSOR] Failed to save results for job ${batchJob.id}:`, saveResult.error);
+        productionLogger.error(`[AUTO PROCESSOR] Failed to save results for job ${batchJob.id}:`, saveResult.error);
         return false;
       }
       
-      console.log(`[AUTO PROCESSOR] Successfully processed and saved ${finalClassifications.length} results for job ${batchJob.id}`);
+      productionLogger.debug(`[AUTO PROCESSOR] Successfully processed and saved ${finalClassifications.length} results for job ${batchJob.id}`);
       return true;
       
     } catch (error) {
-      console.error(`[AUTO PROCESSOR] Error processing completed job ${batchJob.id}:`, error);
+      productionLogger.error(`[AUTO PROCESSOR] Error processing completed job ${batchJob.id}:`, error);
       return false;
     }
   }
@@ -84,7 +84,7 @@ export class AutomaticResultProcessor {
         .single();
         
       if (error || !jobData) {
-        console.error(`[AUTO PROCESSOR] Error fetching job data for ${batchJob.id}:`, error);
+        productionLogger.error(`[AUTO PROCESSOR] Error fetching job data for ${batchJob.id}:`, error);
         return null;
       }
       
@@ -112,7 +112,7 @@ export class AutomaticResultProcessor {
       };
       
     } catch (error) {
-      console.error(`[AUTO PROCESSOR] Error reconstructing payee data for job ${batchJob.id}:`, error);
+      productionLogger.error(`[AUTO PROCESSOR] Error reconstructing payee data for job ${batchJob.id}:`, error);
       return null;
     }
   }
@@ -129,13 +129,13 @@ export class AutomaticResultProcessor {
         .limit(1);
         
       if (error) {
-        console.error(`[AUTO PROCESSOR] Error checking pre-processed results for job ${jobId}:`, error);
+        productionLogger.error(`[AUTO PROCESSOR] Error checking pre-processed results for job ${jobId}:`, error);
         return false;
       }
       
       return data && data.length > 0;
     } catch (error) {
-      console.error(`[AUTO PROCESSOR] Error checking pre-processed results for job ${jobId}:`, error);
+      productionLogger.error(`[AUTO PROCESSOR] Error checking pre-processed results for job ${jobId}:`, error);
       return false;
     }
   }
@@ -152,13 +152,13 @@ export class AutomaticResultProcessor {
         .order('payee_name');
         
       if (error) {
-        console.error(`[AUTO PROCESSOR] Error fetching pre-processed results for job ${jobId}:`, error);
+        productionLogger.error(`[AUTO PROCESSOR] Error fetching pre-processed results for job ${jobId}:`, error);
         return null;
       }
       
       return data;
     } catch (error) {
-      console.error(`[AUTO PROCESSOR] Error fetching pre-processed results for job ${jobId}:`, error);
+      productionLogger.error(`[AUTO PROCESSOR] Error fetching pre-processed results for job ${jobId}:`, error);
       return null;
     }
   }

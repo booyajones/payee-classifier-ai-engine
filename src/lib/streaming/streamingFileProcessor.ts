@@ -24,7 +24,7 @@ export class StreamingFileProcessor {
       onChunk
     } = options;
 
-    console.log(`[STREAMING] Starting stream processing for ${file.name} (${file.size} bytes)`);
+    productionLogger.debug(`[STREAMING] Starting stream processing for ${file.name} (${file.size} bytes)`);
     
     const results: T[] = [];
     let processedItems = 0;
@@ -41,7 +41,7 @@ export class StreamingFileProcessor {
         if (processedItems % this.MEMORY_CHECK_INTERVAL === 0) {
           const memoryStats = MemoryOptimizer.getMemoryStats();
           if (memoryStats.memoryPressure === 'high') {
-            console.warn('[STREAMING] High memory pressure, forcing cleanup');
+            productionLogger.warn('[STREAMING] High memory pressure, forcing cleanup');
             MemoryOptimizer.suggestGarbageCollection();
             await new Promise(resolve => setTimeout(resolve, 100));
           }
@@ -74,7 +74,7 @@ export class StreamingFileProcessor {
           onProgress?.(progress, `Processed ${processedItems} items`);
           
         } catch (error) {
-          console.error(`[STREAMING] Chunk ${chunkIndex} processing failed:`, error);
+          productionLogger.error(`[STREAMING] Chunk ${chunkIndex} processing failed:`, error);
           throw new Error(`Chunk processing failed at item ${processedItems}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
 
@@ -82,11 +82,11 @@ export class StreamingFileProcessor {
         await new Promise(resolve => setTimeout(resolve, 1));
       }
 
-      console.log(`[STREAMING] Stream processing complete: ${results.length} items processed`);
+      productionLogger.debug(`[STREAMING] Stream processing complete: ${results.length} items processed`);
       return results;
 
     } catch (error) {
-      console.error('[STREAMING] Stream processing failed:', error);
+      productionLogger.error('[STREAMING] Stream processing failed:', error);
       throw error;
     }
   }

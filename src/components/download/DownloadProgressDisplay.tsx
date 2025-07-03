@@ -92,10 +92,10 @@ const DownloadProgressDisplay: React.FC = () => {
   const { downloads, cancelDownload, clearDownload } = useDownloadProgress();
   const activeDownloads = Object.values(downloads);
 
-  console.log(`[DOWNLOAD PROGRESS DISPLAY] Rendering with ${activeDownloads.length} downloads:`, activeDownloads);
+  productionLogger.debug(`[DOWNLOAD PROGRESS DISPLAY] Rendering with ${activeDownloads.length} downloads:`, activeDownloads);
 
   if (activeDownloads.length === 0) {
-    console.log(`[DOWNLOAD PROGRESS DISPLAY] No active downloads, hiding display`);
+    productionLogger.debug(`[DOWNLOAD PROGRESS DISPLAY] No active downloads, hiding display`);
     return null;
   }
 

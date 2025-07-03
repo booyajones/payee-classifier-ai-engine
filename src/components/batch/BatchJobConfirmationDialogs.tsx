@@ -31,18 +31,18 @@ export const useBatchJobConfirmationDialogs = ({
   const showCancelConfirmation = (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job) {
-      console.error(`[CONFIRMATION DIALOGS] Job not found for cancellation: ${jobId}`);
+      productionLogger.error(`[CONFIRMATION DIALOGS] Job not found for cancellation: ${jobId}`);
       return;
     }
     
-    console.log(`[CONFIRMATION DIALOGS] Showing cancel confirmation for job ${jobId}`);
+    productionLogger.debug(`[CONFIRMATION DIALOGS] Showing cancel confirmation for job ${jobId}`);
     
     setConfirmDialog({
       isOpen: true,
       title: 'Cancel Batch Job',
       description: `Are you sure you want to cancel this job? This action cannot be undone and you may be charged for completed requests.`,
       onConfirm: () => {
-        console.log(`[CONFIRMATION DIALOGS] User confirmed cancellation for job ${jobId}`);
+        productionLogger.debug(`[CONFIRMATION DIALOGS] User confirmed cancellation for job ${jobId}`);
         handleCancelJob(job.id);
         closeConfirmDialog();
       },
@@ -54,7 +54,7 @@ export const useBatchJobConfirmationDialogs = ({
     const job = jobs.find(j => j.id === jobId);
     const jobStatus = job?.status || 'unknown';
     
-    console.log(`[CONFIRMATION DIALOGS] Showing delete confirmation for job ${jobId} with status: ${jobStatus}`);
+    productionLogger.debug(`[CONFIRMATION DIALOGS] Showing delete confirmation for job ${jobId} with status: ${jobStatus}`);
     
     let description = '';
     if (jobStatus === 'cancelling') {
@@ -72,13 +72,13 @@ export const useBatchJobConfirmationDialogs = ({
       title: 'Delete Job Permanently',
       description,
       onConfirm: () => {
-        console.log(`[CONFIRMATION DIALOGS] User confirmed deletion for job ${jobId}`);
+        productionLogger.debug(`[CONFIRMATION DIALOGS] User confirmed deletion for job ${jobId}`);
         
         // Validate onJobDelete function before calling
         if (typeof onJobDelete === 'function') {
           onJobDelete(jobId);
         } else {
-          console.error('[CONFIRMATION DIALOGS] onJobDelete is not a function:', typeof onJobDelete);
+          productionLogger.error('[CONFIRMATION DIALOGS] onJobDelete is not a function:', typeof onJobDelete);
         }
         
         closeConfirmDialog();
@@ -88,7 +88,7 @@ export const useBatchJobConfirmationDialogs = ({
   };
 
   const closeConfirmDialog = () => {
-    console.log('[CONFIRMATION DIALOGS] Closing confirmation dialog');
+    productionLogger.debug('[CONFIRMATION DIALOGS] Closing confirmation dialog');
     setConfirmDialog(prev => ({ ...prev, isOpen: false }));
   };
 

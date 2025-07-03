@@ -13,7 +13,7 @@ export const useCleanup = () => {
       try {
         fn();
       } catch (error) {
-        console.error('[CLEANUP] Error during cleanup:', error);
+        productionLogger.error('[CLEANUP] Error during cleanup:', error);
       }
     });
     cleanupFunctions.current = [];
@@ -37,7 +37,7 @@ export const useMemoryOptimization = () => {
         const usedPercent = (memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100;
         
         if (usedPercent > 80) {
-          console.warn('[MEMORY] High memory usage detected:', usedPercent.toFixed(1) + '%');
+          productionLogger.warn('[MEMORY] High memory usage detected:', usedPercent.toFixed(1) + '%');
         }
       };
 

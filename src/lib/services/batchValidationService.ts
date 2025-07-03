@@ -12,7 +12,7 @@ export class BatchValidationService {
   }
 
   validateBatchInput(payeeRowData: PayeeRowData): void {
-    console.log(`[BATCH VALIDATION] Validating batch input:`, {
+    productionLogger.debug(`[BATCH VALIDATION] Validating batch input:`, {
       uniquePayeeNames: payeeRowData.uniquePayeeNames.length,
       originalFileData: payeeRowData.originalFileData.length,
       rowMappings: payeeRowData.rowMappings.length
@@ -38,10 +38,10 @@ export class BatchValidationService {
     // Validate that all payee names are valid
     const invalidPayees = payeeRowData.uniquePayeeNames.filter(name => !name || typeof name !== 'string' || name.trim() === '');
     if (invalidPayees.length > 0) {
-      console.warn(`[BATCH VALIDATION] Found ${invalidPayees.length} invalid payee names`);
+      productionLogger.warn(`[BATCH VALIDATION] Found ${invalidPayees.length} invalid payee names`);
     }
 
-    console.log(`[BATCH VALIDATION] Validation passed: ${payeeRowData.uniquePayeeNames.length} unique payees from ${payeeRowData.originalFileData.length} rows`);
+    productionLogger.debug(`[BATCH VALIDATION] Validation passed: ${payeeRowData.uniquePayeeNames.length} unique payees from ${payeeRowData.originalFileData.length} rows`);
   }
 }
 

@@ -11,7 +11,7 @@ export const useIndexState = () => {
   const [hasApiKey, setHasApiKey] = useState(false);
   const { toast } = useToast();
 
-  console.log('[INDEX DEBUG] Component rendering');
+  productionLogger.debug('[INDEX DEBUG] Component rendering');
 
   useEffect(() => {
     const initializeComponent = async () => {
@@ -19,7 +19,7 @@ export const useIndexState = () => {
         setHasApiKey(isOpenAIInitialized());
         logMemoryUsage('Index component mount');
       } catch (error) {
-        console.error('[INDEX ERROR] Initialization failed:', error);
+        productionLogger.error('[INDEX ERROR] Initialization failed:', error);
         toast({
           title: "Initialization Error",
           description: "Failed to initialize component",
@@ -36,7 +36,7 @@ export const useIndexState = () => {
     try {
       logMemoryUsage('Index state initialized');
     } catch (error) {
-      console.error('[INDEX ERROR] Memory logging failed:', error);
+      productionLogger.error('[INDEX ERROR] Memory logging failed:', error);
     }
   }, []);
 
@@ -46,7 +46,7 @@ export const useIndexState = () => {
     summary: BatchProcessingResult
   ) => {
     try {
-      console.log(`[INDEX] Batch complete: ${results.length} results - CSV auto-downloaded`);
+      productionLogger.debug(`[INDEX] Batch complete: ${results.length} results - CSV auto-downloaded`);
       
       setBatchResults(results);
       setBatchSummary(summary);
@@ -58,7 +58,7 @@ export const useIndexState = () => {
       
       logMemoryUsage('Batch processing complete');
     } catch (error) {
-      console.error('[INDEX ERROR] Batch completion failed:', error);
+      productionLogger.error('[INDEX ERROR] Batch completion failed:', error);
       toast({
         title: "Batch Error",
         description: "Failed to process batch completion",
@@ -70,7 +70,7 @@ export const useIndexState = () => {
   // Handle job deletion - clear summary and results
   const handleJobDelete = () => {
     try {
-      console.log('[INDEX] Clearing batch summary and results due to job deletion');
+      productionLogger.debug('[INDEX] Clearing batch summary and results due to job deletion');
       setBatchResults([]);
       setBatchSummary(null);
       
@@ -79,7 +79,7 @@ export const useIndexState = () => {
         description: "Batch summary removed with deleted job.",
       });
     } catch (error) {
-      console.error('[INDEX ERROR] Failed to clear batch data:', error);
+      productionLogger.error('[INDEX ERROR] Failed to clear batch data:', error);
     }
   };
 
@@ -87,7 +87,7 @@ export const useIndexState = () => {
     try {
       setHasApiKey(true);
     } catch (error) {
-      console.error('[INDEX ERROR] Key setting failed:', error);
+      productionLogger.error('[INDEX ERROR] Key setting failed:', error);
     }
   };
 

@@ -18,7 +18,7 @@ const FileGenerationFixer = () => {
         description: "All completed jobs have been processed and files generated",
       });
     } catch (error) {
-      console.error('Fix failed:', error);
+      productionLogger.error('Fix failed:', error);
       toast({
         title: "Fix Failed",
         description: error instanceof Error ? error.message : 'Failed to fix file generation',

@@ -41,7 +41,7 @@ export const useWebWorkerFileProcessor = () => {
       };
 
       workerRef.current.onerror = (error) => {
-        console.error('[WEB WORKER] Error:', error);
+        productionLogger.error('[WEB WORKER] Error:', error);
         toast({
           title: "Processing Error",
           description: "Background processing encountered an error",
@@ -50,7 +50,7 @@ export const useWebWorkerFileProcessor = () => {
       };
 
     } catch (error) {
-      console.error('[WEB WORKER] Failed to initialize:', error);
+      productionLogger.error('[WEB WORKER] Failed to initialize:', error);
       toast({
         title: "Worker Initialization Failed",
         description: "Falling back to main thread processing",

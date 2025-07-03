@@ -14,7 +14,7 @@ export function validateAndCreatePayeeRowData(
 ): PayeeRowData {
   // VALIDATION: Ensure we have a mapping for every original row
   if (rowMappings.length !== originalFileData.length) {
-    console.error(`[ROW MAPPING ${mode}] CRITICAL ERROR: Row mapping failed - expected ${originalFileData.length} mappings, got ${rowMappings.length}`);
+    productionLogger.error(`[ROW MAPPING ${mode}] CRITICAL ERROR: Row mapping failed - expected ${originalFileData.length} mappings, got ${rowMappings.length}`);
     throw new Error(`CRITICAL: Row mapping failed - expected ${originalFileData.length} mappings, got ${rowMappings.length}`);
   }
 
@@ -22,7 +22,7 @@ export function validateAndCreatePayeeRowData(
   const usedIndices = new Set<number>();
   for (const mapping of rowMappings) {
     if (usedIndices.has(mapping.originalRowIndex)) {
-      console.error(`[ROW MAPPING ${mode}] DUPLICATE ORIGINAL ROW INDEX: ${mapping.originalRowIndex}`);
+      productionLogger.error(`[ROW MAPPING ${mode}] DUPLICATE ORIGINAL ROW INDEX: ${mapping.originalRowIndex}`);
       throw new Error(`Duplicate original row index detected: ${mapping.originalRowIndex}`);
     }
     usedIndices.add(mapping.originalRowIndex);
@@ -50,12 +50,12 @@ export function validateAndCreatePayeeRowData(
     mostCommonSteps
   };
 
-  console.log(`[ROW MAPPING ${mode}] === MAPPING COMPLETE WITH ${mode} STANDARDIZATION ===`);
-  console.log(`[ROW MAPPING ${mode}] ${originalFileData.length} original rows → ${uniquePayeeNames.length} unique payees → ${rowMappings.length} mappings`);
-  console.log(`[ROW MAPPING ${mode}] Standardization: ${changesDetected}/${standardizationResults.length} names cleaned (${((changesDetected / standardizationResults.length) * 100).toFixed(1)}%)`);
+  productionLogger.debug(`[ROW MAPPING ${mode}] === MAPPING COMPLETE WITH ${mode} STANDARDIZATION ===`);
+  productionLogger.debug(`[ROW MAPPING ${mode}] ${originalFileData.length} original rows → ${uniquePayeeNames.length} unique payees → ${rowMappings.length} mappings`);
+  productionLogger.debug(`[ROW MAPPING ${mode}] Standardization: ${changesDetected}/${standardizationResults.length} names cleaned (${((changesDetected / standardizationResults.length) * 100).toFixed(1)}%)`);
   
   if (mode === 'SYNC') {
-    console.log(`[ROW MAPPING] Most common cleaning steps:`, mostCommonSteps.slice(0, 3).map(s => s.step));
+    productionLogger.debug(`[ROW MAPPING] Most common cleaning steps:`, mostCommonSteps.slice(0, 3).map(s => s.step));
   }
 
   return {

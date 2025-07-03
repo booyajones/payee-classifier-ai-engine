@@ -62,10 +62,10 @@ export class IntelligentCache {
           entry.lastAccess = Date.now();
           store.put(entry);
           
-          console.log(`[CACHE] Hit for fingerprint: ${fileFingerprint}`);
+          productionLogger.debug(`[CACHE] Hit for fingerprint: ${fileFingerprint}`);
           resolve(entry.data);
         } else {
-          console.log(`[CACHE] Miss for fingerprint: ${fileFingerprint}`);
+          productionLogger.debug(`[CACHE] Miss for fingerprint: ${fileFingerprint}`);
           resolve(null);
         }
       };
@@ -100,7 +100,7 @@ export class IntelligentCache {
 
       request.onerror = () => reject(request.error);
       request.onsuccess = () => {
-        console.log(`[CACHE] Stored ${size} bytes for fingerprint: ${fileFingerprint}`);
+        productionLogger.debug(`[CACHE] Stored ${size} bytes for fingerprint: ${fileFingerprint}`);
         resolve();
       };
     });
@@ -153,7 +153,7 @@ export class IntelligentCache {
   private async cleanup(): Promise<void> {
     if (!this.db) return;
 
-    console.log('[CACHE] Starting intelligent cleanup');
+    productionLogger.debug('[CACHE] Starting intelligent cleanup');
 
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([IntelligentCache.STORE_NAME], 'readwrite');
@@ -184,7 +184,7 @@ export class IntelligentCache {
           removedCount++;
         }
 
-        console.log(`[CACHE] Cleanup complete: removed ${removedCount} entries`);
+        productionLogger.debug(`[CACHE] Cleanup complete: removed ${removedCount} entries`);
         resolve();
       };
     });
@@ -219,7 +219,7 @@ export class IntelligentCache {
 
       request.onerror = () => reject(request.error);
       request.onsuccess = () => {
-        console.log('[CACHE] Cache cleared');
+        productionLogger.debug('[CACHE] Cache cleared');
         resolve();
       };
     });

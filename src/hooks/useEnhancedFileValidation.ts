@@ -23,23 +23,23 @@ export const useEnhancedFileValidation = () => {
     setIsValidating(true);
 
     try {
-      console.log(`[FILE VALIDATION DEBUG] Starting validation for: ${file.name}`);
+      productionLogger.debug(`[FILE VALIDATION DEBUG] Starting validation for: ${file.name}`);
 
       // Basic file validation
       const basicValidationError = validateBasicFileProperties(file, options);
       if (basicValidationError) {
-        console.log(`[FILE VALIDATION DEBUG] Basic validation failed:`, basicValidationError);
+        productionLogger.debug(`[FILE VALIDATION DEBUG] Basic validation failed:`, basicValidationError);
         return basicValidationError;
       }
 
       // Advanced validation - peek at file content
       const fileInfo = await analyzeFileStructure(file);
-      console.log(`[FILE VALIDATION DEBUG] File structure analysis:`, fileInfo);
+      productionLogger.debug(`[FILE VALIDATION DEBUG] File structure analysis:`, fileInfo);
 
       // Structure validation
       const structureValidationError = validateFileStructure(fileInfo, options);
       if (structureValidationError) {
-        console.log(`[FILE VALIDATION DEBUG] Structure validation failed:`, structureValidationError);
+        productionLogger.debug(`[FILE VALIDATION DEBUG] Structure validation failed:`, structureValidationError);
         return structureValidationError;
       }
 
@@ -47,7 +47,7 @@ export const useEnhancedFileValidation = () => {
       const warnings = generateValidationWarnings(file, fileInfo)
         .filter(warning => !warning.toLowerCase().includes('mime type') && !warning.toLowerCase().includes('unexpected mime type'));
 
-      console.log(`[FILE VALIDATION DEBUG] Validation completed successfully:`, {
+      productionLogger.debug(`[FILE VALIDATION DEBUG] Validation completed successfully:`, {
         fileInfo,
         warningCount: warnings.length,
         hasWarnings: warnings.length > 0
@@ -65,7 +65,7 @@ export const useEnhancedFileValidation = () => {
       };
 
     } catch (error) {
-      console.error(`[FILE VALIDATION DEBUG] Validation failed with error:`, error);
+      productionLogger.error(`[FILE VALIDATION DEBUG] Validation failed with error:`, error);
       
       const appError = error instanceof FileValidationError 
         ? error 

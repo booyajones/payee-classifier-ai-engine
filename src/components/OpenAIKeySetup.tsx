@@ -47,7 +47,7 @@ const OpenAIKeySetup = ({ onKeySet }: OpenAIKeySetupProps) => {
       
       onKeySet();
     } catch (error) {
-      console.error("Error setting API key:", error);
+      productionLogger.error("Error setting API key:", error);
       toast({
         title: "API Key Error",
         description: "Failed to initialize OpenAI client. Please check your API key.",

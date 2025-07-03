@@ -10,14 +10,14 @@ export async function processDownloadResults(
 ) {
   const { job, payeeData, uniquePayeeNames } = context;
   
-  console.log(`[BATCH DOWNLOAD] Downloading results for ${uniquePayeeNames.length} unique payees from ${payeeData.originalFileData.length} original rows`);
+  productionLogger.debug(`[BATCH DOWNLOAD] Downloading results for ${uniquePayeeNames.length} unique payees from ${payeeData.originalFileData.length} original rows`);
   
   // Start with initial progress
   onProgress(0, uniquePayeeNames.length, 0);
   
   // Download raw results from OpenAI
   const rawResults = await getBatchJobResults(job, uniquePayeeNames);
-  console.log(`[BATCH DOWNLOAD] Downloaded ${rawResults.length} raw results from OpenAI`);
+  productionLogger.debug(`[BATCH DOWNLOAD] Downloaded ${rawResults.length} raw results from OpenAI`);
   
   // Progress after download
   onProgress(0, uniquePayeeNames.length, 10);
@@ -35,7 +35,7 @@ export async function processDownloadResults(
     }
   });
 
-  console.log(`[BATCH DOWNLOAD] Enhanced processing complete: ${finalClassifications.length} unique classifications`);
+  productionLogger.debug(`[BATCH DOWNLOAD] Enhanced processing complete: ${finalClassifications.length} unique classifications`);
   
   // Final progress
   onProgress(uniquePayeeNames.length, uniquePayeeNames.length, 90);
@@ -48,13 +48,13 @@ export async function saveProcessedResults(
   jobId: string
 ) {
   try {
-    console.log(`[BATCH DOWNLOAD] Saving ${finalClassifications.length} results with enhanced validation`);
+    productionLogger.debug(`[BATCH DOWNLOAD] Saving ${finalClassifications.length} results with enhanced validation`);
     const saveStats = await saveClassificationResultsWithValidation(finalClassifications, jobId);
     
-    console.log(`[BATCH DOWNLOAD] Enhanced save complete:`, saveStats);
+    productionLogger.debug(`[BATCH DOWNLOAD] Enhanced save complete:`, saveStats);
     
     if (saveStats.sicValidationErrors.length > 0) {
-      console.warn('[BATCH DOWNLOAD] SIC validation errors during save:', saveStats.sicValidationErrors);
+      productionLogger.warn('[BATCH DOWNLOAD] SIC validation errors during save:', saveStats.sicValidationErrors);
       return {
         success: true,
         warning: `Saved results but found ${saveStats.sicValidationErrors.length} SIC validation issues.`
@@ -63,7 +63,7 @@ export async function saveProcessedResults(
     
     return { success: true };
   } catch (dbError) {
-    console.error('[BATCH DOWNLOAD] Enhanced database save failed:', dbError);
+    productionLogger.error('[BATCH DOWNLOAD] Enhanced database save failed:', dbError);
     return {
       success: false,
       error: "Results processed but database save failed with validation errors."

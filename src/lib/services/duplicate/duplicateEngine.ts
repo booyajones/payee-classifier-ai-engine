@@ -24,7 +24,7 @@ export class SmartDuplicateDetectionEngine {
   
   constructor(config: Partial<DuplicateDetectionConfig> = {}) {
     this.config = { ...DEFAULT_DUPLICATE_CONFIG, ...config };
-    console.log('[DUPLICATE ENGINE] Initialized with config:', this.config);
+    productionLogger.debug('[DUPLICATE ENGINE] Initialized with config:', this.config);
   }
 
   /**
@@ -32,19 +32,19 @@ export class SmartDuplicateDetectionEngine {
    */
   async detectDuplicates(records: DuplicateDetectionInput[]): Promise<DuplicateDetectionResult> {
     const startTime = Date.now();
-    console.log(`[DUPLICATE ENGINE] Starting duplicate detection for ${records.length} records`);
+    productionLogger.debug(`[DUPLICATE ENGINE] Starting duplicate detection for ${records.length} records`);
 
     // Step 1: Data ingestion and cleaning
     const cleanedRecords = cleanRecords(records);
-    console.log(`[DUPLICATE ENGINE] Cleaned ${cleanedRecords.length} records`);
+    productionLogger.debug(`[DUPLICATE ENGINE] Cleaned ${cleanedRecords.length} records`);
 
     // Step 2: Multi-algorithm similarity analysis
     const duplicatePairs = findDuplicatePairs(cleanedRecords, this.config);
-    console.log(`[DUPLICATE ENGINE] Found ${duplicatePairs.length} potential duplicate pairs`);
+    productionLogger.debug(`[DUPLICATE ENGINE] Found ${duplicatePairs.length} potential duplicate pairs`);
 
     // Step 3: Three-tiered logic funnel
     const processedPairs = await processWithTieredLogic(duplicatePairs, this.config);
-    console.log(`[DUPLICATE ENGINE] Processed pairs with tiered logic`);
+    productionLogger.debug(`[DUPLICATE ENGINE] Processed pairs with tiered logic`);
 
     // Step 4: Generate enriched output
     const processedRecords = generateEnrichedOutput(records, processedPairs);
@@ -53,8 +53,8 @@ export class SmartDuplicateDetectionEngine {
     const processingTime = Date.now() - startTime;
     const statistics = generateStatistics(processedRecords, processingTime);
 
-    console.log(`[DUPLICATE ENGINE] Completed in ${processingTime}ms`);
-    console.log(`[DUPLICATE ENGINE] Statistics:`, statistics);
+    productionLogger.debug(`[DUPLICATE ENGINE] Completed in ${processingTime}ms`);
+    productionLogger.debug(`[DUPLICATE ENGINE] Statistics:`, statistics);
 
     return {
       processed_records: processedRecords,
