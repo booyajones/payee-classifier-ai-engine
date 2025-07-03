@@ -1,26 +1,12 @@
-// @ts-nocheck
+import React, { Component } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { AlertTriangle, RefreshCw, Bug, ChevronDown } from 'lucide-react';
 
-
-interface Props {
-  children: ReactNode;
-  fallback?: ReactNode;
-  onError?: (error: Error, errorInfo: ErrorInfo) => void;
-}
-
-interface State {
-  hasError: boolean;
-  error: Error | null;
-  errorInfo: ErrorInfo | null;
-  errorId: string;
-}
-
-export class ErrorBoundaryEnhanced extends Component<Props, State> {
-  constructor(props: Props) {
+export class ErrorBoundaryEnhanced extends Component {
+  constructor(props) {
     super(props);
     this.state = {
       hasError: false,
@@ -30,7 +16,7 @@ export class ErrorBoundaryEnhanced extends Component<Props, State> {
     };
   }
 
-  static getDerivedStateFromError(error: Error): Partial<State> {
+  static getDerivedStateFromError(error) {
     return {
       hasError: true,
       error,
@@ -38,7 +24,7 @@ export class ErrorBoundaryEnhanced extends Component<Props, State> {
     };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  componentDidCatch(error, errorInfo) {
     const errorId = `ERR-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     this.setState({

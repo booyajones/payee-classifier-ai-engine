@@ -1,5 +1,3 @@
-
-// @ts-nocheck
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { UnifiedProgressProvider } from "@/contexts/UnifiedProgressContext";
 import { useIndexState } from "@/hooks/useIndexState";
@@ -36,7 +34,7 @@ const Index = () => {
     );
   }
 
-  const handleBatchClassify = (results: any[]) => {
+  const handleBatchClassify = (results) => {
     // Handle batch classification results
   };
 

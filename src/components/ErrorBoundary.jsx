@@ -1,28 +1,10 @@
-
-// @ts-nocheck
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { Component } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw, Bug, Home } from 'lucide-react';
 
-interface Props {
-  children: ReactNode;
-  fallback?: ReactNode;
-  onError?: (error: Error, errorInfo: ErrorInfo) => void;
-  resetOnPropsChange?: boolean;
-  resetKeys?: Array<string | number>;
-}
-
-interface State {
-  hasError: boolean;
-  error?: Error;
-  errorInfo?: ErrorInfo;
-  errorId: string;
-  prevResetKeys?: Array<string | number>;
-}
-
-class ErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
+class ErrorBoundary extends Component {
+  constructor(props) {
     super(props);
     this.state = { 
       hasError: false,
@@ -31,11 +13,11 @@ class ErrorBoundary extends Component<Props, State> {
     };
   }
 
-  private generateErrorId(): string {
+  generateErrorId() {
     return `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  static getDerivedStateFromError(error: Error): Partial<State> {
+  static getDerivedStateFromError(error) {
     return { 
       hasError: true, 
       error,
@@ -43,7 +25,7 @@ class ErrorBoundary extends Component<Props, State> {
     };
   }
 
-  static getDerivedStateFromProps(props: Props, state: State): Partial<State> | null {
+  static getDerivedStateFromProps(props, state) {
     const { resetKeys } = props;
     const { prevResetKeys, hasError } = state;
     
@@ -66,7 +48,7 @@ class ErrorBoundary extends Component<Props, State> {
     return null;
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  componentDidCatch(error, errorInfo) {
     productionLogger.error(`[ERROR BOUNDARY ${this.state.errorId}] Component error caught:`, error, errorInfo);
     
     // Report specific error patterns
