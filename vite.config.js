@@ -3,7 +3,6 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
-// Completely disable TypeScript processing
 export default defineConfig({
   server: {
     host: "::",
@@ -12,7 +11,6 @@ export default defineConfig({
   plugins: [
     react({
       include: "**/*.{jsx,js}",
-      exclude: ["**/*.ts", "**/*.tsx"],
       jsxImportSource: "react"
     }),
     componentTagger()
@@ -26,23 +24,26 @@ export default defineConfig({
     'process.env': {},
     'global': 'globalThis'
   },
-  esbuild: false,
+  esbuild: {
+    include: /\.(js|jsx)$/,
+    exclude: /\.(ts|tsx)$/,
+    loader: 'jsx',
+    jsx: 'automatic'
+  },
   build: {
     target: 'esnext',
-    minify: false,
     sourcemap: false,
     rollupOptions: {
-      onwarn: () => {},
-      external: []
+      onwarn: () => {}
     }
   },
   optimizeDeps: {
     include: ['react', 'react-dom'],
     esbuildOptions: {
-      target: 'esnext',
-      jsx: 'automatic',
-      loader: 'jsx'
+      loader: {
+        '.js': 'jsx',
+        '.jsx': 'jsx'
+      }
     }
-  },
-  logLevel: 'error'
+  }
 });
