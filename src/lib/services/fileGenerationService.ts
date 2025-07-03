@@ -86,6 +86,22 @@ export class FileGenerationService {
         console.error(`[PRE-GEN] Failed to update job ${jobId} with file URLs:`, updateError);
       }
 
+      // Store file blobs directly in the database for fast download
+      const csvBuffer = await csvBlob.arrayBuffer();
+      const excelBuffer = await excelBlob.arrayBuffer();
+
+      const { error: fileInsertError } = await supabase
+        .from('batch_job_files')
+        .upsert({
+          job_id: jobId,
+          csv_data: csvBuffer,
+          excel_data: excelBuffer
+        });
+
+      if (fileInsertError) {
+        console.error(`[PRE-GEN] Failed to store file blobs for job ${jobId}:`, fileInsertError);
+      }
+
       console.log(`[PRE-GEN] Successfully generated files for job ${jobId}`);
 
       return {
