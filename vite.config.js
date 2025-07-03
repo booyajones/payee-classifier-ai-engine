@@ -31,27 +31,19 @@ export default defineConfig({
         if (id.endsWith('.ts') || id.endsWith('.tsx')) {
           // Comprehensive TypeScript syntax removal
           let jsCode = code
-            // Remove all type annotations
+            // Remove all type annotations and TypeScript syntax
             .replace(/: (any|string|number|boolean|void|unknown|never|object|\w+\[\]|\w+<[^>]*>|\w+)/g, '')
             .replace(/\?\s*:/g, ':')
+            .replace(/as\s+\w+/g, '')
+            .replace(/<[^>]*>/g, '')
             
-            // Remove interfaces and types
-            .replace(/interface\s+\w+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/gs, '')
-            .replace(/type\s+\w+\s*=\s*[^;]*;/gs, '')
+            // Remove imports and exports of types
+            .replace(/import\s+type\s+\{[^}]*\}\s+from\s+['"][^'"]*['"];?\s*\n?/g, '')
+            .replace(/import\s+type\s+\w+\s+from\s+['"][^'"]*['"];?\s*\n?/g, '')
             .replace(/export\s+type\s+\w+\s*=\s*[^;]*;/gs, '')
             .replace(/export\s+interface\s+\w+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/gs, '')
             
-            // Remove type imports
-            .replace(/import\s+type\s+\{[^}]*\}\s+from\s+['"][^'"]*['"];?\s*\n?/g, '')
-            .replace(/import\s+type\s+\w+\s+from\s+['"][^'"]*['"];?\s*\n?/g, '')
-            
-            // Remove type assertions
-            .replace(/\s+as\s+\w+/g, '')
-            .replace(/\s+as\s+\w+\[\]/g, '')
-            .replace(/\s+as\s+\w+<[^>]*>/g, '')
-            
-            // Remove generic type parameters
-            .replace(/<[^>]*>/g, '')
+            // Remove interface and type declarations
             
             // Remove declare statements
             .replace(/declare\s+global\s*\{[^}]*\}/gs, '')

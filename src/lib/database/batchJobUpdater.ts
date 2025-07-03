@@ -224,11 +224,12 @@ export class BatchJobUpdater {
         }
       }
 
-      const { data: fileData, error: fileError } = await supabase
-        .from('batch_job_files')
-        .select('id')
-        .eq('batch_job_id', jobId)
-        .maybeSingle();
+      // Check if file exists in storage bucket instead of non-existent table
+      const { data: fileData, error: fileError } = await supabase.storage
+        .from('batch-results')
+        .list('', {
+          search: jobId
+        });
 
       return !fileError && !!fileData;
     } catch (error) {

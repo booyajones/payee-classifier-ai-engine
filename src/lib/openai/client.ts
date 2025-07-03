@@ -1,6 +1,6 @@
 
 import OpenAI from 'openai';
-import { storeApiKey, getApiKey, hasSavedApiKey, deleteApiKey } from '@/lib/backend/apiKeyService';
+import { storeApiKey, getApiKey, hasSavedApiKey, deleteApiKey } from '@/lib/backend/apiKeyService.js';
 
 let openaiClient: OpenAI | null = null;
 let currentToken: string | null = null;
