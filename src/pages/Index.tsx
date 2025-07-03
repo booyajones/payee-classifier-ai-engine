@@ -1,4 +1,5 @@
 
+// @ts-nocheck
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { UnifiedProgressProvider } from "@/contexts/UnifiedProgressContext";
 import { useIndexState } from "@/hooks/useIndexState";

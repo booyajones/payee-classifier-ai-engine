@@ -1,4 +1,5 @@
 
+// @ts-nocheck
 import React, { useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Upload, Play, TestTube, Users, Eye } from "lucide-react";

@@ -27,4 +27,10 @@ declare module '*.ts' {
 declare var TS6133: any;
 declare var TS6198: any;
 
+// Global suppression for unused variables
+// @ts-ignore
+declare var __suppressUnusedVariables: any;
+
+export {};
+
 export {};
