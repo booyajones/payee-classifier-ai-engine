@@ -12,7 +12,7 @@ export const useBatchJobEventHandling = (
   useEffect(() => {
     const handleJobUpdate = async () => {
       if (eventListenerActive.current) {
-        console.log('[EVENT HANDLING] Event handler already active, skipping...');
+        productionLogger.debug('[EVENT HANDLING] Event handler already active, skipping...');
         return;
       }
 
@@ -20,10 +20,10 @@ export const useBatchJobEventHandling = (
       
       try {
         await new Promise(resolve => setTimeout(resolve, 100));
-        console.log('[EVENT HANDLING] Received job update event, refreshing jobs...');
+        productionLogger.debug('[EVENT HANDLING] Received job update event, refreshing jobs...');
         await refreshJobs(true);
       } catch (error) {
-        console.error('[EVENT HANDLING] Error during event-triggered refresh:', error);
+        productionLogger.error('[EVENT HANDLING] Error during event-triggered refresh:', error);
         const appError = handleError(error, 'Event-triggered refresh');
         setError('refresh', appError.message);
       } finally {

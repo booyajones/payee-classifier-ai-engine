@@ -27,7 +27,7 @@ export async function classifyPayeeWithAI(
   }
 
   try {
-    console.log(`[SINGLE CLASSIFICATION] Classifying "${payeeName}" with OpenAI API including SIC code analysis...`);
+    productionLogger.debug(`[SINGLE CLASSIFICATION] Classifying "${payeeName}" with OpenAI API including SIC code analysis...`);
     
     const apiCall = openaiClient.chat.completions.create({
       model: CLASSIFICATION_MODEL,
@@ -62,7 +62,7 @@ Return JSON: {"classification": "Business|Individual", "confidence": number, "re
       max_tokens: 250
     });
     
-    console.log(`[SINGLE CLASSIFICATION] Making API call with SIC analysis for "${payeeName}"...`);
+    productionLogger.debug(`[SINGLE CLASSIFICATION] Making API call with SIC analysis for "${payeeName}"...`);
     
     const response = await timeoutPromise(apiCall, timeout);
 
@@ -71,7 +71,7 @@ Return JSON: {"classification": "Business|Individual", "confidence": number, "re
       throw new Error("No response content from OpenAI API");
     }
 
-    console.log(`[SINGLE CLASSIFICATION] Raw OpenAI response for "${payeeName}":`, content);
+    productionLogger.debug(`[SINGLE CLASSIFICATION] Raw OpenAI response for "${payeeName}":`, content);
     
     try {
       const result = JSON.parse(content);
@@ -83,19 +83,19 @@ Return JSON: {"classification": "Business|Individual", "confidence": number, "re
       // Enhanced SIC code validation and processing
       if (result.classification === 'Business') {
         if (!result.sicCode || !/^\d{4}$/.test(result.sicCode)) {
-          console.warn(`[SIC WARNING] Business "${payeeName}" missing or invalid SIC code "${result.sicCode}", assigning default`);
+          productionLogger.warn(`[SIC WARNING] Business "${payeeName}" missing or invalid SIC code "${result.sicCode}", assigning default`);
           result.sicCode = '7389'; // Business Services, NEC
           result.sicDescription = 'Business Services, Not Elsewhere Classified';
         }
-        console.log(`[SIC SUCCESS] Business "${payeeName}" assigned SIC ${result.sicCode}: ${result.sicDescription}`);
+        productionLogger.debug(`[SIC SUCCESS] Business "${payeeName}" assigned SIC ${result.sicCode}: ${result.sicDescription}`);
       } else {
         // Ensure individuals don't have SIC codes
         result.sicCode = null;
         result.sicDescription = null;
-        console.log(`[SIC INFO] Individual "${payeeName}" - no SIC code assigned`);
+        productionLogger.debug(`[SIC INFO] Individual "${payeeName}" - no SIC code assigned`);
       }
       
-      console.log(`[SINGLE CLASSIFICATION] Successfully classified "${payeeName}": ${result.classification} (${result.confidence}%) SIC: ${result.sicCode || 'N/A'}`);
+      productionLogger.debug(`[SINGLE CLASSIFICATION] Successfully classified "${payeeName}": ${result.classification} (${result.confidence}%) SIC: ${result.sicCode || 'N/A'}`);
       
       return {
         classification: result.classification as 'Business' | 'Individual',
@@ -105,11 +105,11 @@ Return JSON: {"classification": "Business|Individual", "confidence": number, "re
         sicDescription: result.sicDescription || undefined
       };
     } catch (parseError) {
-      console.error(`[SINGLE CLASSIFICATION] Failed to parse response for "${payeeName}":`, content);
+      productionLogger.error(`[SINGLE CLASSIFICATION] Failed to parse response for "${payeeName}":`, content);
       throw new Error("Failed to parse OpenAI response as JSON");
     }
   } catch (error) {
-    console.error(`[SINGLE CLASSIFICATION] Error calling OpenAI API for "${payeeName}":`, error);
+    productionLogger.error(`[SINGLE CLASSIFICATION] Error calling OpenAI API for "${payeeName}":`, error);
     
     if (error instanceof Error) {
       if (error.message.includes('401') || error.message.includes('authentication')) {

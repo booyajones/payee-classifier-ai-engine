@@ -71,7 +71,7 @@ export async function runDuplicateTests(): Promise<{
     details: string;
   }>;
 }> {
-  console.log('[DUPLICATE TESTING] Running duplicate detection validation tests...');
+  productionLogger.debug('[DUPLICATE TESTING] Running duplicate detection validation tests...');
   
   const results = [];
   let passed = 0;
@@ -114,7 +114,7 @@ export async function runDuplicateTests(): Promise<{
         details
       });
       
-      console.log(`[DUPLICATE TESTING] ${details}`);
+      productionLogger.debug(`[DUPLICATE TESTING] ${details}`);
       
     } catch (error) {
       failed++;
@@ -125,11 +125,11 @@ export async function runDuplicateTests(): Promise<{
         passed: false,
         details
       });
-      console.error(`[DUPLICATE TESTING] ${details}`);
+      productionLogger.error(`[DUPLICATE TESTING] ${details}`);
     }
   }
   
-  console.log(`[DUPLICATE TESTING] Tests completed: ${passed} passed, ${failed} failed`);
+  productionLogger.debug(`[DUPLICATE TESTING] Tests completed: ${passed} passed, ${failed} failed`);
   
   return { passed, failed, results };
 }

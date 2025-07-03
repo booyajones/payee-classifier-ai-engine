@@ -21,12 +21,12 @@ const DirectCSVExport = ({ job, payeeData, onDownloadResults }: DirectCSVExportP
   const handleMainDownload = async () => {
     setIsDownloading(true);
     try {
-      console.log(`[DIRECT CSV] Starting main download for job ${job.id}`);
-      console.log(`[DIRECT CSV] onDownloadResults type:`, typeof onDownloadResults);
+      productionLogger.debug(`[DIRECT CSV] Starting main download for job ${job.id}`);
+      productionLogger.debug(`[DIRECT CSV] onDownloadResults type:`, typeof onDownloadResults);
       
       if (typeof onDownloadResults !== 'function') {
         const errorMsg = `onDownloadResults is not a function (type: ${typeof onDownloadResults})`;
-        console.error(`[DIRECT CSV] ${errorMsg}`);
+        productionLogger.error(`[DIRECT CSV] ${errorMsg}`);
         toast({
           title: "Download Error",
           description: "Download function is not available. Please refresh the page and try again.",
@@ -41,7 +41,7 @@ const DirectCSVExport = ({ job, payeeData, onDownloadResults }: DirectCSVExportP
         description: "Downloading processed classification results...",
       });
     } catch (error) {
-      console.error('[DIRECT CSV] Main download error:', error);
+      productionLogger.error('[DIRECT CSV] Main download error:', error);
       toast({
         title: "Download Error",
         description: `Failed to download results: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -55,7 +55,7 @@ const DirectCSVExport = ({ job, payeeData, onDownloadResults }: DirectCSVExportP
   const handleExportOriginal = async () => {
     setIsExporting(true);
     try {
-      console.log(`[DIRECT CSV] Exporting original data for job ${job.id}`);
+      productionLogger.debug(`[DIRECT CSV] Exporting original data for job ${job.id}`);
       
       if (!payeeData.originalFileData || payeeData.originalFileData.length === 0) {
         throw new Error('No original file data available for export');
@@ -98,7 +98,7 @@ const DirectCSVExport = ({ job, payeeData, onDownloadResults }: DirectCSVExportP
       });
       
     } catch (error) {
-      console.error('[DIRECT CSV] Export original error:', error);
+      productionLogger.error('[DIRECT CSV] Export original error:', error);
       toast({
         title: "Export Error",
         description: `Failed to export original data: ${error instanceof Error ? error.message : 'Unknown error'}`,

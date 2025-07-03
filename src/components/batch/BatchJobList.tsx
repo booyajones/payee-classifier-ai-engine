@@ -28,7 +28,7 @@ const BatchJobList = ({
   onCancel,
   onJobDelete
 }: BatchJobListProps) => {
-  console.log(`[BATCH JOB LIST] Rendering ${jobs.length} jobs`);
+  productionLogger.debug(`[BATCH JOB LIST] Rendering ${jobs.length} jobs`);
 
   if (jobs.length === 0) {
     return (

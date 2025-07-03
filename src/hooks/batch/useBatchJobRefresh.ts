@@ -12,7 +12,7 @@ export const useBatchJobRefresh = (
   const performRefresh = useCallback(async (silent = false) => {
     const refreshKey = 'global';
     if (refreshInProgress.current.has(refreshKey)) {
-      console.log('[JOB REFRESH] Global refresh already in progress, skipping...');
+      productionLogger.debug('[JOB REFRESH] Global refresh already in progress, skipping...');
       return;
     }
     
@@ -21,7 +21,7 @@ export const useBatchJobRefresh = (
       clearError('refresh');
       await refreshJobs(silent);
     } catch (error) {
-      console.error('[JOB REFRESH] Error during refresh:', error);
+      productionLogger.error('[JOB REFRESH] Error during refresh:', error);
       const appError = handleError(error, 'Refresh Jobs');
       setError('refresh', appError.message);
       if (!silent) {

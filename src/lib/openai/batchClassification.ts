@@ -27,7 +27,7 @@ export async function classifyPayeesBatchWithAI(
     return [];
   }
 
-  console.log(`[BATCH] Starting classification of ${payeeNames.length} payees`);
+  productionLogger.debug(`[BATCH] Starting classification of ${payeeNames.length} payees`);
 
   const results: Array<{
     payeeName: string;
@@ -39,7 +39,7 @@ export async function classifyPayeesBatchWithAI(
   // Process in smaller batches with reduced concurrency
   for (let i = 0; i < payeeNames.length; i += MAX_BATCH_SIZE) {
     const batchNames = payeeNames.slice(i, i + MAX_BATCH_SIZE);
-    console.log(`[BATCH] Processing batch ${Math.floor(i/MAX_BATCH_SIZE) + 1} with ${batchNames.length} payees`);
+    productionLogger.debug(`[BATCH] Processing batch ${Math.floor(i/MAX_BATCH_SIZE) + 1} with ${batchNames.length} payees`);
     
     try {
       // Process names sequentially to avoid overwhelming the API
@@ -52,21 +52,21 @@ export async function classifyPayeesBatchWithAI(
             ...result
           });
         } catch (error) {
-          console.error(`[INDIVIDUAL] Failed to classify ${name}:`, error);
+          productionLogger.error(`[INDIVIDUAL] Failed to classify ${name}:`, error);
           throw new Error(`Classification failed for ${name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
       
       results.push(...batchResults);
       
-      console.log(`[BATCH] Successfully processed batch ${Math.floor(i/MAX_BATCH_SIZE) + 1}`);
+      productionLogger.debug(`[BATCH] Successfully processed batch ${Math.floor(i/MAX_BATCH_SIZE) + 1}`);
       
     } catch (error) {
-      console.error(`[BATCH] Error with batch ${Math.floor(i/MAX_BATCH_SIZE) + 1}:`, error);
+      productionLogger.error(`[BATCH] Error with batch ${Math.floor(i/MAX_BATCH_SIZE) + 1}:`, error);
       throw error;
     }
   }
   
-  console.log(`[BATCH] Completed classification of ${results.length} payees`);
+  productionLogger.debug(`[BATCH] Completed classification of ${results.length} payees`);
   return results;
 }

@@ -11,7 +11,7 @@ export async function processIndividualResult(
   stats: BatchProcessorStats,
   originalRowData?: any
 ): Promise<PayeeClassification> {
-  console.log(`[RESULT PROCESSOR] Processing result ${index} for "${payeeName}" with original data preservation`);
+  productionLogger.debug(`[RESULT PROCESSOR] Processing result ${index} for "${payeeName}" with original data preservation`);
   
   // Apply keyword exclusion check
   const keywordExclusion = await checkKeywordExclusion(payeeName);
@@ -19,7 +19,7 @@ export async function processIndividualResult(
   // ENFORCE HIGH ACCURACY - reject low confidence results
   const confidence = result.result?.confidence || result.confidence || 50;
   if (confidence < 85) {
-    console.warn(`[RESULT PROCESSOR] Low confidence ${confidence}% for "${payeeName}", marking as needs review`);
+    productionLogger.warn(`[RESULT PROCESSOR] Low confidence ${confidence}% for "${payeeName}", marking as needs review`);
   }
   
   // Override classification if excluded
@@ -27,7 +27,7 @@ export async function processIndividualResult(
   if (keywordExclusion.isExcluded) {
     finalClassification = 'Business';
     stats.excludedCount++;
-    console.log(`[RESULT PROCESSOR] Keyword exclusion applied to "${payeeName}" - forced to Business`);
+    productionLogger.debug(`[RESULT PROCESSOR] Keyword exclusion applied to "${payeeName}" - forced to Business`);
   }
   
   if (finalClassification === 'Business') {
@@ -40,9 +40,9 @@ export async function processIndividualResult(
   const sicCode = result.result?.sicCode || result.sicCode;
   if (finalClassification === 'Business' && sicCode) {
     stats.sicCodeCount++;
-    console.log(`[RESULT PROCESSOR] Business "${payeeName}" has SIC code: ${sicCode}`);
+    productionLogger.debug(`[RESULT PROCESSOR] Business "${payeeName}" has SIC code: ${sicCode}`);
   } else if (finalClassification === 'Business' && !sicCode) {
-    console.warn(`[RESULT PROCESSOR] Business "${payeeName}" missing SIC code`);
+    productionLogger.warn(`[RESULT PROCESSOR] Business "${payeeName}" missing SIC code`);
   }
 
   // CRITICAL: Preserve ALL original row data and ensure correct reasoning
@@ -69,6 +69,6 @@ export async function processIndividualResult(
     rowIndex: index
   };
 
-  console.log(`[RESULT PROCESSOR] Processed "${payeeName}": ${finalClassification} (${confidence}%) with ${Object.keys(processedResult.originalData || {}).length} original columns`);
+  productionLogger.debug(`[RESULT PROCESSOR] Processed "${payeeName}": ${finalClassification} (${confidence}%) with ${Object.keys(processedResult.originalData || {}).length} original columns`);
   return processedResult;
 }

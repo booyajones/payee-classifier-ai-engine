@@ -23,13 +23,13 @@ export async function enhancedClassifyPayeeWithAI(
   payeeName: string,
   timeout: number = DEFAULT_API_TIMEOUT
 ): Promise<EnhancedClassificationResult> {
-  console.log(`[ENHANCED CLASSIFICATION] Classifying "${payeeName}" with SIC code support`);
+  productionLogger.debug(`[ENHANCED CLASSIFICATION] Classifying "${payeeName}" with SIC code support`);
 
   try {
     // Use the single classification function which already has SIC code logic
     const result = await classifyPayeeWithAI(payeeName, timeout);
     
-    console.log(`[ENHANCED CLASSIFICATION] Result for "${payeeName}":`, {
+    productionLogger.debug(`[ENHANCED CLASSIFICATION] Result for "${payeeName}":`, {
       classification: result.classification,
       confidence: result.confidence,
       sicCode: result.sicCode,
@@ -47,7 +47,7 @@ export async function enhancedClassifyPayeeWithAI(
       sicDescription: result.sicDescription
     };
   } catch (error) {
-    console.error(`[ENHANCED CLASSIFICATION] Error classifying "${payeeName}":`, error);
+    productionLogger.error(`[ENHANCED CLASSIFICATION] Error classifying "${payeeName}":`, error);
     throw error;
   }
 }
@@ -59,6 +59,6 @@ export async function consensusClassification(
   payeeName: string,
   timeout: number = DEFAULT_API_TIMEOUT
 ): Promise<EnhancedClassificationResult> {
-  console.log(`[CONSENSUS CLASSIFICATION] Using enhanced classification for "${payeeName}"`);
+  productionLogger.debug(`[CONSENSUS CLASSIFICATION] Using enhanced classification for "${payeeName}"`);
   return await enhancedClassifyPayeeWithAI(payeeName, timeout);
 }

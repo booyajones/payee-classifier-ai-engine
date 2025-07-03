@@ -11,10 +11,10 @@ export function isWholeWordMatch(text: string, keyword: string): boolean {
   const pattern = new RegExp(`\\b${escapedKeyword}\\b`, 'i');
   const matches = pattern.test(text);
   
-  console.log(`[WHOLE WORD MATCH DEBUG] Testing "${keyword}" in "${text}"`);
-  console.log(`[WHOLE WORD MATCH DEBUG] Escaped: "${escapedKeyword}"`);
-  console.log(`[WHOLE WORD MATCH DEBUG] Pattern: ${pattern.toString()}`);
-  console.log(`[WHOLE WORD MATCH DEBUG] Result: ${matches}`);
+  productionLogger.debug(`[WHOLE WORD MATCH DEBUG] Testing "${keyword}" in "${text}"`);
+  productionLogger.debug(`[WHOLE WORD MATCH DEBUG] Escaped: "${escapedKeyword}"`);
+  productionLogger.debug(`[WHOLE WORD MATCH DEBUG] Pattern: ${pattern.toString()}`);
+  productionLogger.debug(`[WHOLE WORD MATCH DEBUG] Result: ${matches}`);
   
   return matches;
 }
@@ -23,7 +23,7 @@ export function isWholeWordMatch(text: string, keyword: string): boolean {
  * Test the regex pattern construction with common cases
  */
 export function testRegexPatterns() {
-  console.log(`[REGEX TEST] Testing regex pattern construction...`);
+  productionLogger.debug(`[REGEX TEST] Testing regex pattern construction...`);
   
   const testCases = [
     { text: "BANK OF AMERICA", keyword: "BANK", expected: true },
@@ -37,7 +37,7 @@ export function testRegexPatterns() {
   testCases.forEach(({ text, keyword, expected }) => {
     const result = isWholeWordMatch(text, keyword);
     const status = result === expected ? "✅ PASS" : "❌ FAIL";
-    console.log(`[REGEX TEST] ${status} "${keyword}" in "${text}" - Expected: ${expected}, Got: ${result}`);
+    productionLogger.debug(`[REGEX TEST] ${status} "${keyword}" in "${text}" - Expected: ${expected}, Got: ${result}`);
   });
 }
 
@@ -45,7 +45,7 @@ export function testRegexPatterns() {
  * Test the normalization process
  */
 export function testNormalization() {
-  console.log(`[NORMALIZATION TEST] Testing text normalization...`);
+  productionLogger.debug(`[NORMALIZATION TEST] Testing text normalization...`);
   
   const testCases = [
     "Bank of America",
@@ -59,7 +59,7 @@ export function testNormalization() {
   testCases.forEach(testCase => {
     const { advancedNormalization } = require('./stringMatching');
     const result = advancedNormalization(testCase);
-    console.log(`[NORMALIZATION TEST] "${testCase}" -> "${result.normalized}"`);
-    console.log(`[NORMALIZATION TEST] Tokens: [${result.tokens.join(', ')}]`);
+    productionLogger.debug(`[NORMALIZATION TEST] "${testCase}" -> "${result.normalized}"`);
+    productionLogger.debug(`[NORMALIZATION TEST] Tokens: [${result.tokens.join(', ')}]`);
   });
 }

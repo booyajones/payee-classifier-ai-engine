@@ -17,7 +17,7 @@ export class FileGenerationService {
     fileSizeBytes?: number;
   }> {
     try {
-      console.log(`[PRE-GEN] Generating files for job ${jobId}`);
+      productionLogger.debug(`[PRE-GEN] Generating files for job ${jobId}`);
 
       // Generate CSV content
       const csvContent = this.generateCSVContent(
@@ -83,7 +83,7 @@ export class FileGenerationService {
         .eq('id', jobId);
 
       if (updateError) {
-        console.error(`[PRE-GEN] Failed to update job ${jobId} with file URLs:`, updateError);
+        productionLogger.error(`[PRE-GEN] Failed to update job ${jobId} with file URLs:`, updateError);
       }
 
       // Store file blobs directly in the database for fast download
@@ -99,10 +99,10 @@ export class FileGenerationService {
         });
 
       if (fileInsertError) {
-        console.error(`[PRE-GEN] Failed to store file blobs for job ${jobId}:`, fileInsertError);
+        productionLogger.error(`[PRE-GEN] Failed to store file blobs for job ${jobId}:`, fileInsertError);
       }
 
-      console.log(`[PRE-GEN] Successfully generated files for job ${jobId}`);
+      productionLogger.debug(`[PRE-GEN] Successfully generated files for job ${jobId}`);
 
       return {
         error: null,
@@ -112,7 +112,7 @@ export class FileGenerationService {
       };
 
     } catch (error) {
-      console.error(`[PRE-GEN] Error generating files for job ${jobId}:`, error);
+      productionLogger.error(`[PRE-GEN] Error generating files for job ${jobId}:`, error);
       return {
         error: error instanceof Error ? error.message : 'Unknown error'
       };
@@ -146,7 +146,7 @@ export class FileGenerationService {
 
     // Use row mappings to restore original order and columns
     if (!rowMappings || rowMappings.length === 0) {
-      console.warn('[PRE-GEN] No row mappings provided, falling back to basic merge');
+      productionLogger.warn('[PRE-GEN] No row mappings provided, falling back to basic merge');
       const originalHeaders = Object.keys(originalFileData[0] || {});
       const enhancedHeaders = [
         ...originalHeaders,

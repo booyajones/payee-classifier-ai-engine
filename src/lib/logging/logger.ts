@@ -9,6 +9,8 @@ export interface LogEntry {
   context?: string;
 }
 
+const devConsole = console;
+
 class Logger {
   private isDevelopment = import.meta.env.DEV;
   private logLevel: LogLevel = this.isDevelopment ? 'debug' : 'info';
@@ -48,7 +50,7 @@ class Logger {
     this.addToHistory(entry);
     
     if (this.isDevelopment) {
-      console.log(`[${context || 'DEBUG'}] ${message}`, data || '');
+      devConsole.log(`[${context || 'DEBUG'}] ${message}`, data || '');
     }
   }
 
@@ -58,7 +60,7 @@ class Logger {
     const entry = this.createLogEntry('info', message, data, context);
     this.addToHistory(entry);
     
-    console.log(`[${context || 'INFO'}] ${message}`, data || '');
+    devConsole.log(`[${context || 'INFO'}] ${message}`, data || '');
   }
 
   warn(message: string, data?: any, context?: string) {
@@ -67,7 +69,7 @@ class Logger {
     const entry = this.createLogEntry('warn', message, data, context);
     this.addToHistory(entry);
     
-    console.warn(`[${context || 'WARN'}] ${message}`, data || '');
+    devConsole.warn(`[${context || 'WARN'}] ${message}`, data || '');
   }
 
   error(message: string, data?: any, context?: string) {
@@ -76,7 +78,7 @@ class Logger {
     const entry = this.createLogEntry('error', message, data, context);
     this.addToHistory(entry);
     
-    console.error(`[${context || 'ERROR'}] ${message}`, data || '');
+    devConsole.error(`[${context || 'ERROR'}] ${message}`, data || '');
   }
 
   getLogs(level?: LogLevel): LogEntry[] {
@@ -90,11 +92,11 @@ class Logger {
 
   // Performance timing utilities
   time(label: string, context?: string) {
-    console.time(`[${context || 'PERF'}] ${label}`);
+    devConsole.time(`[${context || 'PERF'}] ${label}`);
   }
 
   timeEnd(label: string, context?: string) {
-    console.timeEnd(`[${context || 'PERF'}] ${label}`);
+    devConsole.timeEnd(`[${context || 'PERF'}] ${label}`);
   }
 }
 

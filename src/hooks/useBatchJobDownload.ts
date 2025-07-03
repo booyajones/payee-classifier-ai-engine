@@ -24,7 +24,7 @@ export const useBatchJobDownload = ({
   const handleDownloadResults = useCallback(async (job: BatchJob) => {
     const payeeData = payeeRowDataMap[job.id];
     if (!payeeData) {
-      console.error(`[BATCH DOWNLOAD] No payee data found for job ${job.id}`);
+      productionLogger.error(`[BATCH DOWNLOAD] No payee data found for job ${job.id}`);
       return;
     }
 
@@ -34,21 +34,21 @@ export const useBatchJobDownload = ({
     const totalPayees = payeeData.uniquePayeeNames.length;
 
     try {
-      console.log(`[BATCH DOWNLOAD] Starting download for job ${job.id}`);
-      console.log(`[BATCH DOWNLOAD] Download ID: ${downloadId}, Filename: ${filename}, Total payees: ${totalPayees}`);
+      productionLogger.debug(`[BATCH DOWNLOAD] Starting download for job ${job.id}`);
+      productionLogger.debug(`[BATCH DOWNLOAD] Download ID: ${downloadId}, Filename: ${filename}, Total payees: ${totalPayees}`);
       
       // Clear any stale downloads first to prevent old error states
       clearAllDownloads();
       
       // Start the download progress tracking
       startDownload(downloadId, filename, totalPayees);
-      console.log(`[BATCH DOWNLOAD] Download progress tracking started`);
+      productionLogger.debug(`[BATCH DOWNLOAD] Download progress tracking started`);
       
       // Check if results are already processed for instant download
       const hasPreProcessed = await AutomaticResultProcessor.hasPreProcessedResults(job.id);
       
       if (hasPreProcessed) {
-        console.log(`[BATCH DOWNLOAD] Using pre-processed results for instant download of job ${job.id}`);
+        productionLogger.debug(`[BATCH DOWNLOAD] Using pre-processed results for instant download of job ${job.id}`);
         
         // Add a small delay to ensure progress is visible for instant downloads
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -122,7 +122,7 @@ export const useBatchJobDownload = ({
           onJobComplete
         },
         (processed, total, percentage) => {
-          console.log(`[BATCH DOWNLOAD] Progress: ${processed}/${total} (${percentage}%)`);
+          productionLogger.debug(`[BATCH DOWNLOAD] Progress: ${processed}/${total} (${percentage}%)`);
           updateDownload(downloadId, {
             stage: percentage < 50 ? 'Processing classifications' : 'Applying keyword exclusions',
             progress: Math.min(70, 20 + (percentage * 0.5)), // Progress from 20% to 70%
@@ -144,7 +144,7 @@ export const useBatchJobDownload = ({
       const saveResult = await saveProcessedResults(finalClassifications, job.id);
       
       if (!saveResult.success) {
-        console.error('[BATCH DOWNLOAD] Database save failed:', saveResult.error);
+        productionLogger.error('[BATCH DOWNLOAD] Database save failed:', saveResult.error);
         updateDownload(downloadId, { 
           error: saveResult.error || "Database save failed",
           isActive: false,
@@ -165,13 +165,13 @@ export const useBatchJobDownload = ({
       });
 
       // Enhanced automatic file generation for instant future downloads
-      console.log(`[BATCH DOWNLOAD] Triggering enhanced file generation for job ${job.id}`);
+      productionLogger.debug(`[BATCH DOWNLOAD] Triggering enhanced file generation for job ${job.id}`);
       const fileGenResult = await EnhancedFileGenerationService.processCompletedJob(job);
       
       if (fileGenResult.success) {
-        console.log(`[BATCH DOWNLOAD] Files generated successfully for job ${job.id}`);
+        productionLogger.debug(`[BATCH DOWNLOAD] Files generated successfully for job ${job.id}`);
       } else {
-        console.warn(`[BATCH DOWNLOAD] File generation failed for job ${job.id}:`, fileGenResult.error);
+        productionLogger.warn(`[BATCH DOWNLOAD] File generation failed for job ${job.id}:`, fileGenResult.error);
       }
 
       // Complete the download progress
@@ -186,7 +186,7 @@ export const useBatchJobDownload = ({
       });
 
     } catch (error) {
-      console.error(`[BATCH DOWNLOAD] Download failed for job ${job.id}:`, error);
+      productionLogger.error(`[BATCH DOWNLOAD] Download failed for job ${job.id}:`, error);
       
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       updateDownload(downloadId, { 

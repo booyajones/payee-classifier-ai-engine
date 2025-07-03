@@ -63,7 +63,7 @@ export const useFileStructureAnalyzer = () => {
                   encoding: 'Excel Format'
                 });
               } catch (excelError) {
-                console.warn('[FILE STRUCTURE ANALYZER] Excel parsing failed:', excelError);
+                productionLogger.warn('[FILE STRUCTURE ANALYZER] Excel parsing failed:', excelError);
                 resolve({
                   hasHeaders: false,
                   estimatedRows: 0,
@@ -100,7 +100,7 @@ export const useFileStructureAnalyzer = () => {
               });
             }
           } catch (error) {
-            console.warn('[FILE STRUCTURE ANALYZER] Could not analyze file structure:', error);
+            productionLogger.warn('[FILE STRUCTURE ANALYZER] Could not analyze file structure:', error);
             resolve({});
           }
         };

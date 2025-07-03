@@ -41,7 +41,7 @@ export class BatchJobLoader {
     jobs: BatchJob[];
     payeeRowDataMap: Record<string, PayeeRowData>;
   }> {
-    console.log('[BATCH JOB LOADER] Loading all batch jobs with enhanced validation');
+    productionLogger.debug('[BATCH JOB LOADER] Loading all batch jobs with enhanced validation');
 
     const { data, error } = await supabase
       .from('batch_jobs')
@@ -49,23 +49,23 @@ export class BatchJobLoader {
       .order('app_created_at', { ascending: false });
 
     if (error) {
-      console.error('[BATCH JOB LOADER] Error loading batch jobs:', error);
+      productionLogger.error('[BATCH JOB LOADER] Error loading batch jobs:', error);
       throw new Error(`Failed to load batch jobs: ${error.message}`);
     }
 
     if (!data || data.length === 0) {
-      console.log('[BATCH JOB LOADER] No batch jobs found');
+      productionLogger.debug('[BATCH JOB LOADER] No batch jobs found');
       return { jobs: [], payeeRowDataMap: {} };
     }
 
-    console.log(`[BATCH JOB LOADER] Processing ${data.length} batch jobs`);
+    productionLogger.debug(`[BATCH JOB LOADER] Processing ${data.length} batch jobs`);
 
     const jobs: BatchJob[] = [];
     const payeeRowDataMap: Record<string, PayeeRowData> = {};
 
     data.forEach((record, index) => {
       try {
-        console.log(`[BATCH JOB LOADER] Processing job ${index + 1}/${data.length}: ${record.id}`);
+        productionLogger.debug(`[BATCH JOB LOADER] Processing job ${index + 1}/${data.length}: ${record.id}`);
         
         const batchJob: BatchJob = {
           id: record.id,
@@ -100,7 +100,7 @@ export class BatchJobLoader {
         const isBackgroundLoading = metadata && metadata.full_data_loading;
 
         if (isPreview || isBackgroundLoading) {
-          console.log(`[BATCH JOB LOADER] Job ${record.id} is in preview/background loading mode`);
+          productionLogger.debug(`[BATCH JOB LOADER] Job ${record.id} is in preview/background loading mode`);
         }
 
         // Create PayeeRowData with all required properties
@@ -123,13 +123,13 @@ export class BatchJobLoader {
         jobs.push(batchJob);
         payeeRowDataMap[record.id] = payeeRowData;
         
-        console.log(`[BATCH JOB LOADER] Successfully processed job ${record.id} with ${uniquePayeeNames.length} payees`);
+        productionLogger.debug(`[BATCH JOB LOADER] Successfully processed job ${record.id} with ${uniquePayeeNames.length} payees`);
       } catch (error) {
-        console.error(`[BATCH JOB LOADER] Error processing job ${record.id}:`, error);
+        productionLogger.error(`[BATCH JOB LOADER] Error processing job ${record.id}:`, error);
       }
     });
 
-    console.log(`[BATCH JOB LOADER] Successfully loaded ${jobs.length} batch jobs with enhanced processing`);
+    productionLogger.debug(`[BATCH JOB LOADER] Successfully loaded ${jobs.length} batch jobs with enhanced processing`);
     return { jobs, payeeRowDataMap };
   }
 }

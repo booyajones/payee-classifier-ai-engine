@@ -6,7 +6,7 @@ export const detectOpenAIError = (error: unknown): { code: string; message: stri
   const errorMessage = error instanceof Error ? error.message : String(error);
   const lowerMessage = errorMessage.toLowerCase();
 
-  console.log(`[BATCH ERROR DETECTION] Analyzing error: ${errorMessage}`);
+  productionLogger.debug(`[BATCH ERROR DETECTION] Analyzing error: ${errorMessage}`);
 
   if (lowerMessage.includes('quota') || lowerMessage.includes('rate limit') || lowerMessage.includes('usage limit')) {
     return {

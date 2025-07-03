@@ -75,7 +75,7 @@ export async function runExclusionTests(): Promise<{
     details: string;
   }>;
 }> {
-  console.log('[EXCLUSION TESTING] Running exclusion validation tests...');
+  productionLogger.debug('[EXCLUSION TESTING] Running exclusion validation tests...');
   
   const results = [];
   let passed = 0;
@@ -103,7 +103,7 @@ export async function runExclusionTests(): Promise<{
         details
       });
       
-      console.log(`[EXCLUSION TESTING] ${details}`);
+      productionLogger.debug(`[EXCLUSION TESTING] ${details}`);
       
     } catch (error) {
       failed++;
@@ -114,11 +114,11 @@ export async function runExclusionTests(): Promise<{
         passed: false,
         details
       });
-      console.error(`[EXCLUSION TESTING] ${details}`);
+      productionLogger.error(`[EXCLUSION TESTING] ${details}`);
     }
   }
   
-  console.log(`[EXCLUSION TESTING] Tests completed: ${passed} passed, ${failed} failed`);
+  productionLogger.debug(`[EXCLUSION TESTING] Tests completed: ${passed} passed, ${failed} failed`);
   
   return { passed, failed, results };
 }

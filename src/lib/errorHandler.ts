@@ -101,7 +101,7 @@ export const ERROR_CODES = {
 } as const;
 
 export const handleError = (error: unknown, context?: string): AppError => {
-  console.error(`[ERROR HANDLER] ${context || 'Unknown context'}:`, error);
+  productionLogger.error(`[ERROR HANDLER] ${context || 'Unknown context'}:`, error);
 
   // If it's already an AppError, just add context if needed
   if (error instanceof BatchProcessingError || error instanceof FileValidationError || error instanceof DatabaseError) {
@@ -227,7 +227,7 @@ export const showErrorToast = (error: AppError, context?: string) => {
   const title = context ? `${context} Error` : 'Error';
   
   // Add debug logging to track error toasts
-  console.log(`[ERROR TOAST DEBUG] Showing error toast:`, {
+  productionLogger.debug(`[ERROR TOAST DEBUG] Showing error toast:`, {
     title,
     message: error.message,
     code: error.code,
@@ -239,13 +239,13 @@ export const showErrorToast = (error: AppError, context?: string) => {
   const isDuplicateMessage = error.message.length < 10 || error.message === 'An unexpected error occurred.';
   
   if (isDuplicateMessage) {
-    console.warn('[ERROR HANDLER] Skipping generic/duplicate error toast:', error.message);
+    productionLogger.warn('[ERROR HANDLER] Skipping generic/duplicate error toast:', error.message);
     return;
   }
   
   // Check for specific error patterns that might cause false positives
   if (error.message.includes('MIME type') || error.message.includes('Unexpected MIME type')) {
-    console.warn('[ERROR HANDLER] Skipping MIME type warning toast:', error.message);
+    productionLogger.warn('[ERROR HANDLER] Skipping MIME type warning toast:', error.message);
     return;
   }
   
@@ -257,7 +257,7 @@ export const showErrorToast = (error: AppError, context?: string) => {
   });
 
   // Log detailed error for debugging
-  console.error(`[${error.code}] ${error.message}`, {
+  productionLogger.error(`[${error.code}] ${error.message}`, {
     details: error.details,
     context: error.context,
     timestamp: error.timestamp,
@@ -278,7 +278,7 @@ export const showRetryableErrorToast = (
       duration: 8000, // Longer duration for retryable errors
     });
 
-    console.log('[RETRY] Retryable error occurred:', error);
+    productionLogger.debug('[RETRY] Retryable error occurred:', error);
   } else {
     showErrorToast(error, context);
   }
@@ -305,7 +305,7 @@ export const withDatabaseErrorHandling = async <T>(
     
     // For retryable database errors, we could implement retry logic here
     if (appError.retryable && appError instanceof DatabaseError) {
-      console.log(`[DATABASE] Retryable error in ${context}, consider implementing retry logic`);
+      productionLogger.debug(`[DATABASE] Retryable error in ${context}, consider implementing retry logic`);
     }
     
     return null;

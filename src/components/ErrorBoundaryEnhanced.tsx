@@ -48,7 +48,7 @@ export class ErrorBoundaryEnhanced extends Component<Props, State> {
     });
 
     // Log error to console
-    console.error('React Error Boundary caught error:', {
+    productionLogger.error('React Error Boundary caught error:', {
       error: error.message,
       stack: error.stack,
       componentStack: errorInfo.componentStack,
@@ -84,7 +84,7 @@ export class ErrorBoundaryEnhanced extends Component<Props, State> {
     // Copy error report to clipboard
     navigator.clipboard.writeText(JSON.stringify(errorReport, null, 2));
     
-    console.log('Error report copied to clipboard:', { errorId });
+    productionLogger.debug('Error report copied to clipboard:', { errorId });
   };
 
   render() {

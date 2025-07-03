@@ -31,7 +31,7 @@ export async function processInChunks<T, R>(
     onChunkComplete
   } = options;
 
-  console.log(`[CHUNK PROCESSOR] Processing ${items.length} items in chunks of ${chunkSize}`);
+  productionLogger.debug(`[CHUNK PROCESSOR] Processing ${items.length} items in chunks of ${chunkSize}`);
   
   const startTime = Date.now();
   const results: R[] = new Array(items.length);
@@ -63,7 +63,7 @@ export async function processInChunks<T, R>(
   }
 
   const processingTimeMs = Date.now() - startTime;
-  console.log(`[CHUNK PROCESSOR] Completed processing ${processedCount} items in ${processingTimeMs}ms`);
+  productionLogger.debug(`[CHUNK PROCESSOR] Completed processing ${processedCount} items in ${processingTimeMs}ms`);
 
   return {
     results,
@@ -92,7 +92,7 @@ export async function processInParallelChunks<T, R>(
 ): Promise<ChunkProcessingResult<R>> {
   const { chunkSize = getOptimalChunkSize(items.length), onProgress } = options;
   
-  console.log(`[PARALLEL CHUNK PROCESSOR] Processing ${items.length} items in parallel chunks of ${chunkSize}`);
+  productionLogger.debug(`[PARALLEL CHUNK PROCESSOR] Processing ${items.length} items in parallel chunks of ${chunkSize}`);
   
   const startTime = Date.now();
   const chunks: T[][] = [];
@@ -126,7 +126,7 @@ export async function processInParallelChunks<T, R>(
   }
 
   const processingTimeMs = Date.now() - startTime;
-  console.log(`[PARALLEL CHUNK PROCESSOR] Completed processing ${results.length} items in ${processingTimeMs}ms`);
+  productionLogger.debug(`[PARALLEL CHUNK PROCESSOR] Completed processing ${results.length} items in ${processingTimeMs}ms`);
 
   return {
     results,

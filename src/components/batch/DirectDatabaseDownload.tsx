@@ -29,7 +29,7 @@ const DirectDatabaseDownload = ({ jobId, className }: DirectDatabaseDownloadProp
         .single();
 
       if (fileError) {
-        console.error('Failed to fetch batch job file record', fileError);
+        productionLogger.error('Failed to fetch batch job file record', fileError);
       }
 
       if (fileRecord && fileRecord.csv_data) {
@@ -54,7 +54,7 @@ const DirectDatabaseDownload = ({ jobId, className }: DirectDatabaseDownloadProp
         return;
       }
 
-      console.log(`[COMPLETE DOWNLOAD] Fetching complete job data for ${jobId}`);
+      productionLogger.debug(`[COMPLETE DOWNLOAD] Fetching complete job data for ${jobId}`);
       
       // Step 1: Fetch the complete batch job with original file data and row mappings
       const { data: batchJob, error: batchError } = await supabase
@@ -82,7 +82,7 @@ const DirectDatabaseDownload = ({ jobId, className }: DirectDatabaseDownloadProp
         throw new Error('No classification results found for this job');
       }
 
-      console.log(`[COMPLETE DOWNLOAD] Found ${classifications.length} classifications, ${(batchJob.original_file_data as any[]).length} original rows`);
+      productionLogger.debug(`[COMPLETE DOWNLOAD] Found ${classifications.length} classifications, ${(batchJob.original_file_data as any[]).length} original rows`);
 
       // Step 3: Reconstruct the PayeeRowData structure
       const payeeRowData: PayeeRowData = {
@@ -105,7 +105,7 @@ const DirectDatabaseDownload = ({ jobId, className }: DirectDatabaseDownloadProp
         );
         
         if (!dbClassification) {
-          console.warn(`[COMPLETE DOWNLOAD] No classification found for payee "${payeeName}"`);
+          productionLogger.warn(`[COMPLETE DOWNLOAD] No classification found for payee "${payeeName}"`);
           return {
             id: `missing-${index}`,
             payeeName,
@@ -140,12 +140,12 @@ const DirectDatabaseDownload = ({ jobId, className }: DirectDatabaseDownloadProp
         };
       });
 
-      console.log(`[COMPLETE DOWNLOAD] Reconstructed ${classificationResults.length} classification results`);
+      productionLogger.debug(`[COMPLETE DOWNLOAD] Reconstructed ${classificationResults.length} classification results`);
 
       // Step 5: Use the proper row mapping to restore ALL original data + AI analysis
       const completeResults = mapResultsToOriginalRows(classificationResults, payeeRowData);
       
-      console.log(`[COMPLETE DOWNLOAD] Mapped to ${completeResults.length} complete rows with original + AI data`);
+      productionLogger.debug(`[COMPLETE DOWNLOAD] Mapped to ${completeResults.length} complete rows with original + AI data`);
 
       // Step 6: Generate CSV with ALL columns (original + AI analysis)
       if (completeResults.length === 0) {
@@ -178,8 +178,8 @@ const DirectDatabaseDownload = ({ jobId, className }: DirectDatabaseDownloadProp
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       
-      console.log(`[COMPLETE DOWNLOAD] CSV downloaded with ${completeResults.length} rows and ${allColumns.length} columns`);
-      console.log(`[COMPLETE DOWNLOAD] Columns included:`, allColumns);
+      productionLogger.debug(`[COMPLETE DOWNLOAD] CSV downloaded with ${completeResults.length} rows and ${allColumns.length} columns`);
+      productionLogger.debug(`[COMPLETE DOWNLOAD] Columns included:`, allColumns);
       
       toast({
         title: "Complete Download Successful",
@@ -187,7 +187,7 @@ const DirectDatabaseDownload = ({ jobId, className }: DirectDatabaseDownloadProp
       });
       
     } catch (error) {
-      console.error('[COMPLETE DOWNLOAD] Download failed:', error);
+      productionLogger.error('[COMPLETE DOWNLOAD] Download failed:', error);
       
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       toast({

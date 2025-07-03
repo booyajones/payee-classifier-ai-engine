@@ -81,7 +81,7 @@ async function processWithChatCompletions(
   const results: BatchClassificationResult[] = [];
   const batchSize = 10;
   
-  console.log(`[BATCH API] Processing ${payeeNames.length} names with SIC codes using model: ${CLASSIFICATION_MODEL}`);
+  productionLogger.debug(`[BATCH API] Processing ${payeeNames.length} names with SIC codes using model: ${CLASSIFICATION_MODEL}`);
   
   for (let i = 0; i < payeeNames.length; i += batchSize) {
     const batch = payeeNames.slice(i, i + batchSize);
@@ -112,7 +112,7 @@ Return ONLY a JSON object with: classification, confidence (0-100), reasoning, s
           const parsed = JSON.parse(content);
           
           // Debug SIC code assignment
-          console.log(`[BATCH API SIC] "${name}": ${parsed.classification}, SIC: ${parsed.sicCode || 'None'}`);
+          productionLogger.debug(`[BATCH API SIC] "${name}": ${parsed.classification}, SIC: ${parsed.sicCode || 'None'}`);
           
           return {
             payeeName: name,
@@ -125,7 +125,7 @@ Return ONLY a JSON object with: classification, confidence (0-100), reasoning, s
           };
         }
       } catch (error) {
-        console.error(`[BATCH API] Error processing ${name}:`, error);
+        productionLogger.error(`[BATCH API] Error processing ${name}:`, error);
         return {
           payeeName: name,
           classification: 'Individual' as const,
@@ -151,7 +151,7 @@ Return ONLY a JSON object with: classification, confidence (0-100), reasoning, s
   // Log SIC code statistics
   const businessResults = results.filter(r => r.classification === 'Business');
   const sicResults = results.filter(r => r.sicCode);
-  console.log(`[BATCH API] SIC Statistics: ${sicResults.length}/${businessResults.length} businesses have SIC codes`);
+  productionLogger.debug(`[BATCH API] SIC Statistics: ${sicResults.length}/${businessResults.length} businesses have SIC codes`);
   
   return results;
 }
@@ -167,7 +167,7 @@ export async function processBatchClassification({
     return [];
   }
 
-  console.log(`[BATCH API] Starting batch classification with SIC codes for ${payeeNames.length} payees`);
+  productionLogger.debug(`[BATCH API] Starting batch classification with SIC codes for ${payeeNames.length} payees`);
   
   try {
     onProgress?.('Starting classification with SIC codes...', 10);
@@ -177,12 +177,12 @@ export async function processBatchClassification({
     });
     
     onProgress?.('Classification with SIC codes complete', 100);
-    console.log(`[BATCH API] Completed classification with SIC codes: ${results.length} results`);
+    productionLogger.debug(`[BATCH API] Completed classification with SIC codes: ${results.length} results`);
     
     return results;
 
   } catch (error) {
-    console.error('[BATCH API] Processing with SIC codes failed:', error);
+    productionLogger.error('[BATCH API] Processing with SIC codes failed:', error);
     
     return payeeNames.map(name => ({
       payeeName: name,
