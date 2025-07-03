@@ -8,7 +8,7 @@ export const useBatchJobActionsHandler = () => {
   const updateJob = useBatchJobStore(state => state.updateJob);
   const { handleCancelJob } = useBatchJobCancellation(updateJob);
 
-  const handleCancel = async (jobId: string) => {
+  const handleCancel = async (jobId) => {
     try {
       await handleCancelJob(jobId);
       toast({
@@ -18,32 +18,29 @@ export const useBatchJobActionsHandler = () => {
     } catch (error) {
       productionLogger.error('Failed to cancel job:', error);
       toast({
-        title: "Cancel Failed",
-        description: error instanceof Error ? error.message : 'Failed to cancel job',
-        variant: "destructive"
+        title: "Cancellation Failed",
+        description: "Failed to cancel the job. Please try again.",
+        variant: "destructive",
       });
     }
   };
 
-  const handleJobDelete = async (jobId: string, removeJob: (jobId: string) => void) => {
+  const handleJobDelete = (jobId, removeJobFn) => {
     try {
-      // Delete from database first
-      const { BatchJobDatabaseOperations } = await import('@/lib/database/batchJobDatabaseOperations');
-      await BatchJobDatabaseOperations.deleteBatchJob(jobId);
-      
-      // Then remove from store
-      removeJob(jobId);
+      if (removeJobFn) {
+        removeJobFn(jobId);
+      }
       
       toast({
         title: "Job Deleted",
-        description: `Permanently removed job ${jobId.slice(0, 8)}...`,
+        description: `Job ${jobId.slice(0, 8)}... has been removed from the list.`,
       });
     } catch (error) {
       productionLogger.error('Failed to delete job:', error);
       toast({
         title: "Delete Failed",
-        description: error instanceof Error ? error.message : 'Failed to delete job',
-        variant: "destructive"
+        description: "Failed to delete the job. Please try again.",
+        variant: "destructive",
       });
     }
   };
