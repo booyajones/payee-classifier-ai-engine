@@ -1,8 +1,10 @@
 
 import React, { useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Upload, Play, TestTube, Users, Eye } from "lucide-react";
+import { FileText, Upload, Play, TestTube, Users, Eye, Activity } from "lucide-react";
 import SingleClassificationForm from "@/components/SingleClassificationForm";
+import HealthCheckPanel from "@/components/testing/HealthCheckPanel";
+import ImplementationSummary from "@/components/testing/ImplementationSummary";
 
 import SmartFileUpload from "@/components/SmartFileUpload";
 import KeywordExclusionManager from "@/components/KeywordExclusionManager";
@@ -127,7 +129,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
   
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-      <TabsList className="grid w-full grid-cols-4">
+      <TabsList className="grid w-full grid-cols-5">
         <TabsTrigger value="single" className="flex items-center gap-2">
           <Play className="h-4 w-4" />
           Single
@@ -143,6 +145,10 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
         <TabsTrigger value="keywords" className="flex items-center gap-2">
           <FileText className="h-4 w-4" />
           Keywords
+        </TabsTrigger>
+        <TabsTrigger value="health" className="flex items-center gap-2">
+          <Activity className="h-4 w-4" />
+          Health
         </TabsTrigger>
       </TabsList>
 
@@ -169,6 +175,13 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
 
       <TabsContent value="keywords" className="mt-6">
         <KeywordExclusionManager />
+      </TabsContent>
+
+      <TabsContent value="health" className="mt-6">
+        <div className="space-y-6">
+          <ImplementationSummary />
+          <HealthCheckPanel />
+        </div>
       </TabsContent>
 
     </Tabs>
