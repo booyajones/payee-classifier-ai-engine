@@ -1,13 +1,11 @@
-
 import { useState, useEffect } from "react";
-import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { isOpenAIInitialized } from "@/lib/openai/client";
 import { logMemoryUsage } from "@/lib/openai/apiUtils";
 import { useToast } from "@/components/ui/use-toast";
 
 export const useIndexState = () => {
-  const [batchResults, setBatchResults] = useState<PayeeClassification[]>([]);
-  const [batchSummary, setBatchSummary] = useState<BatchProcessingResult | null>(null);
+  const [batchResults, setBatchResults] = useState([]);
+  const [batchSummary, setBatchSummary] = useState(null);
   const [hasApiKey, setHasApiKey] = useState(false);
   const { toast } = useToast();
 
@@ -41,10 +39,7 @@ export const useIndexState = () => {
   }, []);
 
   // Handle batch completion
-  const handleBatchComplete = async (
-    results: PayeeClassification[],
-    summary: BatchProcessingResult
-  ) => {
+  const handleBatchComplete = async (results, summary) => {
     try {
       productionLogger.debug(`[INDEX] Batch complete: ${results.length} results - CSV auto-downloaded`);
       

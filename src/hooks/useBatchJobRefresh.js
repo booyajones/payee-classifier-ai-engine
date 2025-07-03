@@ -1,13 +1,13 @@
 
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { BatchJob, checkBatchJobStatus } from "@/lib/openai/trueBatchAPI";
+import { checkBatchJobStatus } from "@/lib/openai/trueBatchAPI";
 import { handleError, showRetryableErrorToast } from "@/lib/errorHandler";
 import { useApiRetry } from "@/hooks/useRetry";
 import { BatchJobUpdater } from "@/lib/database/batchJobUpdater";
 
-export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
-  const [refreshingJobs, setRefreshingJobs] = useState<Set<string>>(new Set());
+export const useBatchJobRefresh = (onJobUpdate) => {
+  const [refreshingJobs, setRefreshingJobs] = useState(new Set());
   const { toast } = useToast();
 
   const {
@@ -24,7 +24,7 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
     }
   });
 
-  const detectStalledJob = (job: BatchJob): boolean => {
+  const detectStalledJob = (job) => {
     if (job.status !== 'in_progress') return false;
     
     // Check if job has been processing for too long with no progress
@@ -40,7 +40,7 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
     return hasNoProgress && isTakingTooLong;
   };
 
-  const handleRefreshJob = async (jobId: string, silent: boolean = false) => {
+  const handleRefreshJob = async (jobId, silent = false) => {
     setRefreshingJobs(prev => new Set(prev).add(jobId));
     try {
       productionLogger.debug(`[JOB REFRESH] Refreshing job ${jobId} with stall detection`);
