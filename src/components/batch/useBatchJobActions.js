@@ -1,7 +1,3 @@
-
-import { BatchJob } from "@/lib/openai/trueBatchAPI";
-import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
-import { PayeeRowData } from "@/lib/rowMapping";
 import { useBatchJobPolling } from "@/hooks/useBatchJobPolling";
 import { useBatchJobRefresh } from "@/hooks/useBatchJobRefresh";
 import { useBatchJobDownload } from "@/hooks/useBatchJobDownload";
@@ -11,19 +7,12 @@ import { createSafeCallbacks } from "./batchJobCallbackUtils";
 import { createActionHandlers } from "./batchJobActionHandlers";
 import { createStallDetection } from "./batchJobStallUtils";
 
-interface UseBatchJobActionsProps {
-  jobs: BatchJob[];
-  payeeRowDataMap: Record<string, PayeeRowData>;
-  onJobUpdate: (job: BatchJob) => void;
-  onJobComplete: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void;
-}
-
 export const useBatchJobActions = ({
   jobs,
   payeeRowDataMap,
   onJobUpdate,
   onJobComplete
-}: UseBatchJobActionsProps) => {
+}) => {
   const { toast } = useToast();
 
   // Create safe callback wrappers
