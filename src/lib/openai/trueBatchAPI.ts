@@ -5,7 +5,7 @@ import { CLASSIFICATION_MODEL } from './config';
 
 export interface BatchJob {
   id: string;
-  status: 'validating' | 'failed' | 'in_progress' | 'finalizing' | 'completed' | 'expired' | 'cancelling' | 'cancelled';
+  status: 'validating' | 'failed' | 'in_progress' | 'finalizing' | 'processing_results' | 'completed' | 'expired' | 'cancelling' | 'cancelled';
   created_at: number;
   completed_at?: number;
   failed_at?: number;

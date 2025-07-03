@@ -30,7 +30,7 @@ const BatchJobCompletedDownload = ({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Zap className="h-4 w-4 text-green-600" />
-          <span className="text-sm font-medium text-green-700">✅ CSV Ready - Click Download</span>
+          <span className="text-sm font-medium text-green-700">✅ CSV Ready - Instant Download</span>
         </div>
         
         <DirectDatabaseDownload 
@@ -40,7 +40,7 @@ const BatchJobCompletedDownload = ({
       </div>
       
       <div className="text-xs text-green-600 font-medium">
-        ✓ CSV file is ready for immediate download
+        ✓ Pre-processed CSV file ready for instant download
       </div>
     </div>
   );

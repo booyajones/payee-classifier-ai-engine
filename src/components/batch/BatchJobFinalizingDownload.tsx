@@ -17,12 +17,11 @@ const BatchJobFinalizingDownload = ({
 }: BatchJobFinalizingDownloadProps) => {
   const { total, completed } = job.request_counts;
   
-  // Check if job is effectively complete (100% done OR officially completed)
-  const isEffectivelyComplete = job.status === 'completed' || 
-    (total > 0 && completed === total && job.status === 'finalizing');
+  // Only show download for truly completed jobs (files are guaranteed to be ready)
+  const isReadyForDownload = job.status === 'completed';
 
-  // Show download button for completed jobs with results
-  if (!isEffectivelyComplete || activeDownload?.isActive) {
+  // Show download button only for completed jobs with pre-generated files
+  if (!isReadyForDownload || activeDownload?.isActive) {
     return null;
   }
 

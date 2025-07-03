@@ -10,17 +10,48 @@ import { productionLogger } from '@/lib/logging/productionLogger';
  */
 export class BatchJobUpdater {
   /**
-   * Update batch job status with retry logic and enhanced automatic file generation
+   * Update batch job status with synchronous processing for completion
    */
   static async updateBatchJobStatus(batchJob: BatchJob): Promise<void> {
     productionLogger.info(`Updating batch job ${batchJob.id} status to ${batchJob.status}`, null, 'BATCH_JOB_UPDATER');
 
+    // Handle OpenAI completion -> processing_results transition
+    if (batchJob.status === 'completed' && batchJob.request_counts.completed > 0) {
+      productionLogger.info(`Job ${batchJob.id} completed by OpenAI, starting synchronous processing`, null, 'BATCH_JOB_UPDATER');
+      
+      // First, set status to processing_results
+      await this.updateJobStatus(batchJob.id, 'processing_results', batchJob);
+      
+      // Process results and generate files synchronously
+      const success = await this.processJobSynchronously(batchJob);
+      
+      if (success) {
+        // Only now mark as truly completed
+        await this.updateJobStatus(batchJob.id, 'completed', batchJob);
+        productionLogger.info(`Job ${batchJob.id} fully processed and marked as completed`, null, 'BATCH_JOB_UPDATER');
+      } else {
+        // Mark as failed if processing failed
+        await this.updateJobStatus(batchJob.id, 'failed', batchJob);
+        productionLogger.error(`Job ${batchJob.id} processing failed, marked as failed`, null, 'BATCH_JOB_UPDATER');
+      }
+      
+      return;
+    }
+
+    // Handle all other status updates normally
+    await this.updateJobStatus(batchJob.id, batchJob.status, batchJob);
+  }
+
+  /**
+   * Update job status in database with retry logic
+   */
+  private static async updateJobStatus(jobId: string, status: string, batchJob: BatchJob): Promise<void> {
     const updateData = {
-      status: batchJob.status,
+      status: status,
       in_progress_at_timestamp: batchJob.in_progress_at || null,
       finalizing_at_timestamp: batchJob.finalizing_at || null,
-      completed_at_timestamp: batchJob.completed_at || null,
-      failed_at_timestamp: batchJob.failed_at || null,
+      completed_at_timestamp: status === 'completed' ? Date.now() / 1000 : batchJob.completed_at || null,
+      failed_at_timestamp: status === 'failed' ? Date.now() / 1000 : batchJob.failed_at || null,
       expired_at_timestamp: batchJob.expired_at || null,
       cancelled_at_timestamp: batchJob.cancelled_at || null,
       request_counts_total: batchJob.request_counts.total,
@@ -39,24 +70,13 @@ export class BatchJobUpdater {
         const { error } = await supabase
           .from('batch_jobs')
           .update(updateData)
-          .eq('id', batchJob.id);
+          .eq('id', jobId);
 
         if (error) {
           throw new Error(`Status update failed: ${error.message}`);
         }
         
-        productionLogger.info(`Successfully updated batch job ${batchJob.id} status to ${batchJob.status}`, null, 'BATCH_JOB_UPDATER');
-        
-        // Enhanced automatic processing when job completes
-        if (batchJob.status === 'completed' && batchJob.request_counts.completed > 0) {
-          productionLogger.info(`Job ${batchJob.id} completed, triggering automatic result processing and file generation`, null, 'BATCH_JOB_UPDATER');
-          
-          // Process and store results automatically for instant downloads with retry logic
-          this.processJobWithRetries(batchJob, 3).catch(error => {
-            productionLogger.error(`Critical failure in automatic processing for ${batchJob.id}`, error, 'BATCH_JOB_UPDATER');
-          });
-        }
-        
+        productionLogger.info(`Successfully updated batch job ${jobId} status to ${status}`, null, 'BATCH_JOB_UPDATER');
         return;
         
       } catch (error) {
@@ -74,44 +94,36 @@ export class BatchJobUpdater {
   }
 
   /**
-   * Process completed job with automatic retry logic
+   * Process completed job synchronously - must complete before marking job as done
    */
-  private static async processJobWithRetries(batchJob: BatchJob, maxRetries: number): Promise<void> {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        productionLogger.info(`Processing attempt ${attempt}/${maxRetries} for job ${batchJob.id}`, null, 'BATCH_JOB_UPDATER');
-        
-        // First, process and store results
-        const success = await AutomaticResultProcessor.processCompletedBatch(batchJob);
-        
-        if (!success) {
-          throw new Error('Result processing failed');
-        }
-        
-        productionLogger.info(`Result processing completed for ${batchJob.id}`, null, 'BATCH_JOB_UPDATER');
-        
-        // Then generate download files
-        const fileResult = await EnhancedFileGenerationService.processCompletedJob(batchJob);
-        
-        if (!fileResult.success) {
-          throw new Error(`File generation failed: ${fileResult.error}`);
-        }
-        
-        productionLogger.info(`Complete automatic processing successful for ${batchJob.id}`, null, 'BATCH_JOB_UPDATER');
-        return;
-        
-      } catch (error) {
-        productionLogger.error(`Processing attempt ${attempt} failed for ${batchJob.id}`, error, 'BATCH_JOB_UPDATER');
-        
-        if (attempt < maxRetries) {
-          const delay = 2000 * Math.pow(2, attempt - 1); // 2s, 4s, 8s
-          productionLogger.debug(`Retrying in ${delay}ms...`, null, 'BATCH_JOB_UPDATER');
-          await new Promise(resolve => setTimeout(resolve, delay));
-        } else {
-          productionLogger.error(`All processing attempts failed for ${batchJob.id}`, null, 'BATCH_JOB_UPDATER');
-          throw error;
-        }
+  private static async processJobSynchronously(batchJob: BatchJob): Promise<boolean> {
+    try {
+      productionLogger.info(`Starting synchronous processing for job ${batchJob.id}`, null, 'BATCH_JOB_UPDATER');
+      
+      // Process and store results
+      const resultSuccess = await AutomaticResultProcessor.processCompletedBatch(batchJob);
+      
+      if (!resultSuccess) {
+        productionLogger.error(`Result processing failed for ${batchJob.id}`, null, 'BATCH_JOB_UPDATER');
+        return false;
       }
+      
+      productionLogger.info(`Result processing completed for ${batchJob.id}`, null, 'BATCH_JOB_UPDATER');
+      
+      // Generate download files
+      const fileResult = await EnhancedFileGenerationService.processCompletedJob(batchJob);
+      
+      if (!fileResult.success) {
+        productionLogger.error(`File generation failed for ${batchJob.id}: ${fileResult.error}`, null, 'BATCH_JOB_UPDATER');
+        return false;
+      }
+      
+      productionLogger.info(`Synchronous processing successful for ${batchJob.id}`, null, 'BATCH_JOB_UPDATER');
+      return true;
+      
+    } catch (error) {
+      productionLogger.error(`Synchronous processing failed for ${batchJob.id}`, error, 'BATCH_JOB_UPDATER');
+      return false;
     }
   }
 }
