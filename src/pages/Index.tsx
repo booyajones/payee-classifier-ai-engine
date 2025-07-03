@@ -7,6 +7,7 @@ import AppHeader from "@/components/layout/AppHeader";
 import AppFooter from "@/components/layout/AppFooter";
 import MainTabs from "@/components/navigation/MainTabs";
 import ApiKeySetupPage from "@/components/setup/ApiKeySetupPage";
+import { productionLogger } from "@/lib/logging/productionLogger";
 
 const Index = () => {
   productionLogger.debug('Index component rendering');

@@ -168,30 +168,6 @@ export type Database = {
         }
         Relationships: []
       }
-      batch_job_files: {
-        Row: {
-          job_id: string
-          csv_data: string | null
-          excel_data: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          job_id: string
-          csv_data?: string | null
-          excel_data?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          job_id?: string
-          csv_data?: string | null
-          excel_data?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       payee_classifications: {
         Row: {
           ai_duplicate_reasoning: string | null
