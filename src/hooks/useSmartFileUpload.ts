@@ -181,11 +181,7 @@ export const useSmartFileUpload = () => {
       setUploadState('uploaded');
       completeProgress(UPLOAD_ID, 'File uploaded successfully! Please select the payee column.');
 
-      // Enhanced file info toast (success, not error)
-      toast({
-        title: "File Analysis Complete",
-        description: `Found ${data.length.toLocaleString()} rows with ${headers.length} columns. ${validationResult.fileInfo?.hasHeaders ? 'Headers detected.' : ''}`,
-      });
+      // File analysis complete - no toast to avoid spam
 
       debugLog('File upload process completed successfully - awaiting column selection');
 
@@ -246,10 +242,10 @@ export const useSmartFileUpload = () => {
         duplicates
       });
 
-      // Enhanced toast with detailed information
+      // Simplified toast without misleading duplicate claim
       toast({
         title: "Column Validation Complete",
-        description: `Found ${payeeRowData.uniquePayeeNames.length} unique payees from ${fileData.length} total rows (${duplicates} duplicates detected).`,
+        description: `Processing ${payeeRowData.uniquePayeeNames.length} unique payee names from ${fileData.length} total rows.`,
       });
 
       return payeeRowData;

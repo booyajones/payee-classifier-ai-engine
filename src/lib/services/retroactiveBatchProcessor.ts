@@ -76,8 +76,9 @@ export class RetroactiveBatchProcessor {
         originalFileData: payeeRowData.originalFileData
       };
 
-      // const fileResult = await PreGeneratedFileService.generateAndStoreFiles(job.id, batchResult);
-      const fileResult = { error: null, csvUrl: '', excelUrl: '', fileSizeBytes: 0 };
+      // Import and use the actual file generation service
+      const { PreGeneratedFileService } = await import('./preGeneratedFileService');
+      const fileResult = await PreGeneratedFileService.generateAndStoreFiles(job.id, batchResult);
 
       if (fileResult.error) {
         throw new Error(`File generation failed: ${fileResult.error}`);
