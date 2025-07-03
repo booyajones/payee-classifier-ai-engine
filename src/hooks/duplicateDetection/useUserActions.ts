@@ -14,7 +14,7 @@ export const useDuplicateUserActions = (
   const acceptDuplicateGroup = useCallback((groupId: string) => {
     if (!state.result) return;
     
-    productionLogger.debug(`[DUPLICATE DETECTION HOOK] Accepting duplicate group: ${groupId}`);
+    console.log(`[DUPLICATE DETECTION HOOK] Accepting duplicate group: ${groupId}`);
     
     // Update the result to mark all members in this group as accepted duplicates
     const updatedResult = {
@@ -41,7 +41,7 @@ export const useDuplicateUserActions = (
   const rejectDuplicateGroup = useCallback((groupId: string) => {
     if (!state.result) return;
     
-    productionLogger.debug(`[DUPLICATE DETECTION HOOK] Rejecting duplicate group: ${groupId}`);
+    console.log(`[DUPLICATE DETECTION HOOK] Rejecting duplicate group: ${groupId}`);
     
     // Update the result to mark all members in this group as unique
     const updatedResult = {
@@ -74,7 +74,7 @@ export const useDuplicateUserActions = (
   const acceptDuplicateMember = useCallback((groupId: string, payeeId: string) => {
     if (!state.result) return;
     
-    productionLogger.debug(`[DUPLICATE DETECTION HOOK] Accepting duplicate member: ${payeeId} in group ${groupId}`);
+    console.log(`[DUPLICATE DETECTION HOOK] Accepting duplicate member: ${payeeId} in group ${groupId}`);
     
     const updatedResult = {
       ...state.result,
@@ -100,7 +100,7 @@ export const useDuplicateUserActions = (
   const rejectDuplicateMember = useCallback((groupId: string, payeeId: string) => {
     if (!state.result) return;
     
-    productionLogger.debug(`[DUPLICATE DETECTION HOOK] Rejecting duplicate member: ${payeeId} in group ${groupId}`);
+    console.log(`[DUPLICATE DETECTION HOOK] Rejecting duplicate member: ${payeeId} in group ${groupId}`);
     
     const updatedResult = {
       ...state.result,

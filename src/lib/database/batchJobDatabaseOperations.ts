@@ -51,11 +51,11 @@ export class BatchJobDatabaseOperations {
       });
 
     if (error) {
-      productionLogger.error('[DB BATCH OPERATIONS] Minimal record save failed:', error);
+      console.error('[DB BATCH OPERATIONS] Minimal record save failed:', error);
       throw new Error(`Minimal record save failed: ${error.message}`);
     }
 
-    productionLogger.debug(`[DB BATCH OPERATIONS] Minimal record saved for immediate user feedback: ${batchJob.id}`);
+    console.log(`[DB BATCH OPERATIONS] Minimal record saved for immediate user feedback: ${batchJob.id}`);
   }
 
   /**
@@ -104,14 +104,14 @@ export class BatchJobDatabaseOperations {
       throw new Error(`Direct save failed: ${error.message}`);
     }
 
-    productionLogger.debug(`[DB BATCH OPERATIONS] Direct save completed for job ${batchJob.id}`);
+    console.log(`[DB BATCH OPERATIONS] Direct save completed for job ${batchJob.id}`);
   }
 
   /**
    * Delete batch job
    */
   static async deleteBatchJob(jobId: string): Promise<void> {
-    productionLogger.debug(`[DB BATCH OPERATIONS] Deleting batch job ${jobId}`);
+    console.log(`[DB BATCH OPERATIONS] Deleting batch job ${jobId}`);
 
     const { error } = await supabase
       .from('batch_jobs')
@@ -119,11 +119,11 @@ export class BatchJobDatabaseOperations {
       .eq('id', jobId);
 
     if (error) {
-      productionLogger.error('[DB BATCH OPERATIONS] Error deleting batch job:', error);
+      console.error('[DB BATCH OPERATIONS] Error deleting batch job:', error);
       throw new Error(`Failed to delete batch job: ${error.message}`);
     }
 
-    productionLogger.debug(`[DB BATCH OPERATIONS] Successfully deleted batch job ${jobId}`);
+    console.log(`[DB BATCH OPERATIONS] Successfully deleted batch job ${jobId}`);
   }
 
   /**
@@ -135,7 +135,7 @@ export class BatchJobDatabaseOperations {
       .select('*', { count: 'exact', head: true });
 
     if (error) {
-      productionLogger.error('[DB BATCH OPERATIONS] Error getting batch job count:', error);
+      console.error('[DB BATCH OPERATIONS] Error getting batch job count:', error);
       return 0;
     }
 

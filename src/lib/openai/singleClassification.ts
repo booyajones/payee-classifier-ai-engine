@@ -3,13 +3,12 @@ import OpenAI from 'openai';
 import { getOpenAIClient } from './client';
 import { timeoutPromise } from './utils';
 import { DEFAULT_API_TIMEOUT, CLASSIFICATION_MODEL } from './config';
-import { type SimilarityScores } from '@/lib/classification/stringMatching';
 
 /**
  * Classify a single payee name using the OpenAI API with SIC code determination
  */
 export async function classifyPayeeWithAI(
-  payeeName: string,
+  payeeName: string, 
   timeout: number = DEFAULT_API_TIMEOUT
 ): Promise<{
   classification: 'Business' | 'Individual';
@@ -17,7 +16,6 @@ export async function classifyPayeeWithAI(
   reasoning: string;
   sicCode?: string;
   sicDescription?: string;
-  similarityScores?: SimilarityScores;
 }> {
   const openaiClient = getOpenAIClient();
   if (!openaiClient) {
@@ -29,7 +27,7 @@ export async function classifyPayeeWithAI(
   }
 
   try {
-    productionLogger.debug(`[SINGLE CLASSIFICATION] Classifying "${payeeName}" with OpenAI API including SIC code analysis...`);
+    console.log(`[SINGLE CLASSIFICATION] Classifying "${payeeName}" with OpenAI API including SIC code analysis...`);
     
     const apiCall = openaiClient.chat.completions.create({
       model: CLASSIFICATION_MODEL,
@@ -64,7 +62,7 @@ Return JSON: {"classification": "Business|Individual", "confidence": number, "re
       max_tokens: 250
     });
     
-    productionLogger.debug(`[SINGLE CLASSIFICATION] Making API call with SIC analysis for "${payeeName}"...`);
+    console.log(`[SINGLE CLASSIFICATION] Making API call with SIC analysis for "${payeeName}"...`);
     
     const response = await timeoutPromise(apiCall, timeout);
 
@@ -73,7 +71,7 @@ Return JSON: {"classification": "Business|Individual", "confidence": number, "re
       throw new Error("No response content from OpenAI API");
     }
 
-    productionLogger.debug(`[SINGLE CLASSIFICATION] Raw OpenAI response for "${payeeName}":`, content);
+    console.log(`[SINGLE CLASSIFICATION] Raw OpenAI response for "${payeeName}":`, content);
     
     try {
       const result = JSON.parse(content);
@@ -85,41 +83,33 @@ Return JSON: {"classification": "Business|Individual", "confidence": number, "re
       // Enhanced SIC code validation and processing
       if (result.classification === 'Business') {
         if (!result.sicCode || !/^\d{4}$/.test(result.sicCode)) {
-          productionLogger.warn(`[SIC WARNING] Business "${payeeName}" missing or invalid SIC code "${result.sicCode}", assigning default`);
+          console.warn(`[SIC WARNING] Business "${payeeName}" missing or invalid SIC code "${result.sicCode}", assigning default`);
           result.sicCode = '7389'; // Business Services, NEC
           result.sicDescription = 'Business Services, Not Elsewhere Classified';
         }
-        productionLogger.debug(`[SIC SUCCESS] Business "${payeeName}" assigned SIC ${result.sicCode}: ${result.sicDescription}`);
+        console.log(`[SIC SUCCESS] Business "${payeeName}" assigned SIC ${result.sicCode}: ${result.sicDescription}`);
       } else {
         // Ensure individuals don't have SIC codes
         result.sicCode = null;
         result.sicDescription = null;
-        productionLogger.debug(`[SIC INFO] Individual "${payeeName}" - no SIC code assigned`);
+        console.log(`[SIC INFO] Individual "${payeeName}" - no SIC code assigned`);
       }
       
-      productionLogger.debug(`[SINGLE CLASSIFICATION] Successfully classified "${payeeName}": ${result.classification} (${result.confidence}%) SIC: ${result.sicCode || 'N/A'}`);
+      console.log(`[SINGLE CLASSIFICATION] Successfully classified "${payeeName}": ${result.classification} (${result.confidence}%) SIC: ${result.sicCode || 'N/A'}`);
       
-      const similarityScores =
-        typeof result.similarityScores === 'object'
-          ? result.similarityScores
-          : typeof result.similarity_scores === 'object'
-            ? result.similarity_scores
-            : undefined;
-
       return {
         classification: result.classification as 'Business' | 'Individual',
         confidence: Math.min(100, Math.max(0, result.confidence)),
         reasoning: result.reasoning,
         sicCode: result.sicCode || undefined,
-        sicDescription: result.sicDescription || undefined,
-        similarityScores
+        sicDescription: result.sicDescription || undefined
       };
     } catch (parseError) {
-      productionLogger.error(`[SINGLE CLASSIFICATION] Failed to parse response for "${payeeName}":`, content);
+      console.error(`[SINGLE CLASSIFICATION] Failed to parse response for "${payeeName}":`, content);
       throw new Error("Failed to parse OpenAI response as JSON");
     }
   } catch (error) {
-    productionLogger.error(`[SINGLE CLASSIFICATION] Error calling OpenAI API for "${payeeName}":`, error);
+    console.error(`[SINGLE CLASSIFICATION] Error calling OpenAI API for "${payeeName}":`, error);
     
     if (error instanceof Error) {
       if (error.message.includes('401') || error.message.includes('authentication')) {

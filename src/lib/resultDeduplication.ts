@@ -7,7 +7,7 @@ import { PayeeClassification } from './types';
 export function deduplicateClassifications(
   classifications: PayeeClassification[]
 ): PayeeClassification[] {
-  productionLogger.debug(`[DEDUP] Starting deduplication of ${classifications.length} classifications`);
+  console.log(`[DEDUP] Starting deduplication of ${classifications.length} classifications`);
   
   const seen = new Set<string>();
   const seenRowIndices = new Set<number>();
@@ -16,13 +16,13 @@ export function deduplicateClassifications(
   for (const classification of classifications) {
     // Check for duplicate IDs
     if (seen.has(classification.id)) {
-      productionLogger.debug(`[DEDUP] Skipping duplicate ID: ${classification.id}`);
+      console.log(`[DEDUP] Skipping duplicate ID: ${classification.id}`);
       continue;
     }
     
     // Check for duplicate row indices
     if (classification.rowIndex !== undefined && seenRowIndices.has(classification.rowIndex)) {
-      productionLogger.debug(`[DEDUP] Skipping duplicate row index: ${classification.rowIndex}`);
+      console.log(`[DEDUP] Skipping duplicate row index: ${classification.rowIndex}`);
       continue;
     }
     
@@ -35,7 +35,7 @@ export function deduplicateClassifications(
     deduplicated.push(classification);
   }
   
-  productionLogger.debug(`[DEDUP] Deduplicated from ${classifications.length} to ${deduplicated.length} classifications`);
+  console.log(`[DEDUP] Deduplicated from ${classifications.length} to ${deduplicated.length} classifications`);
   return deduplicated;
 }
 

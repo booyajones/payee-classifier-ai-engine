@@ -22,13 +22,13 @@ export async function loadCustomExclusionKeywords(): Promise<string[]> {
       .order('keyword');
 
     if (error) {
-      productionLogger.error('Error loading custom exclusion keywords:', error);
+      console.error('Error loading custom exclusion keywords:', error);
       return [];
     }
 
     return data?.map(item => item.keyword) || [];
   } catch (error) {
-    productionLogger.error('Error loading custom exclusion keywords:', error);
+    console.error('Error loading custom exclusion keywords:', error);
     return [];
   }
 }
@@ -45,13 +45,13 @@ export async function loadAllExclusionKeywords(): Promise<ExclusionKeyword[]> {
       .order('category, keyword');
 
     if (error) {
-      productionLogger.error('Error loading all exclusion keywords:', error);
+      console.error('Error loading all exclusion keywords:', error);
       return [];
     }
 
     return (data || []) as ExclusionKeyword[];
   } catch (error) {
-    productionLogger.error('Error loading all exclusion keywords:', error);
+    console.error('Error loading all exclusion keywords:', error);
     return [];
   }
 }
@@ -76,13 +76,13 @@ export async function addCustomExclusionKeyword(
       if (error.code === '23505') { // Unique constraint violation
         return { success: false, error: 'Keyword already exists' };
       }
-      productionLogger.error('Error adding custom exclusion keyword:', error);
+      console.error('Error adding custom exclusion keyword:', error);
       return { success: false, error: error.message };
     }
 
     return { success: true };
   } catch (error) {
-    productionLogger.error('Error adding custom exclusion keyword:', error);
+    console.error('Error adding custom exclusion keyword:', error);
     return { success: false, error: 'Failed to add keyword' };
   }
 }
@@ -114,13 +114,13 @@ export async function updateExclusionKeyword(
       if (error.code === '23505') { // Unique constraint violation
         return { success: false, error: 'Keyword already exists' };
       }
-      productionLogger.error('Error updating exclusion keyword:', error);
+      console.error('Error updating exclusion keyword:', error);
       return { success: false, error: error.message };
     }
 
     return { success: true };
   } catch (error) {
-    productionLogger.error('Error updating exclusion keyword:', error);
+    console.error('Error updating exclusion keyword:', error);
     return { success: false, error: 'Failed to update keyword' };
   }
 }
@@ -136,13 +136,13 @@ export async function deleteExclusionKeyword(id: string): Promise<{ success: boo
       .eq('id', id);
 
     if (error) {
-      productionLogger.error('Error deleting exclusion keyword:', error);
+      console.error('Error deleting exclusion keyword:', error);
       return { success: false, error: error.message };
     }
 
     return { success: true };
   } catch (error) {
-    productionLogger.error('Error deleting exclusion keyword:', error);
+    console.error('Error deleting exclusion keyword:', error);
     return { success: false, error: 'Failed to delete keyword' };
   }
 }
@@ -158,13 +158,13 @@ export async function getAllCustomExclusionKeywords(): Promise<ExclusionKeyword[
       .order('keyword');
 
     if (error) {
-      productionLogger.error('Error loading all custom exclusion keywords:', error);
+      console.error('Error loading all custom exclusion keywords:', error);
       return [];
     }
 
     return (data || []) as ExclusionKeyword[];
   } catch (error) {
-    productionLogger.error('Error loading all custom exclusion keywords:', error);
+    console.error('Error loading all custom exclusion keywords:', error);
     return [];
   }
 }
@@ -182,13 +182,13 @@ export async function resetKeywordsByCategory(category: string): Promise<{ succe
       .neq('keyword_type', 'builtin');
 
     if (deleteError) {
-      productionLogger.error('Error resetting keywords by category:', deleteError);
+      console.error('Error resetting keywords by category:', deleteError);
       return { success: false, error: deleteError.message };
     }
 
     return { success: true };
   } catch (error) {
-    productionLogger.error('Error resetting keywords by category:', error);
+    console.error('Error resetting keywords by category:', error);
     return { success: false, error: 'Failed to reset category' };
   }
 }
@@ -204,7 +204,7 @@ export async function getKeywordCategories(): Promise<string[]> {
       .eq('is_active', true);
 
     if (error) {
-      productionLogger.error('Error loading keyword categories:', error);
+      console.error('Error loading keyword categories:', error);
       return [];
     }
 
@@ -217,7 +217,7 @@ export async function getKeywordCategories(): Promise<string[]> {
     
     return categories.sort();
   } catch (error) {
-    productionLogger.error('Error loading keyword categories:', error);
+    console.error('Error loading keyword categories:', error);
     return [];
   }
 }

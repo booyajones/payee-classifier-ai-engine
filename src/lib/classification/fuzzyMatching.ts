@@ -34,7 +34,7 @@ export async function performFuzzyMatching(payeeName: string, threshold: number)
       processingMethod: 'Fuzzy matching against cache'
     };
   } catch (error) {
-    productionLogger.warn('Fuzzy matching failed:', error);
+    console.warn('Fuzzy matching failed:', error);
     return null;
   }
 }

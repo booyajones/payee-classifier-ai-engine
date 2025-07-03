@@ -4,7 +4,7 @@ import { FixedSizeList as List } from 'react-window';
 import { Table, TableBody } from '@/components/ui/table';
 import { PayeeClassification } from '@/lib/types';
 import ClassificationTableHeader from './TableHeader';
-import { VirtualizedTableRow } from './VirtualizedTableRow';
+import VirtualizedTableRow from './VirtualizedTableRow';
 
 interface VirtualizedTableProps {
   results: PayeeClassification[];
@@ -20,7 +20,7 @@ const MAX_HEIGHT = 600; // Maximum table height
 
 // Define enhanced columns that include SIC fields - FIXED VERSION
 const getEnhancedColumns = (originalColumns: Array<{ key: string; label: string; isOriginal: boolean }>) => {
-  productionLogger.debug('[TABLE COLUMNS] Original columns:', originalColumns);
+  console.log('[TABLE COLUMNS] Original columns:', originalColumns);
   
   const classificationColumns = [
     { key: 'classification', label: 'Classification', isOriginal: false },
@@ -35,7 +35,7 @@ const getEnhancedColumns = (originalColumns: Array<{ key: string; label: string;
   ];
   
   const enhancedColumns = [...originalColumns, ...classificationColumns];
-  productionLogger.debug('[TABLE COLUMNS] Enhanced columns with SIC:', enhancedColumns);
+  console.log('[TABLE COLUMNS] Enhanced columns with SIC:', enhancedColumns);
   
   return enhancedColumns;
 };
@@ -58,10 +58,10 @@ const VirtualizedTable = React.memo(({
   React.useEffect(() => {
     const businessResults = results.filter(r => r.result.classification === 'Business');
     const sicResults = results.filter(r => r.result.sicCode);
-    productionLogger.debug(`[TABLE DEBUG] Total results: ${results.length}, Business: ${businessResults.length}, With SIC: ${sicResults.length}`);
+    console.log(`[TABLE DEBUG] Total results: ${results.length}, Business: ${businessResults.length}, With SIC: ${sicResults.length}`);
     
     if (sicResults.length > 0) {
-      productionLogger.debug('[TABLE DEBUG] Sample SIC data:', sicResults.slice(0, 3).map(r => ({
+      console.log('[TABLE DEBUG] Sample SIC data:', sicResults.slice(0, 3).map(r => ({
         payee: r.payeeName,
         sicCode: r.result.sicCode,
         sicDescription: r.result.sicDescription

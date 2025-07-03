@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import DirectDatabaseDownload from './DirectDatabaseDownload';
@@ -18,11 +17,12 @@ const BatchJobFinalizingDownload = ({
 }: BatchJobFinalizingDownloadProps) => {
   const { total, completed } = job.request_counts;
   
-  // Only show download for truly completed jobs (files are guaranteed to be ready)
-  const isReadyForDownload = job.status === 'completed';
+  // Check if job is effectively complete (100% done OR officially completed)
+  const isEffectivelyComplete = job.status === 'completed' || 
+    (total > 0 && completed === total && job.status === 'finalizing');
 
-  // Show download button only for completed jobs with pre-generated files
-  if (!isReadyForDownload || activeDownload?.isActive) {
+  // Show download button for completed jobs with results
+  if (!isEffectivelyComplete || activeDownload?.isActive) {
     return null;
   }
 

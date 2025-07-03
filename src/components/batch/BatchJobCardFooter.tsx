@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';

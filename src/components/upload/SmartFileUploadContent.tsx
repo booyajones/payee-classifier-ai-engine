@@ -1,133 +1,128 @@
-// @ts-nocheck
-import { useCallback, useMemo, useState, useEffect } from 'react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { UploadCloud, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+
+import { UploadState, FileProcessingInfo } from '@/hooks/useSmartFileUpload';
+import FileSelectionArea from './FileSelectionArea';
+import ColumnSelectionArea from './ColumnSelectionArea';
+import EnhancedUploadProgressDisplay from './EnhancedUploadProgressDisplay';
+
+import UploadSuccessDisplay from './UploadSuccessDisplay';
+import UploadErrorDisplay from './UploadErrorDisplay';
+import ProgressIndicator from '../ui/progress-indicator';
+import { DuplicateDetectionResults } from '../duplicate';
 
 interface SmartFileUploadContentProps {
-  onFileUpload: (file: File) => Promise<void>;
-  isUploading: boolean;
-  uploadError?: string;
-  lastUploadedFileName?: string;
-  lastUploadSuccess?: boolean;
+  uploadState: UploadState;
+  isProcessing: boolean;
+  fileData: any[] | null;
+  fileHeaders: string[];
+  selectedPayeeColumn: string;
+  setSelectedPayeeColumn: (column: string) => void;
+  processingInfo: FileProcessingInfo;
+  errorMessage: string;
+  triggerFileSelect: () => void;
+  handleColumnSelect: () => void;
+  resetUpload: () => void;
+  UPLOAD_ID: string;
+  duplicateDetectionResults?: any;
+  onDuplicateReviewComplete?: () => void;
 }
 
 const SmartFileUploadContent = ({
-  onFileUpload,
-  isUploading,
-  uploadError,
-  lastUploadedFileName,
-  lastUploadSuccess
+  uploadState,
+  isProcessing,
+  fileData,
+  fileHeaders,
+  selectedPayeeColumn,
+  setSelectedPayeeColumn,
+  processingInfo,
+  errorMessage,
+  triggerFileSelect,
+  handleColumnSelect,
+  resetUpload,
+  UPLOAD_ID,
+  duplicateDetectionResults,
+  onDuplicateReviewComplete
 }: SmartFileUploadContentProps) => {
-  const { toast } = useToast();
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setSelectedFile(e.target.files[0]);
-    }
-  }, []);
-
-  const handleUploadClick = useCallback(async () => {
-    if (!selectedFile) {
-      toast({
-        title: "No File Selected",
-        description: "Please select a file to upload.",
-        variant: "destructive"
-      });
-      return;
-    }
-    try {
-      await onFileUpload(selectedFile);
-      setSelectedFile(null);
-    } catch (error) {
-      toast({
-        title: "Upload Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred during upload.",
-        variant: "destructive"
-      });
-    }
-  }, [selectedFile, onFileUpload, toast]);
-
-  const fileNameDisplay = useMemo(() => {
-    if (selectedFile) {
-      return selectedFile.name;
-    }
-    if (lastUploadedFileName) {
-      return lastUploadedFileName;
-    }
-    return "No file selected";
-  }, [selectedFile, lastUploadedFileName]);
-
-  useEffect(() => {
-    if (uploadError) {
-      toast({
-        title: "Upload Error",
-        description: uploadError,
-        variant: "destructive"
-      });
-    }
-  }, [uploadError, toast]);
+  
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-4">
-        <label
-          htmlFor="file-upload"
-          className="cursor-pointer flex items-center gap-2 rounded-md border border-dashed border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted"
-        >
-          <UploadCloud className="h-5 w-5" />
-          Select File
-        </label>
-        <input
-          id="file-upload"
-          type="file"
-          accept=".csv,.xlsx,.xls"
-          onChange={handleFileChange}
-          className="hidden"
-          disabled={isUploading}
+    <>
+      {uploadState === 'idle' && (
+        <FileSelectionArea 
+          onFileSelect={triggerFileSelect}
+          disabled={isProcessing}
         />
-        <span className="text-sm text-muted-foreground truncate max-w-xs">{fileNameDisplay}</span>
-      </div>
+      )}
 
-      <div className="flex gap-2">
-        <Button
-          onClick={handleUploadClick}
-          disabled={isUploading || !selectedFile}
-          className="flex-1"
-        >
-          {isUploading ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Uploading...
-            </>
-          ) : (
-            "Upload"
-          )}
-        </Button>
-        {lastUploadSuccess && (
-          <Badge variant="outline" className="flex items-center gap-1">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            Uploaded Successfully
-          </Badge>
-        )}
-        {uploadError && (
-          <Badge variant="destructive" className="flex items-center gap-1">
-            <AlertCircle className="h-4 w-4 text-red-600" />
-            Upload Failed
-          </Badge>
-        )}
-      </div>
+      {uploadState === 'uploaded' && fileHeaders.length > 0 && (
+        <ColumnSelectionArea
+          fileHeaders={fileHeaders}
+          selectedColumn={selectedPayeeColumn}
+          onColumnChange={setSelectedPayeeColumn}
+          onProcess={handleColumnSelect}
+          onCancel={resetUpload}
+          recordCount={fileData?.length || 0}
+          processingInfo={processingInfo}
+          disabled={isProcessing}
+        />
+      )}
 
-      <Alert variant="info" className="text-sm">
-        <AlertDescription>
-          Supported file types: CSV, XLSX, XLS. Files should contain payee data for classification.
-        </AlertDescription>
-      </Alert>
-    </div>
+      {uploadState === 'uploaded' && fileHeaders.length === 0 && (
+        <UploadErrorDisplay
+          error="No column headers found in the uploaded file. Please ensure your file has a header row."
+          onRetry={resetUpload}
+          onReset={resetUpload}
+          context="Column Header Detection"
+        />
+      )}
+
+      {uploadState === 'processing' && (
+        <div className="space-y-4">
+          <ProgressIndicator 
+            progress={0}
+            status="loading"
+            message="Processing your file..."
+            className="mb-4"
+          />
+          
+          <EnhancedUploadProgressDisplay
+            uploadState={uploadState}
+            uploadId={UPLOAD_ID}
+            showMemoryStats={true}
+            showProgressHistory={false}
+          />
+          
+        </div>
+      )}
+
+      {uploadState === 'complete' && !duplicateDetectionResults && (
+        <UploadSuccessDisplay
+          uploadId={UPLOAD_ID}
+          onReset={resetUpload}
+          resultCount={processingInfo.uniquePayees}
+        />
+      )}
+
+      {uploadState === 'complete' && duplicateDetectionResults && (
+        <DuplicateDetectionResults
+          result={duplicateDetectionResults}
+          onAcceptGroup={(groupId) => console.log('Accept group:', groupId)}
+          onRejectGroup={(groupId) => console.log('Reject group:', groupId)}
+          onAcceptMember={(groupId, payeeId) => console.log('Accept member:', payeeId)}
+          onRejectMember={(groupId, payeeId) => console.log('Reject member:', payeeId)}
+          onExportResults={() => console.log('Export results')}
+          onProceedWithProcessing={() => onDuplicateReviewComplete?.()}
+        />
+      )}
+
+      {uploadState === 'error' && (
+        <UploadErrorDisplay
+          error={errorMessage}
+          onRetry={resetUpload}
+          onReset={resetUpload}
+          context="Smart File Upload"
+        />
+      )}
+    </>
   );
 };
 

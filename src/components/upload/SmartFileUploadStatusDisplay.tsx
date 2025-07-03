@@ -1,65 +1,57 @@
-// @ts-nocheck
-import { AlertCircle, CheckCircle, Clock, Loader2 } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
+
+import { AlertTriangle, Loader2, Database } from 'lucide-react';
 
 interface SmartFileUploadStatusDisplayProps {
-  uploadStatus: 'idle' | 'uploading' | 'success' | 'error';
-  errorMessage?: string;
-  fileData?: any;
+  hasGlobalError: boolean;
+  isProcessing: boolean;
+  fileData: any[] | null;
 }
 
-const SmartFileUploadStatusDisplay = ({ uploadStatus, errorMessage }: SmartFileUploadStatusDisplayProps) => {
-  const getStatusIcon = () => {
-    switch (uploadStatus) {
-      case 'uploading':
-        return <Loader2 className="h-4 w-4 animate-spin" />;
-      case 'success':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'error':
-        return <AlertCircle className="h-4 w-4 text-red-500" />;
-      default:
-        return <Clock className="h-4 w-4" />;
-    }
-  };
-
-  const getStatusText = () => {
-    switch (uploadStatus) {
-      case 'uploading':
-        return 'Uploading file...';
-      case 'success':
-        return 'File uploaded successfully!';
-      case 'error':
-        return errorMessage || 'File upload failed.';
-      default:
-        return 'Ready to upload';
-    }
-  };
-
-  const getAlertVariant = () => {
-    switch (uploadStatus) {
-      case 'success':
-        return 'success';
-      case 'error':
-        return 'destructive';
-      default:
-        return 'default';
-    }
-  };
-
-  if (uploadStatus === 'idle') {
-    return null;
-  }
-
+const SmartFileUploadStatusDisplay = ({ 
+  hasGlobalError, 
+  isProcessing, 
+  fileData 
+}: SmartFileUploadStatusDisplayProps) => {
   return (
-    <Alert variant={getAlertVariant()}>
-      {getStatusIcon() && (
-        <AlertCircle className="h-4 w-4" />
+    <>
+      {/* Global error state */}
+      {hasGlobalError && (
+        <div className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">
+          <div className="flex items-center gap-1 mb-1">
+            <AlertTriangle className="h-3 w-3" />
+            System Alert
+          </div>
+          <p>There are active errors in the batch processing system. Check the error messages below.</p>
+        </div>
       )}
-      <AlertDescription>
-        {getStatusText()}
-      </AlertDescription>
-    </Alert>
+
+      {/* Processing status */}
+      {isProcessing && (
+        <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded border border-blue-200">
+          <div className="flex items-center gap-1 mb-1">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Enhanced Processing Active
+          </div>
+          <p>✓ OpenAI batch job creation in progress</p>
+          <p>✓ Real-time error detection and handling</p>
+          <p>✓ Automatic fallback for large files (45k+ payees)</p>
+          <p>✓ You can continue working - processing happens in background</p>
+        </div>
+      )}
+
+      {/* System enhancements info */}
+      <div className="text-xs text-muted-foreground bg-green-50 p-2 rounded border border-green-200">
+        <div className="flex items-center gap-1 text-green-700 font-medium mb-1">
+          <Database className="h-3 w-3" />
+          Smart Processing Enhancements
+        </div>
+        <p>🚀 Instant OpenAI batch creation with comprehensive error handling</p>
+        <p>📊 Intelligent error detection (quota, auth, network issues)</p>
+        <p>🔧 Automatic fallback processing for large files (45k+ payees)</p>
+        <p>⚡ Real-time progress tracking and detailed status updates</p>
+        <p>🎯 Enhanced user feedback with actionable error messages</p>
+      </div>
+    </>
   );
 };
 

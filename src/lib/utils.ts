@@ -143,7 +143,7 @@ export async function parseUploadedFile(file: File, headersOnly: boolean = false
         
         resolve(rows);
       } catch (error) {
-        productionLogger.error("Error parsing file:", error);
+        console.error("Error parsing file:", error);
         reject(error);
       }
     };

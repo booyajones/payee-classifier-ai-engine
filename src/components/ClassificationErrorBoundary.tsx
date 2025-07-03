@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -45,19 +44,19 @@ class ClassificationErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     const context = this.props.context || 'Classification System';
-    productionLogger.error(`[${context} ERROR BOUNDARY] Component error caught:`, error, errorInfo);
+    console.error(`[${context} ERROR BOUNDARY] Component error caught:`, error, errorInfo);
     
     // Log specific error types for classification issues
     if (error.message.includes('Maximum call stack size exceeded')) {
-      productionLogger.error('[CLASSIFICATION ERROR] Stack overflow detected - possible infinite loop in classification logic');
+      console.error('[CLASSIFICATION ERROR] Stack overflow detected - possible infinite loop in classification logic');
     }
     
     if (error.message.includes('Cannot read properties of undefined')) {
-      productionLogger.error('[CLASSIFICATION ERROR] Undefined property access - likely missing data validation');
+      console.error('[CLASSIFICATION ERROR] Undefined property access - likely missing data validation');
     }
     
     if (error.message.includes('quota') || error.message.includes('rate limit')) {
-      productionLogger.error('[CLASSIFICATION ERROR] API quota/rate limit exceeded');
+      console.error('[CLASSIFICATION ERROR] API quota/rate limit exceeded');
     }
     
     this.setState({ error, errorInfo });

@@ -46,7 +46,7 @@ export function processPayeeDeduplication(
       for (const [processedName, cachedResult] of duplicateCache.entries()) {
         const similarity = calculateCombinedSimilarity(normalizedName, processedName);
         if (similarity.combined >= similarityThreshold) {
-          productionLogger.debug(`[V3 Batch] Fuzzy duplicate found: "${name}" matches "${cachedResult.payeeName}" (${similarity.combined.toFixed(1)}%)`);
+          console.log(`[V3 Batch] Fuzzy duplicate found: "${name}" matches "${cachedResult.payeeName}" (${similarity.combined.toFixed(1)}%)`);
           results.push({
             ...cachedResult,
             id: `${cachedResult.id}-fuzzy-${i}`,
@@ -74,7 +74,7 @@ export function processPayeeDeduplication(
     }
   }
 
-  productionLogger.debug(`[V3 Batch] After deduplication: ${processQueue.length} unique names to process (${payeeNames.length - processQueue.length} duplicates found)`);
+  console.log(`[V3 Batch] After deduplication: ${processQueue.length} unique names to process (${payeeNames.length - processQueue.length} duplicates found)`);
 
   return { processQueue, results, duplicateCache };
 }

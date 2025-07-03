@@ -1,7 +1,6 @@
-// @ts-nocheck
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
@@ -23,7 +22,7 @@ const DuplicateTestRunner = () => {
   const runAllTests = async () => {
     setIsRunning(true);
     try {
-      productionLogger.debug('[TEST RUNNER] Starting comprehensive tests...');
+      console.log('[TEST RUNNER] Starting comprehensive tests...');
       
       // Run duplicate detection tests
       const dupResults = await runDuplicateTests();
@@ -33,9 +32,9 @@ const DuplicateTestRunner = () => {
       const excResults = await runExclusionTests();
       setExclusionResults(excResults);
       
-      productionLogger.debug('[TEST RUNNER] All tests completed');
+      console.log('[TEST RUNNER] All tests completed');
     } catch (error) {
-      productionLogger.error('[TEST RUNNER] Test execution failed:', error);
+      console.error('[TEST RUNNER] Test execution failed:', error);
     } finally {
       setIsRunning(false);
     }

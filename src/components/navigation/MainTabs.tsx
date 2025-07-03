@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import React, { useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Upload, Play, TestTube, Users, Eye } from "lucide-react";
@@ -27,12 +26,12 @@ interface MainTabsProps {
 }
 
 const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: MainTabsProps) => {
-  productionLogger.debug('MainTabs rendering, props:', { allResultsLength: allResults.length });
+  console.log('MainTabs rendering, props:', { allResultsLength: allResults.length });
   const { activeTab, setActiveTab } = useAppStore();
   const { addJob, setPayeeData } = useBatchJobStore();
   const { toast } = useToast();
   const { saveBatchJob } = useBatchJobPersistence();
-  productionLogger.debug('MainTabs activeTab:', activeTab);
+  console.log('MainTabs activeTab:', activeTab);
 
   // Generate original columns from results data - memoized to prevent rerenders
   const getOriginalColumns = useMemo(() => {
@@ -52,23 +51,23 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
 
   // Handler for tab changes
   const handleTabChange = (tab: string) => {
-    productionLogger.debug('Tab changed:', tab);
+    console.log('Tab changed:', tab);
     setActiveTab(tab);
   };
 
   // Handler for single classification results
   const handleSingleClassify = (result: PayeeClassification) => {
-    productionLogger.debug('Single classification result:', result.payeeName);
+    console.log('Single classification result:', result.payeeName);
   };
 
   // Handler for viewing result details
   const handleViewDetails = (result: PayeeClassification) => {
-    productionLogger.debug('View details for payee:', result.payeeName);
+    console.log('View details for payee:', result.payeeName);
   };
 
   // Handler for batch job creation
   const handleBatchJobCreated = async (batchJob: any, payeeRowData: any) => {
-    productionLogger.debug('Creating new batch job with payee data:', payeeRowData.uniquePayeeNames.length);
+    console.log('Creating new batch job with payee data:', payeeRowData.uniquePayeeNames.length);
     
     try {
       // Create the actual OpenAI batch job
@@ -89,14 +88,14 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
       
       toast({
         title: "Batch Job Created",
-        description: `Created batch job for ${payeeRowData.uniquePayeeNames.length} payees`,
+        description: `Created job ${newBatchJob.id.slice(0, 8)}... for ${payeeRowData.uniquePayeeNames.length} payees`,
       });
       
       // Switch to jobs tab
       setActiveTab('jobs');
       
     } catch (error) {
-      productionLogger.error('Failed to create batch job:', error);
+      console.error('Failed to create batch job:', error);
       toast({
         title: "Job Creation Failed",
         description: error instanceof Error ? error.message : 'Failed to create job',
@@ -124,7 +123,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
     return originalColumns;
   }, [allResults.length]);
 
-  productionLogger.debug('MainTabs about to render tabs with activeTab:', activeTab);
+  console.log('MainTabs about to render tabs with activeTab:', activeTab);
   
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
@@ -156,7 +155,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
         <SmartFileUpload 
           onBatchJobCreated={handleBatchJobCreated}
           onProcessingComplete={(results, summary, jobId) => {
-            productionLogger.debug('Processing complete:', results.length, jobId);
+            console.log('Processing complete:', results.length, jobId);
             onComplete(results, summary);
             setActiveTab('jobs');
           }}

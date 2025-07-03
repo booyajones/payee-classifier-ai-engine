@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, X, Trash2 } from 'lucide-react';
@@ -29,46 +28,46 @@ const BatchJobActions = ({
   // Safe handler wrappers with better error handling and validation
   const safeRefresh = () => {
     try {
-      productionLogger.debug(`[BATCH ACTIONS] Refreshing job ${job.id}`);
+      console.log(`[BATCH ACTIONS] Refreshing job ${job.id}`);
       if (typeof onRefresh === 'function') {
         onRefresh();
       } else {
-        productionLogger.error('[BATCH ACTIONS] onRefresh is not a function:', typeof onRefresh);
+        console.error('[BATCH ACTIONS] onRefresh is not a function:', typeof onRefresh);
         throw new Error('Refresh function not available');
       }
     } catch (error) {
-      productionLogger.error('[BATCH ACTIONS] Error in refresh:', error);
+      console.error('[BATCH ACTIONS] Error in refresh:', error);
     }
   };
 
   const safeCancel = () => {
     try {
-      productionLogger.debug(`[BATCH ACTIONS] Cancelling job ${job.id}`);
+      console.log(`[BATCH ACTIONS] Cancelling job ${job.id}`);
       if (typeof onCancel === 'function') {
         onCancel();
       } else {
-        productionLogger.error('[BATCH ACTIONS] onCancel is not a function:', typeof onCancel);
+        console.error('[BATCH ACTIONS] onCancel is not a function:', typeof onCancel);
         throw new Error('Cancel function not available');
       }
     } catch (error) {
-      productionLogger.error('[BATCH ACTIONS] Error in cancel:', error);
+      console.error('[BATCH ACTIONS] Error in cancel:', error);
     }
   };
 
   const safeDelete = () => {
     try {
-      productionLogger.debug(`[BATCH ACTIONS] Initiating delete for job ${job.id}`);
+      console.log(`[BATCH ACTIONS] Initiating delete for job ${job.id}`);
       
       // Validate onDelete function
       if (typeof onDelete === 'function') {
-        productionLogger.debug(`[BATCH ACTIONS] Calling onDelete for job ${job.id}`);
+        console.log(`[BATCH ACTIONS] Calling onDelete for job ${job.id}`);
         onDelete();
       } else {
-        productionLogger.error('[BATCH ACTIONS] onDelete is not a function:', typeof onDelete);
+        console.error('[BATCH ACTIONS] onDelete is not a function:', typeof onDelete);
         throw new Error('Delete function not available');
       }
     } catch (error) {
-      productionLogger.error('[BATCH ACTIONS] Error in delete:', error);
+      console.error('[BATCH ACTIONS] Error in delete:', error);
     }
   };
 

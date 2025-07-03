@@ -11,7 +11,7 @@ export const useBatchJobRealtimeHandler = ({ onJobUpdate }: BatchJobRealtimeHand
   const { toast } = useToast();
 
   const handleRealtimeJobUpdate = useCallback((updatedJob: BatchJob) => {
-    productionLogger.debug('[REALTIME] Received job update:', updatedJob.id.substring(0, 8), 'status:', updatedJob.status);
+    console.log('[REALTIME] Received job update:', updatedJob.id.substring(0, 8), 'status:', updatedJob.status);
     onJobUpdate(updatedJob);
     
     // Show toast notification for significant status changes
@@ -21,7 +21,7 @@ export const useBatchJobRealtimeHandler = ({ onJobUpdate }: BatchJobRealtimeHand
         updatedJob.id.length > 20) {
       toast({
         title: "Job Status Updated",
-        description: `Batch job is now ${updatedJob.status}`,
+        description: `Batch job (...${updatedJob.id.slice(-8)}) is now ${updatedJob.status}`,
         variant: updatedJob.status === 'completed' ? 'default' : 'destructive'
       });
     }

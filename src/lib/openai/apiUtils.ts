@@ -1,6 +1,4 @@
 
-// @ts-nocheck
-
 import { timeoutPromise } from './utils';
 
 interface RequestConfig {
@@ -37,12 +35,12 @@ export async function makeAPIRequest<T>(
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      productionLogger.debug(`[API] Attempt ${attempt + 1}/${retries + 1}`);
+      console.log(`[API] Attempt ${attempt + 1}/${retries + 1}`);
       
       const result = await timeoutPromise(requestFn(), timeout);
       
       if (attempt > 0) {
-        productionLogger.debug(`[API] Request succeeded after ${attempt + 1} attempts`);
+        console.log(`[API] Request succeeded after ${attempt + 1} attempts`);
       }
       
       return result;
@@ -50,16 +48,16 @@ export async function makeAPIRequest<T>(
       lastError = error as Error;
       
       if (lastError.message.includes('timed out')) {
-        productionLogger.error(`[API] Request timed out after ${timeout}ms (attempt ${attempt + 1})`);
+        console.error(`[API] Request timed out after ${timeout}ms (attempt ${attempt + 1})`);
         lastError = new APIError(`Request timed out after ${timeout}ms`, undefined, true);
       } else {
-        productionLogger.error(`[API] Request failed on attempt ${attempt + 1}:`, error);
+        console.error(`[API] Request failed on attempt ${attempt + 1}:`, error);
       }
 
       // Don't retry on the last attempt
       if (attempt < retries) {
         const delay = retryDelay * Math.pow(2, attempt); // Exponential backoff
-        productionLogger.debug(`[API] Retrying in ${delay}ms...`);
+        console.log(`[API] Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -85,7 +83,7 @@ export async function checkServerHealth(): Promise<boolean> {
     clearTimeout(timeoutId);
     return response.ok;
   } catch (error) {
-    productionLogger.error('[API] Server health check failed:', error);
+    console.error('[API] Server health check failed:', error);
     return false;
   }
 }
@@ -113,8 +111,8 @@ export function logMemoryUsage(context: string): void {
   const memory = getMemoryUsage();
   
   if (memory.percentage > 80) {
-    productionLogger.warn(`[MEMORY] High memory usage in ${context}: ${memory.percentage.toFixed(1)}%`);
+    console.warn(`[MEMORY] High memory usage in ${context}: ${memory.percentage.toFixed(1)}%`);
   } else if (memory.percentage > 0) {
-    productionLogger.debug(`[MEMORY] Memory usage in ${context}: ${memory.percentage.toFixed(1)}%`);
+    console.log(`[MEMORY] Memory usage in ${context}: ${memory.percentage.toFixed(1)}%`);
   }
 }

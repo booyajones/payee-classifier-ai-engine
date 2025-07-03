@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import { useState } from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 
@@ -32,18 +31,18 @@ export const useBatchJobConfirmationDialogs = ({
   const showCancelConfirmation = (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job) {
-      productionLogger.error(`[CONFIRMATION DIALOGS] Job not found for cancellation: ${jobId}`);
+      console.error(`[CONFIRMATION DIALOGS] Job not found for cancellation: ${jobId}`);
       return;
     }
     
-    productionLogger.debug(`[CONFIRMATION DIALOGS] Showing cancel confirmation for job ${jobId}`);
+    console.log(`[CONFIRMATION DIALOGS] Showing cancel confirmation for job ${jobId}`);
     
     setConfirmDialog({
       isOpen: true,
       title: 'Cancel Batch Job',
       description: `Are you sure you want to cancel this job? This action cannot be undone and you may be charged for completed requests.`,
       onConfirm: () => {
-        productionLogger.debug(`[CONFIRMATION DIALOGS] User confirmed cancellation for job ${jobId}`);
+        console.log(`[CONFIRMATION DIALOGS] User confirmed cancellation for job ${jobId}`);
         handleCancelJob(job.id);
         closeConfirmDialog();
       },
@@ -55,7 +54,7 @@ export const useBatchJobConfirmationDialogs = ({
     const job = jobs.find(j => j.id === jobId);
     const jobStatus = job?.status || 'unknown';
     
-    productionLogger.debug(`[CONFIRMATION DIALOGS] Showing delete confirmation for job ${jobId} with status: ${jobStatus}`);
+    console.log(`[CONFIRMATION DIALOGS] Showing delete confirmation for job ${jobId} with status: ${jobStatus}`);
     
     let description = '';
     if (jobStatus === 'cancelling') {
@@ -73,13 +72,13 @@ export const useBatchJobConfirmationDialogs = ({
       title: 'Delete Job Permanently',
       description,
       onConfirm: () => {
-        productionLogger.debug(`[CONFIRMATION DIALOGS] User confirmed deletion for job ${jobId}`);
+        console.log(`[CONFIRMATION DIALOGS] User confirmed deletion for job ${jobId}`);
         
         // Validate onJobDelete function before calling
         if (typeof onJobDelete === 'function') {
           onJobDelete(jobId);
         } else {
-          productionLogger.error('[CONFIRMATION DIALOGS] onJobDelete is not a function:', typeof onJobDelete);
+          console.error('[CONFIRMATION DIALOGS] onJobDelete is not a function:', typeof onJobDelete);
         }
         
         closeConfirmDialog();
@@ -89,7 +88,7 @@ export const useBatchJobConfirmationDialogs = ({
   };
 
   const closeConfirmDialog = () => {
-    productionLogger.debug('[CONFIRMATION DIALOGS] Closing confirmation dialog');
+    console.log('[CONFIRMATION DIALOGS] Closing confirmation dialog');
     setConfirmDialog(prev => ({ ...prev, isOpen: false }));
   };
 

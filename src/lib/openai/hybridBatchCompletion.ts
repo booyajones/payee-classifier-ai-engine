@@ -10,7 +10,7 @@ export async function completeBatchJob(
   batchJob: BatchJob,
   originalPayeeNames: string[]
 ): Promise<HybridBatchResult> {
-  productionLogger.debug(`[HYBRID BATCH] Completing batch job ${batchJob.id} for ${originalPayeeNames.length} payees`);
+  console.log(`[HYBRID BATCH] Completing batch job ${batchJob.id} for ${originalPayeeNames.length} payees`);
   
   // Re-apply keyword exclusions to get the same filtering - ALWAYS ENABLED
   const exclusionResults = await applyKeywordExclusions(originalPayeeNames);
@@ -44,7 +44,7 @@ export async function completeBatchJob(
   const aiNames = needsAI.map(item => item.name);
   
   try {
-    productionLogger.debug(`[HYBRID BATCH] Retrieving batch results for ${aiNames.length} AI-processed names`);
+    console.log(`[HYBRID BATCH] Retrieving batch results for ${aiNames.length} AI-processed names`);
     const batchResults = await getBatchJobResults(batchJob, aiNames);
     
     // Merge batch results back into final results
@@ -58,7 +58,7 @@ export async function completeBatchJob(
       };
     });
 
-    productionLogger.debug(`[HYBRID BATCH] Batch job completion successful`);
+    console.log(`[HYBRID BATCH] Batch job completion successful`);
 
     return {
       results: finalResults.filter(r => r !== null) as HybridBatchResult['results'],
@@ -69,7 +69,7 @@ export async function completeBatchJob(
       }
     };
   } catch (error) {
-    productionLogger.error('[HYBRID BATCH] Error completing batch job:', error);
+    console.error('[HYBRID BATCH] Error completing batch job:', error);
     throw new Error(`Failed to complete batch job: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }

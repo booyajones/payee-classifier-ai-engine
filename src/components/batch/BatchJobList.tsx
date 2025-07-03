@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import React from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
@@ -29,7 +28,7 @@ const BatchJobList = ({
   onCancel,
   onJobDelete
 }: BatchJobListProps) => {
-  productionLogger.debug(`[BATCH JOB LIST] Rendering ${jobs.length} jobs`);
+  console.log(`[BATCH JOB LIST] Rendering ${jobs.length} jobs`);
 
   if (jobs.length === 0) {
     return (

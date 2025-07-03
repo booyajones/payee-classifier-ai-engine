@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { PayeeClassification, ClassificationConfig } from "@/lib/types";
 import { useToast } from "@/components/ui/use-toast";
 import { RotateCcw } from "lucide-react";
 import { Label } from "@/components/ui/label";
+
 
 interface SingleClassificationFormProps {
   onClassify: (result: PayeeClassification) => void;
@@ -54,13 +55,13 @@ const SingleClassificationForm = ({ onClassify }: SingleClassificationFormProps)
     setIsProcessing(true);
     
     try {
-      productionLogger.debug(`Starting classification for: ${payeeName}`, { payeeName, config });
+      console.log(`Starting classification for: ${payeeName}`, { payeeName, config });
       
       // Use final classification with intelligent escalation
       const result = await classifyPayee(payeeName, config);
       const classification = createPayeeClassification(payeeName, result);
       
-      productionLogger.debug(`Classification result:`, { result, payeeName });
+      console.log(`Classification result:`, { result, payeeName });
       
       setCurrentResult(classification);
       onClassify(classification);
@@ -70,7 +71,7 @@ const SingleClassificationForm = ({ onClassify }: SingleClassificationFormProps)
         description: `${payeeName} classified as ${result.classification} with ${result.confidence}% confidence using V3 intelligent escalation.`,
       });
     } catch (error) {
-      productionLogger.error("Classification error:", error);
+      console.error("Classification error:", error);
       toast({
         title: "Classification Error",
         description: error instanceof Error ? error.message : "An error occurred while processing your request.",

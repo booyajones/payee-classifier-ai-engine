@@ -30,7 +30,7 @@ export function findDuplicatePairs(
       // Enhanced boost for obvious duplicates
       if (obviousDuplicate) {
         final_duplicate_score = Math.max(final_duplicate_score, 96);
-        productionLogger.debug(`[PAIR ANALYZER] ✅ OBVIOUS DUPLICATE DETECTED: "${record1.payee_name}" vs "${record2.payee_name}" - boosted to ${final_duplicate_score}%`);
+        console.log(`[PAIR ANALYZER] ✅ OBVIOUS DUPLICATE DETECTED: "${record1.payee_name}" vs "${record2.payee_name}" - boosted to ${final_duplicate_score}%`);
       } else {
         // Check for other patterns that should be high confidence
         const name1Lower = record1.payee_name.toLowerCase();
@@ -39,12 +39,12 @@ export function findDuplicatePairs(
         // Case-only differences should be very high confidence
         if (name1Lower === name2Lower && record1.payee_name !== record2.payee_name) {
           final_duplicate_score = Math.max(final_duplicate_score, 98);
-          productionLogger.debug(`[PAIR ANALYZER] ✅ CASE-ONLY DIFFERENCE: "${record1.payee_name}" vs "${record2.payee_name}" - boosted to ${final_duplicate_score}%`);
+          console.log(`[PAIR ANALYZER] ✅ CASE-ONLY DIFFERENCE: "${record1.payee_name}" vs "${record2.payee_name}" - boosted to ${final_duplicate_score}%`);
         }
       }
       
       // DEBUG: Show detailed similarity breakdown
-      productionLogger.debug(`[PAIR ANALYZER] "${record1.payee_name}" vs "${record2.payee_name}": FINAL=${final_duplicate_score.toFixed(1)}% | JW=${similarity_scores.jaroWinkler.toFixed(1)}% | TS=${similarity_scores.tokenSort.toFixed(1)}% | TSe=${similarity_scores.tokenSet.toFixed(1)}% | Obvious=${obviousDuplicate}`);
+      console.log(`[PAIR ANALYZER] "${record1.payee_name}" vs "${record2.payee_name}": FINAL=${final_duplicate_score.toFixed(1)}% | JW=${similarity_scores.jaroWinkler.toFixed(1)}% | TS=${similarity_scores.tokenSort.toFixed(1)}% | TSe=${similarity_scores.tokenSet.toFixed(1)}% | Obvious=${obviousDuplicate}`);
       
 
       // Determine confidence tier

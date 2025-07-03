@@ -1,109 +1,105 @@
 
-// @ts-nocheck
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 
-interface ProgressData {
-  id: string;
-  type: 'upload' | 'download' | 'processing';
-  progress: number;
+interface ProgressState {
   stage: string;
-  processed: number;
-  total: number;
-  isActive: boolean;
-  metadata?: any;
+  percentage: number;
   message?: string;
+  jobId?: string;
 }
 
 interface UnifiedProgressContextType {
-  progressItems: Record<string, ProgressData>;
-  startProgress: (id: string, type: 'upload' | 'download' | 'processing', total: number, metadata?: any) => void;
-  updateProgress: (id: string, progress: number, stage: string, processed: number) => void;
-  completeProgress: (id: string) => void;
+  getProgress: (id: string) => ProgressState | null;
+  updateProgress: (id: string, stage: string, percentage: number, message?: string, jobId?: string) => void;
+  completeProgress: (id: string, message?: string) => void;
   clearProgress: (id: string) => void;
-  getActiveProgress: () => ProgressData[];
-  getProgress: (id: string) => ProgressData | undefined;
-  getProgressById: (id: string) => ProgressData | undefined;
+  clearAllProgress: () => void;
 }
 
 const UnifiedProgressContext = createContext<UnifiedProgressContextType | undefined>(undefined);
 
 export const UnifiedProgressProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [progressItems, setProgressItems] = useState<Record<string, ProgressData>>({});
+  const [progressMap, setProgressMap] = useState<Record<string, ProgressState>>({});
+  const lastUpdateRef = useRef<Record<string, number>>({});
 
-  const startProgress = useCallback((id: string, type: 'upload' | 'download' | 'processing', total: number, metadata?: any) => {
-    setProgressItems((prev: any) => ({
-      ...prev,
-      [id]: {
-        id,
-        type,
-        progress: 0,
-        stage: `Starting ${type}...`,
-        processed: 0,
-        total,
-        isActive: true,
-        metadata
-      }
-    }));
-  }, []);
-
-  const updateProgress = useCallback((id: string, progress: number, stage: string, processed: number) => {
-    setProgressItems((prev: any) => ({
-      ...prev,
-      [id]: {
-        ...prev[id],
-        progress,
-        stage,
-        processed,
-        isActive: true
-      }
-    }));
-  }, []);
-
-  const completeProgress = useCallback((id: string) => {
-    setProgressItems((prev: any) => {
-      const newItems = { ...prev };
-      if (newItems[id]) {
-        newItems[id] = { ...newItems[id], isActive: false };
-      }
-      return newItems;
-    });
+  const updateProgress = useCallback((
+    id: string, 
+    stage: string, 
+    percentage: number, 
+    message?: string, 
+    jobId?: string
+  ) => {
+    const now = Date.now();
+    const lastUpdate = lastUpdateRef.current[id] || 0;
     
-    setTimeout(() => {
-      setProgressItems((prev: any) => {
-        const newItems = { ...prev };
-        delete newItems[id];
-        return newItems;
-      });
-    }, 3000);
+    // Throttle updates to prevent excessive re-renders (max 1 update per 500ms per ID)
+    if (now - lastUpdate < 500 && percentage < 100) {
+      return;
+    }
+    
+    lastUpdateRef.current[id] = now;
+    
+    setProgressMap(prev => ({
+      ...prev,
+      [id]: {
+        stage,
+        percentage: Math.min(100, Math.max(0, percentage)),
+        message,
+        jobId
+      }
+    }));
   }, []);
 
-  const getActiveProgress = useCallback(() => {
-    return Object.values(progressItems).filter(item => item.isActive);
-  }, [progressItems]);
+  const completeProgress = useCallback((id: string, message?: string) => {
+    setProgressMap(prev => ({
+      ...prev,
+      [id]: {
+        stage: 'Complete',
+        percentage: 100,
+        message: message || 'Processing complete',
+        jobId: prev[id]?.jobId
+      }
+    }));
+    
+    // Auto-clear completed progress after 30 seconds
+    setTimeout(() => {
+      setProgressMap(prev => {
+        const newMap = { ...prev };
+        delete newMap[id];
+        return newMap;
+      });
+      delete lastUpdateRef.current[id];
+    }, 30000);
+  }, []);
 
   const clearProgress = useCallback((id: string) => {
-    setProgressItems((prev: any) => {
-      const newItems = { ...prev };
-      delete newItems[id];
-      return newItems;
+    setProgressMap(prev => {
+      const newMap = { ...prev };
+      delete newMap[id];
+      return newMap;
     });
+    delete lastUpdateRef.current[id];
   }, []);
 
-  const getProgressById = useCallback((id: string) => {
-    return progressItems[id];
-  }, [progressItems]);
+  const clearAllProgress = useCallback(() => {
+    setProgressMap({});
+    lastUpdateRef.current = {};
+  }, []);
+
+  const getProgress = useCallback((id: string) => {
+    return progressMap[id] || null;
+  }, [progressMap]);
+
+  const value = {
+    getProgress,
+    updateProgress,
+    completeProgress,
+    clearProgress,
+    clearAllProgress
+  };
 
   return (
-    <UnifiedProgressContext.Provider value={{
-      progressItems,
-      startProgress,
-      updateProgress,
-      completeProgress,
-      clearProgress,
-      getActiveProgress,
-      getProgress: getProgressById,
-      getProgressById
-    }}>
+    <UnifiedProgressContext.Provider value={value}>
       {children}
     </UnifiedProgressContext.Provider>
   );

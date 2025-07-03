@@ -17,7 +17,7 @@ export const useBatchJobPersistence = () => {
           .order('app_created_at', { ascending: false });
 
         if (error) {
-          productionLogger.error('Failed to load batch jobs:', error);
+          console.error('Failed to load batch jobs:', error);
           return;
         }
 
@@ -67,10 +67,10 @@ export const useBatchJobPersistence = () => {
 
           setJobs(batchJobs);
           setPayeeDataMap(payeeDataMap);
-          productionLogger.debug(`Loaded ${batchJobs.length} batch jobs from database`);
+          console.log(`Loaded ${batchJobs.length} batch jobs from database`);
         }
       } catch (error) {
-        productionLogger.error('Error loading batch jobs:', error);
+        console.error('Error loading batch jobs:', error);
       } finally {
         setLoaded(true);
       }
@@ -109,13 +109,13 @@ export const useBatchJobPersistence = () => {
         } as any);
 
       if (error) {
-        productionLogger.error('Failed to save batch job to database:', error);
+        console.error('Failed to save batch job to database:', error);
         throw error;
       }
       
-      productionLogger.debug(`Saved batch job ${batchJob.id} to database`);
+      console.log(`Saved batch job ${batchJob.id} to database`);
     } catch (error) {
-      productionLogger.error('Error saving batch job:', error);
+      console.error('Error saving batch job:', error);
       throw error;
     }
   };

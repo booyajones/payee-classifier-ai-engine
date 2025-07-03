@@ -10,7 +10,7 @@ export async function duplicateDetectionWithAI(
   payeeName1: string, 
   payeeName2: string
 ): Promise<AiDuplicateJudgment> {
-  productionLogger.debug(`[AI DUPLICATE DETECTION] Analyzing: "${payeeName1}" vs "${payeeName2}"`);
+  console.log(`[AI DUPLICATE DETECTION] Analyzing: "${payeeName1}" vs "${payeeName2}"`);
   
   const client = getOpenAIClient();
   
@@ -68,7 +68,7 @@ Return your analysis as JSON:
       throw new Error('Empty response from OpenAI');
     }
 
-    productionLogger.debug(`[AI DUPLICATE DETECTION] Raw response: ${content}`);
+    console.log(`[AI DUPLICATE DETECTION] Raw response: ${content}`);
 
     // Extract JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -88,13 +88,13 @@ Return your analysis as JSON:
     // Ensure confidence is within valid range
     result.confidence = Math.max(0, Math.min(100, result.confidence));
     
-    productionLogger.debug(`[AI DUPLICATE DETECTION] Result: ${result.is_duplicate ? 'DUPLICATE' : 'NOT DUPLICATE'} (${result.confidence}%)`);
-    productionLogger.debug(`[AI DUPLICATE DETECTION] Reasoning: ${result.reasoning}`);
+    console.log(`[AI DUPLICATE DETECTION] Result: ${result.is_duplicate ? 'DUPLICATE' : 'NOT DUPLICATE'} (${result.confidence}%)`);
+    console.log(`[AI DUPLICATE DETECTION] Reasoning: ${result.reasoning}`);
 
     return result;
 
   } catch (error) {
-    productionLogger.error(`[AI DUPLICATE DETECTION] Error analyzing "${payeeName1}" vs "${payeeName2}":`, error);
+    console.error(`[AI DUPLICATE DETECTION] Error analyzing "${payeeName1}" vs "${payeeName2}":`, error);
     
     // Return conservative fallback
     return {
@@ -111,7 +111,7 @@ Return your analysis as JSON:
 export async function batchDuplicateDetectionWithAI(
   pairs: Array<{ payeeName1: string; payeeName2: string }>
 ): Promise<AiDuplicateJudgment[]> {
-  productionLogger.debug(`[AI BATCH DUPLICATE DETECTION] Processing ${pairs.length} pairs`);
+  console.log(`[AI BATCH DUPLICATE DETECTION] Processing ${pairs.length} pairs`);
   
   const results: AiDuplicateJudgment[] = [];
   
@@ -125,7 +125,7 @@ export async function batchDuplicateDetectionWithAI(
       await new Promise(resolve => setTimeout(resolve, 100));
       
     } catch (error) {
-      productionLogger.error(`[AI BATCH DUPLICATE DETECTION] Failed for pair:`, pair, error);
+      console.error(`[AI BATCH DUPLICATE DETECTION] Failed for pair:`, pair, error);
       results.push({
         is_duplicate: false,
         confidence: 50,
@@ -134,6 +134,6 @@ export async function batchDuplicateDetectionWithAI(
     }
   }
   
-  productionLogger.debug(`[AI BATCH DUPLICATE DETECTION] Completed ${results.length} judgments`);
+  console.log(`[AI BATCH DUPLICATE DETECTION] Completed ${results.length} judgments`);
   return results;
 }

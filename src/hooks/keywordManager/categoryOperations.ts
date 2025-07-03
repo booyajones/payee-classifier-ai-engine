@@ -31,7 +31,7 @@ export const useCategoryOperations = () => {
       });
       return true;
     } catch (error) {
-      productionLogger.error('Error resetting keywords:', error);
+      console.error('Error resetting keywords:', error);
       toast({
         title: "Error",
         description: "Failed to reset keywords",
@@ -66,7 +66,7 @@ export const useCategoryOperations = () => {
         return false;
       }
     } catch (error) {
-      productionLogger.error('Error resetting category:', error);
+      console.error('Error resetting category:', error);
       toast({
         title: "Error",
         description: "Failed to reset category",

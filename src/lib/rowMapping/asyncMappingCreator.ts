@@ -12,14 +12,14 @@ export async function createPayeeRowMappingAsync(
   payeeColumnName: string,
   onProgress?: (processed: number, total: number, percentage: number) => void
 ): Promise<PayeeRowData> {
-  productionLogger.debug(`[ROW MAPPING ASYNC] === CREATING PAYEE ROW MAPPING WITH ASYNC STANDARDIZATION ===`);
-  productionLogger.debug(`[ROW MAPPING ASYNC] Input: ${originalFileData.length} rows, payee column: "${payeeColumnName}"`);
+  console.log(`[ROW MAPPING ASYNC] === CREATING PAYEE ROW MAPPING WITH ASYNC STANDARDIZATION ===`);
+  console.log(`[ROW MAPPING ASYNC] Input: ${originalFileData.length} rows, payee column: "${payeeColumnName}"`);
   
   // Step 1: Extract all payee names for batch standardization
   const originalPayeeNames = originalFileData.map(row => row[payeeColumnName]);
   
   // Step 2: Perform comprehensive data standardization with progress
-  productionLogger.debug(`[ROW MAPPING ASYNC] Performing comprehensive data standardization with chunked processing...`);
+  console.log(`[ROW MAPPING ASYNC] Performing comprehensive data standardization with chunked processing...`);
   const standardizationResults = await batchStandardizeNamesAsync(originalPayeeNames, onProgress);
   
   // Step 3: Create unique name mappings using NORMALIZED names for deduplication
@@ -46,7 +46,7 @@ export async function createPayeeRowMappingAsync(
       normalizedToIndexMap.set(normalizedPayeeName, uniquePayeeIndex);
       
       if (uniquePayeeIndex < 5) {
-        productionLogger.debug(`[ROW MAPPING ASYNC] New unique payee ${uniquePayeeIndex}: "${originalPayeeName}" → "${normalizedPayeeName}"`);
+        console.log(`[ROW MAPPING ASYNC] New unique payee ${uniquePayeeIndex}: "${originalPayeeName}" → "${normalizedPayeeName}"`);
       }
     }
 
@@ -60,7 +60,7 @@ export async function createPayeeRowMappingAsync(
     });
     
     if (originalRowIndex < 5) {
-      productionLogger.debug(`[ROW MAPPING ASYNC] Row ${originalRowIndex}: "${originalPayeeName}" → "${normalizedPayeeName}" (unique index ${uniquePayeeIndex})`);
+      console.log(`[ROW MAPPING ASYNC] Row ${originalRowIndex}: "${originalPayeeName}" → "${normalizedPayeeName}" (unique index ${uniquePayeeIndex})`);
     }
   });
 

@@ -8,15 +8,15 @@ export const createSafeCallbacks = (toast: ReturnType<typeof useToast>['toast'])
   const safeOnJobUpdate = (onJobUpdate: (job: BatchJob) => void) => (job: BatchJob) => {
     try {
       if (typeof onJobUpdate === 'function') {
-        productionLogger.debug(`[BATCH ACTIONS] Calling onJobUpdate for job ${job.id} with status: ${job.status}`);
+        console.log(`[BATCH ACTIONS] Calling onJobUpdate for job ${job.id} with status: ${job.status}`);
         onJobUpdate(job);
       } else {
         const error = new Error(`onJobUpdate is not a function (type: ${typeof onJobUpdate})`);
-        productionLogger.error('[BATCH ACTIONS] Invalid onJobUpdate callback:', error);
+        console.error('[BATCH ACTIONS] Invalid onJobUpdate callback:', error);
         showErrorToast(handleError(error, 'Job Update Callback'), 'Job Update');
       }
     } catch (error) {
-      productionLogger.error('[BATCH ACTIONS] Error in onJobUpdate:', error);
+      console.error('[BATCH ACTIONS] Error in onJobUpdate:', error);
       const appError = handleError(error, 'Job Update Callback');
       showErrorToast(appError, 'Job Update');
     }
@@ -26,7 +26,7 @@ export const createSafeCallbacks = (toast: ReturnType<typeof useToast>['toast'])
   const safeOnJobComplete = (onJobComplete: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void) => 
     (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => {
       try {
-        productionLogger.debug(`[BATCH ACTIONS] onJobComplete called for job ${jobId} with ${results.length} results`);
+        console.log(`[BATCH ACTIONS] onJobComplete called for job ${jobId} with ${results.length} results`);
         
         // Validate inputs
         if (!Array.isArray(results)) {
@@ -38,9 +38,9 @@ export const createSafeCallbacks = (toast: ReturnType<typeof useToast>['toast'])
         }
         
         if (typeof onJobComplete === 'function') {
-          productionLogger.debug(`[BATCH ACTIONS] Executing onJobComplete for job ${jobId}`);
+          console.log(`[BATCH ACTIONS] Executing onJobComplete for job ${jobId}`);
           onJobComplete(results, summary, jobId);
-          productionLogger.debug(`[BATCH ACTIONS] onJobComplete executed successfully for job ${jobId}`);
+          console.log(`[BATCH ACTIONS] onJobComplete executed successfully for job ${jobId}`);
           
           // Show success toast
           toast({
@@ -50,12 +50,12 @@ export const createSafeCallbacks = (toast: ReturnType<typeof useToast>['toast'])
           
         } else {
           const error = new Error(`onJobComplete callback is not a function (type: ${typeof onJobComplete})`);
-          productionLogger.error('[BATCH ACTIONS] Invalid onJobComplete callback:', error);
+          console.error('[BATCH ACTIONS] Invalid onJobComplete callback:', error);
           throw error;
         }
         
       } catch (error) {
-        productionLogger.error('[BATCH ACTIONS] Error in onJobComplete:', error);
+        console.error('[BATCH ACTIONS] Error in onJobComplete:', error);
         const appError = handleError(error, 'Job Completion Callback');
         showErrorToast(appError, 'Job Completion');
         throw appError;

@@ -25,7 +25,7 @@ const KeywordTester = ({ allKeywords }: KeywordTesterProps) => {
       return;
     }
 
-    productionLogger.debug(`[KEYWORD EXCLUSION MANAGER] Testing: "${testPayeeName}"`);
+    console.log(`[KEYWORD EXCLUSION MANAGER] Testing: "${testPayeeName}"`);
     const result = checkKeywordExclusion(testPayeeName, allKeywords);
     setTestResult(result);
     
@@ -34,7 +34,7 @@ const KeywordTester = ({ allKeywords }: KeywordTesterProps) => {
   };
 
   const runFullTest = () => {
-    productionLogger.debug('[KEYWORD EXCLUSION MANAGER] Running full test suite...');
+    console.log('[KEYWORD EXCLUSION MANAGER] Running full test suite...');
     testKeywordExclusion();
     
     toast({

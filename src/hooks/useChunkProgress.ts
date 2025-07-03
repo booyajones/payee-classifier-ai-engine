@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import { useState, useCallback } from 'react';
 import { calculateChunkedProgress } from '@/lib/fileChunking';
 

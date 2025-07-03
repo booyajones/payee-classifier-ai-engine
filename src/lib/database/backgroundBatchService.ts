@@ -33,7 +33,7 @@ export class BackgroundBatchService {
     const jobId = batchJob.id;
     
     if (this.saveQueue.has(jobId)) {
-      productionLogger.debug(`[BACKGROUND SERVICE] Job ${jobId} already queued`);
+      console.log(`[BACKGROUND SERVICE] Job ${jobId} already queued`);
       return this.saveQueue.get(jobId)!;
     }
 
@@ -78,16 +78,16 @@ export class BackgroundBatchService {
     payeeRowData: PayeeRowData
   ): Promise<BackgroundSaveResult> {
     try {
-      productionLogger.debug(`[BACKGROUND SERVICE] Starting background save for job ${batchJob.id}`);
+      console.log(`[BACKGROUND SERVICE] Starting background save for job ${batchJob.id}`);
       
       await this.chunkedBatchJobSave(batchJob, payeeRowData);
       
-      productionLogger.debug(`[BACKGROUND SERVICE] Successfully saved job ${batchJob.id} in background`);
+      console.log(`[BACKGROUND SERVICE] Successfully saved job ${batchJob.id} in background`);
       return { success: true, jobId: batchJob.id };
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      productionLogger.error(`[BACKGROUND SERVICE] Background save failed for job ${batchJob.id}:`, error);
+      console.error(`[BACKGROUND SERVICE] Background save failed for job ${batchJob.id}:`, error);
       
       return {
         success: false,
@@ -108,7 +108,7 @@ export class BackgroundBatchService {
     const isLargeFile = originalDataCount > 5000 || payeeCount > 1000;
     const chunkSize = isLargeFile ? 2000 : 5000;
     
-    productionLogger.debug(`[BACKGROUND SERVICE] Chunked save: ${originalDataCount} rows, ${payeeCount} payees, chunk size: ${chunkSize}`);
+    console.log(`[BACKGROUND SERVICE] Chunked save: ${originalDataCount} rows, ${payeeCount} payees, chunk size: ${chunkSize}`);
 
     if (originalDataCount <= chunkSize) {
       // Small file - save directly
@@ -175,7 +175,7 @@ export class BackgroundBatchService {
     const mappingChunks = this.chunkArray(payeeRowData.rowMappings, chunkSize);
     
     for (let i = 0; i < chunks.length; i++) {
-      productionLogger.debug(`[BACKGROUND SERVICE] Processing chunk ${i + 1}/${chunks.length} for job ${batchJob.id}`);
+      console.log(`[BACKGROUND SERVICE] Processing chunk ${i + 1}/${chunks.length} for job ${batchJob.id}`);
       
       // Add small delay between chunks to prevent overwhelming the database
       if (i > 0) {
@@ -209,7 +209,7 @@ export class BackgroundBatchService {
       }
     }
 
-    productionLogger.debug(`[BACKGROUND SERVICE] Completed chunked save for job ${batchJob.id}`);
+    console.log(`[BACKGROUND SERVICE] Completed chunked save for job ${batchJob.id}`);
   }
 
   private prepareBatchJobRecord(batchJob: BatchJob, payeeRowData: PayeeRowData) {

@@ -1,5 +1,4 @@
 
-// @ts-nocheck  
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { RotateCcw, Download, Clock } from "lucide-react";
@@ -28,7 +27,7 @@ const BatchResultsActions = ({
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
 
-  productionLogger.debug(`[BATCH RESULTS ACTIONS] JobId: ${jobId}, isGenerating: ${isGenerating}, isChecking: ${isChecking}`);
+  console.log(`[BATCH RESULTS ACTIONS] JobId: ${jobId}, isGenerating: ${isGenerating}, isChecking: ${isChecking}`);
 
   const handleDownload = async (format: 'csv' | 'excel') => {
     if (!jobId) {
@@ -82,7 +81,7 @@ const BatchResultsActions = ({
         });
       }
     } catch (error) {
-      productionLogger.error('Download failed:', error);
+      console.error('Download failed:', error);
       toast({
         title: "Download Failed",
         description: error instanceof Error ? error.message : 'Failed to download results',

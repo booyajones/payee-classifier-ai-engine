@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import React from "react";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
@@ -21,7 +20,7 @@ interface BatchFormContentProps {
 }
 
 const BatchFormContent = (props: BatchFormContentProps) => {
-  productionLogger.debug(`[BATCH FORM CONTENT] Rendering with ${props.batchJobs.length} jobs`);
+  console.log(`[BATCH FORM CONTENT] Rendering with ${props.batchJobs.length} jobs`);
 
   return (
     <div className="space-y-6">

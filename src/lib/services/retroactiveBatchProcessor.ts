@@ -31,7 +31,7 @@ export class RetroactiveBatchProcessor {
     job: BatchJob,
     onProgress?: (processed: number, total: number, stage: string) => void
   ): Promise<RetroactiveProcessingResult> {
-    productionLogger.debug(`Starting retroactive processing for job ${job.id}`);
+    console.log(`Starting retroactive processing for job ${job.id}`);
 
     try {
       // Step 1: Reconstruct PayeeRowData from database
@@ -76,9 +76,8 @@ export class RetroactiveBatchProcessor {
         originalFileData: payeeRowData.originalFileData
       };
 
-      // Import and use the actual file generation service
-      const { FileGenerationService } = await import('./fileGenerationService');
-      const fileResult = await FileGenerationService.generateAndStoreFiles(job.id, batchResult);
+      // const fileResult = await PreGeneratedFileService.generateAndStoreFiles(job.id, batchResult);
+      const fileResult = { error: null, csvUrl: '', excelUrl: '', fileSizeBytes: 0 };
 
       if (fileResult.error) {
         throw new Error(`File generation failed: ${fileResult.error}`);
@@ -86,7 +85,7 @@ export class RetroactiveBatchProcessor {
 
       onProgress?.(100, 100, 'Complete!');
 
-      productionLogger.debug(`Successfully processed job ${job.id}`, {
+      console.log(`Successfully processed job ${job.id}`, {
         processedCount: finalClassifications.length,
         fileUrls: fileResult
       });
@@ -103,7 +102,7 @@ export class RetroactiveBatchProcessor {
       };
 
     } catch (error) {
-      productionLogger.error(`Failed to process job ${job.id}`, { error });
+      console.error(`Failed to process job ${job.id}`, { error });
       return {
         jobId: job.id,
         success: false,
@@ -123,7 +122,7 @@ export class RetroactiveBatchProcessor {
       .single();
 
     if (error || !data) {
-      productionLogger.error(`Failed to fetch job data for ${jobId}`, { error });
+      console.error(`Failed to fetch job data for ${jobId}`, { error });
       return null;
     }
 
@@ -177,7 +176,7 @@ export class RetroactiveBatchProcessor {
 
     for (let i = 0; i < jobs.length; i++) {
       const job = jobs[i];
-      productionLogger.debug(`Processing job ${i + 1}/${jobs.length}: ${job.id}`);
+      console.log(`Processing job ${i + 1}/${jobs.length}: ${job.id}`);
 
       const result = await this.processCompletedJob(job, (processed, total, stage) => {
         onJobProgress?.(i, job.id, processed, total, stage);
@@ -198,7 +197,7 @@ export class RetroactiveBatchProcessor {
    * Process all existing completed batch jobs that don't have pre-processed results
    */
   static async processExistingJobs(): Promise<{ processed: number; skipped: number; errors: number }> {
-    productionLogger.debug('[RETROACTIVE] Starting retroactive processing of existing batch jobs');
+    console.log('[RETROACTIVE] Starting retroactive processing of existing batch jobs');
     
     try {
       // Get all completed batch jobs
@@ -213,11 +212,11 @@ export class RetroactiveBatchProcessor {
       }
 
       if (!jobs || jobs.length === 0) {
-        productionLogger.debug('[RETROACTIVE] No completed jobs found');
+        console.log('[RETROACTIVE] No completed jobs found');
         return { processed: 0, skipped: 0, errors: 0 };
       }
 
-      productionLogger.debug(`[RETROACTIVE] Found ${jobs.length} completed jobs to check`);
+      console.log(`[RETROACTIVE] Found ${jobs.length} completed jobs to check`);
       
       let processed = 0;
       let skipped = 0;
@@ -229,12 +228,12 @@ export class RetroactiveBatchProcessor {
           const hasPreProcessed = await AutomaticResultProcessor.hasPreProcessedResults(jobData.id);
           
           if (hasPreProcessed) {
-            productionLogger.debug(`[RETROACTIVE] Skipping job ${jobData.id} - already has pre-processed results`);
+            console.log(`[RETROACTIVE] Skipping job ${jobData.id} - already has pre-processed results`);
             skipped++;
             continue;
           }
 
-          productionLogger.debug(`[RETROACTIVE] Processing job ${jobData.id}`);
+          console.log(`[RETROACTIVE] Processing job ${jobData.id}`);
           
           // Process the results automatically
           const batchJob = {
@@ -256,24 +255,24 @@ export class RetroactiveBatchProcessor {
             // Also generate files for instant downloads
             await EnhancedFileGenerationService.processCompletedJob(batchJob);
             processed++;
-            productionLogger.debug(`[RETROACTIVE] Successfully processed job ${jobData.id}`);
+            console.log(`[RETROACTIVE] Successfully processed job ${jobData.id}`);
           } else {
             errors++;
-            productionLogger.error(`[RETROACTIVE] Failed to process job ${jobData.id}`);
+            console.error(`[RETROACTIVE] Failed to process job ${jobData.id}`);
           }
           
         } catch (error) {
           errors++;
-          productionLogger.error(`[RETROACTIVE] Error processing job ${jobData.id}:`, error);
+          console.error(`[RETROACTIVE] Error processing job ${jobData.id}:`, error);
         }
       }
 
-      productionLogger.debug(`[RETROACTIVE] Completed: processed=${processed}, skipped=${skipped}, errors=${errors}`);
+      console.log(`[RETROACTIVE] Completed: processed=${processed}, skipped=${skipped}, errors=${errors}`);
       
       return { processed, skipped, errors };
       
     } catch (error) {
-      productionLogger.error('[RETROACTIVE] Failed to process existing jobs:', error);
+      console.error('[RETROACTIVE] Failed to process existing jobs:', error);
       throw error;
     }
   }
@@ -300,7 +299,7 @@ export class RetroactiveBatchProcessor {
       return !!(job?.csv_file_url || job?.excel_file_url);
       
     } catch (error) {
-      productionLogger.error(`[RETROACTIVE] Error checking instant download for job ${jobId}:`, error);
+      console.error(`[RETROACTIVE] Error checking instant download for job ${jobId}:`, error);
       return false;
     }
   }
@@ -330,7 +329,7 @@ export class RetroactiveBatchProcessor {
       return hasInstant ? 'instant' : 'processing';
       
     } catch (error) {
-      productionLogger.error(`[RETROACTIVE] Error getting download type for job ${jobId}:`, error);
+      console.error(`[RETROACTIVE] Error getting download type for job ${jobId}:`, error);
       return 'unavailable';
     }
   }

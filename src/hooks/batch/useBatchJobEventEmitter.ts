@@ -9,12 +9,12 @@ export const emitBatchJobUpdate = () => {
   
   // Less aggressive throttling for better responsiveness
   if (now - lastEmitTime < EMIT_THROTTLE_MS) {
-    productionLogger.debug('[BATCH EVENT] Throttling batch job update event');
+    console.log('[BATCH EVENT] Throttling batch job update event');
     return;
   }
   
   lastEmitTime = now;
-  productionLogger.debug(`[BATCH EVENT] Emitting batch job update to ${jobUpdateListeners.size} listeners`);
+  console.log(`[BATCH EVENT] Emitting batch job update to ${jobUpdateListeners.size} listeners`);
   
   // Use setTimeout to prevent blocking and allow for cleanup
   setTimeout(() => {
@@ -22,7 +22,7 @@ export const emitBatchJobUpdate = () => {
       try {
         listener();
       } catch (error) {
-        productionLogger.error('[BATCH EVENT] Error in event listener:', error);
+        console.error('[BATCH EVENT] Error in event listener:', error);
       }
     });
   }, 0);
@@ -33,7 +33,7 @@ export const useBatchJobEventListener = (callback: () => void) => {
   let isProcessing = false;
   const throttledCallback = async () => {
     if (isProcessing) {
-      productionLogger.debug('[BATCH EVENT] Callback already processing, skipping...');
+      console.log('[BATCH EVENT] Callback already processing, skipping...');
       return;
     }
     
@@ -41,7 +41,7 @@ export const useBatchJobEventListener = (callback: () => void) => {
     try {
       await callback();
     } catch (error) {
-      productionLogger.error('[BATCH EVENT] Error in event callback:', error);
+      console.error('[BATCH EVENT] Error in event callback:', error);
     } finally {
       isProcessing = false;
     }

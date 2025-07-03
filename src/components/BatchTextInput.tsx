@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -45,21 +44,21 @@ const BatchTextInput = ({
 
     try {
       const names = payeeNames.split("\n").map(name => name.trim()).filter(name => name !== "");
-      productionLogger.debug(`[BATCH TEXT INPUT] Creating batch job for ${names.length} names:`, names);
+      console.log(`[BATCH TEXT INPUT] Creating batch job for ${names.length} names:`, names);
       
       const { generateContextualBatchJobName } = await import('@/lib/services/batchJobNameGenerator');
       const jobName = generateContextualBatchJobName(names.length, 'text');
       const batchJob = await createBatchJob(names, `Text input batch: ${names.length} payees`, jobName);
-      productionLogger.debug(`[BATCH TEXT INPUT] Batch job created:`, batchJob);
+      console.log(`[BATCH TEXT INPUT] Batch job created:`, batchJob);
 
       onBatchJobCreated(batchJob, names);
 
       toast({
         title: "Batch Job Created",
-        description: `Successfully submitted ${names.length} payees for batch processing`,
+        description: `Successfully submitted ${names.length} payees for batch processing. Job ID: ${batchJob.id.slice(-8)}`,
       });
     } catch (error) {
-      productionLogger.error("Batch job creation error:", error);
+      console.error("Batch job creation error:", error);
       toast({
         title: "Batch Job Creation Error",
         description: error instanceof Error ? error.message : "An error occurred while creating the batch job.",

@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import { useEffect, useRef } from 'react';
 
 export const useCleanup = () => {
@@ -14,7 +13,7 @@ export const useCleanup = () => {
       try {
         fn();
       } catch (error) {
-        productionLogger.error('[CLEANUP] Error during cleanup:', error);
+        console.error('[CLEANUP] Error during cleanup:', error);
       }
     });
     cleanupFunctions.current = [];
@@ -38,7 +37,7 @@ export const useMemoryOptimization = () => {
         const usedPercent = (memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100;
         
         if (usedPercent > 80) {
-          productionLogger.warn('[MEMORY] High memory usage detected:', usedPercent.toFixed(1) + '%');
+          console.warn('[MEMORY] High memory usage detected:', usedPercent.toFixed(1) + '%');
         }
       };
 

@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import { AlertTriangle, Clock, Zap } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';

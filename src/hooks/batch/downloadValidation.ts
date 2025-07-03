@@ -12,7 +12,7 @@ export function validateJobComplete(
 ): ValidationResult {
   if (typeof onJobComplete !== 'function') {
     const errorMsg = `onJobComplete callback is not a function (type: ${typeof onJobComplete})`;
-    productionLogger.error(`[BATCH DOWNLOAD] ${errorMsg}`);
+    console.error(`[BATCH DOWNLOAD] ${errorMsg}`);
     return {
       isValid: false,
       error: "Download callback function is missing. Please refresh the page and try again."

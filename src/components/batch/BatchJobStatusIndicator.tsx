@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Clock, Activity, CheckCircle, AlertCircle, XCircle, Loader2, AlertTriangle } from 'lucide-react';
@@ -32,8 +31,6 @@ const BatchJobStatusIndicator = ({
       case 'in_progress':
         return <Activity className="h-3 w-3" />;
       case 'finalizing':
-        return <Loader2 className="h-3 w-3 animate-spin" />;
-      case 'processing_results':
         return <Loader2 className="h-3 w-3 animate-spin" />;
       case 'completed':
         return <CheckCircle className="h-3 w-3" />;
@@ -70,8 +67,7 @@ const BatchJobStatusIndicator = ({
     
     if (isStalled) return 'Stalled - No Progress';
     
-    let statusText = job.status === 'processing_results' ? 'Processing Results' : 
-                     job.status.charAt(0).toUpperCase() + job.status.slice(1);
+    let statusText = job.status.charAt(0).toUpperCase() + job.status.slice(1);
     
     if (job.status === 'in_progress' && job.request_counts.total > 0) {
       const progress = Math.round((job.request_counts.completed / job.request_counts.total) * 100);

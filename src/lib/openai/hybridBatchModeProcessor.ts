@@ -14,8 +14,8 @@ export async function processWithHybridBatch(
   onProgress?: ProgressCallback,
   config?: ClassificationConfig
 ): Promise<HybridBatchResult> {
-  productionLogger.debug(`[HYBRID BATCH] Starting ${mode} processing for ${payeeNames.length} payees`);
-  productionLogger.debug(`[HYBRID BATCH] Sample payees:`, payeeNames.slice(0, 5));
+  console.log(`[HYBRID BATCH] Starting ${mode} processing for ${payeeNames.length} payees`);
+  console.log(`[HYBRID BATCH] Sample payees:`, payeeNames.slice(0, 5));
   
   const stats: BatchStats = {
     keywordExcluded: 0,
@@ -52,7 +52,7 @@ export async function processWithHybridBatch(
     }
   });
 
-  productionLogger.debug(`[HYBRID BATCH] Keyword exclusions: ${stats.keywordExcluded}, Need AI: ${needsAI.length}`);
+  console.log(`[HYBRID BATCH] Keyword exclusions: ${stats.keywordExcluded}, Need AI: ${needsAI.length}`);
 
   if (needsAI.length === 0) {
     // All were excluded by keywords
@@ -71,9 +71,9 @@ export async function processWithHybridBatch(
     onProgress?.(stats.keywordExcluded, payeeNames.length, (stats.keywordExcluded / payeeNames.length) * 100, stats);
 
     try {
-      productionLogger.debug(`[HYBRID BATCH] Creating batch job for ${aiNames.length} names (${stats.keywordExcluded} excluded)`);
+      console.log(`[HYBRID BATCH] Creating batch job for ${aiNames.length} names (${stats.keywordExcluded} excluded)`);
       const batchJob = await createBatchJob(aiNames, `Hybrid classification batch - ${aiNames.length} payees`);
-      productionLogger.debug(`[HYBRID BATCH] Created batch job:`, batchJob);
+      console.log(`[HYBRID BATCH] Created batch job:`, batchJob);
       
       stats.phase = 'Batch job submitted';
       stats.aiProcessed = aiNames.length;
@@ -85,7 +85,7 @@ export async function processWithHybridBatch(
         stats
       };
     } catch (error) {
-      productionLogger.error('[HYBRID BATCH] Error creating batch job:', error);
+      console.error('[HYBRID BATCH] Error creating batch job:', error);
       throw new Error(`Failed to create batch job: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   } else {
@@ -98,7 +98,7 @@ export async function processWithHybridBatch(
         30000 // timeout
       );
 
-      productionLogger.debug(`[HYBRID BATCH] AI processing complete. Results:`, aiResults);
+      console.log(`[HYBRID BATCH] AI processing complete. Results:`, aiResults);
 
       // Merge AI results back into final results
       needsAI.forEach((item, aiIndex) => {
@@ -120,7 +120,7 @@ export async function processWithHybridBatch(
         stats
       };
     } catch (error) {
-      productionLogger.error('[HYBRID BATCH] Error in real-time processing:', error);
+      console.error('[HYBRID BATCH] Error in real-time processing:', error);
       throw new Error(`Real-time processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

@@ -60,27 +60,6 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
-## Environment Variables
-
-Create a `.env` file in the project root and define the following variables:
-
-```bash
-VITE_SUPABASE_URL=<your-supabase-url>
-VITE_SUPABASE_KEY=<your-supabase-publishable-key>
-```
-
-An example file is provided at `.env.example`.
-
-## Running tests
-
-After installing dependencies with `npm i`, execute the test suite using:
-
-```bash
-npm test
-```
-
-This runs [Vitest](https://vitest.dev/) with React Testing Library.
-
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/aa593c27-4290-4aba-a8b2-135ff8cd3602) and click on Share -> Publish.
@@ -92,9 +71,3 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
-
-## Background file generation worker
-
-File generation now runs in a separate Node process. See
-[`docs/FILE_GENERATION_WORKER.md`](docs/FILE_GENERATION_WORKER.md) for details on
-running and scheduling the worker.

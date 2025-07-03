@@ -12,7 +12,7 @@ export class ManualFileGenerationTrigger {
    * Process all completed jobs that don't have files or results
    */
   static async fixAllCompletedJobs(): Promise<void> {
-    productionLogger.debug('[MANUAL TRIGGER] Starting manual fix for all completed jobs');
+    console.log('[MANUAL TRIGGER] Starting manual fix for all completed jobs');
     
     try {
       // Get all completed jobs without files
@@ -24,21 +24,21 @@ export class ManualFileGenerationTrigger {
         .gt('request_counts_completed', 0);
 
       if (error) {
-        productionLogger.error('[MANUAL TRIGGER] Error fetching completed jobs:', error);
+        console.error('[MANUAL TRIGGER] Error fetching completed jobs:', error);
         return;
       }
 
       if (!jobs || jobs.length === 0) {
-        productionLogger.debug('[MANUAL TRIGGER] No completed jobs found needing processing');
+        console.log('[MANUAL TRIGGER] No completed jobs found needing processing');
         return;
       }
 
-      productionLogger.debug(`[MANUAL TRIGGER] Found ${jobs.length} completed jobs needing processing`);
+      console.log(`[MANUAL TRIGGER] Found ${jobs.length} completed jobs needing processing`);
 
       // Process each job
       for (const jobData of jobs) {
         try {
-          productionLogger.debug(`[MANUAL TRIGGER] Processing job ${jobData.id}`);
+          console.log(`[MANUAL TRIGGER] Processing job ${jobData.id}`);
           
           // Convert to BatchJob format
           const batchJob = this.convertToBatchJob(jobData);
@@ -47,38 +47,38 @@ export class ManualFileGenerationTrigger {
           const hasResults = await AutomaticResultProcessor.hasPreProcessedResults(jobData.id);
           
           if (!hasResults) {
-            productionLogger.debug(`[MANUAL TRIGGER] Processing results for job ${jobData.id}`);
+            console.log(`[MANUAL TRIGGER] Processing results for job ${jobData.id}`);
             const success = await AutomaticResultProcessor.processCompletedBatch(batchJob);
             if (!success) {
-              productionLogger.error(`[MANUAL TRIGGER] Failed to process results for job ${jobData.id}`);
+              console.error(`[MANUAL TRIGGER] Failed to process results for job ${jobData.id}`);
               continue;
             }
           } else {
-            productionLogger.debug(`[MANUAL TRIGGER] Results already exist for job ${jobData.id}`);
+            console.log(`[MANUAL TRIGGER] Results already exist for job ${jobData.id}`);
           }
           
           // Then generate download files
-          productionLogger.debug(`[MANUAL TRIGGER] Generating files for job ${jobData.id}`);
+          console.log(`[MANUAL TRIGGER] Generating files for job ${jobData.id}`);
           const fileResult = await EnhancedFileGenerationService.processCompletedJob(batchJob);
           
           if (fileResult.success) {
-            productionLogger.debug(`[MANUAL TRIGGER] Successfully generated files for job ${jobData.id}`);
+            console.log(`[MANUAL TRIGGER] Successfully generated files for job ${jobData.id}`);
           } else {
-            productionLogger.error(`[MANUAL TRIGGER] Failed to generate files for job ${jobData.id}:`, fileResult.error);
+            console.error(`[MANUAL TRIGGER] Failed to generate files for job ${jobData.id}:`, fileResult.error);
           }
           
           // Small delay between jobs to avoid overwhelming the system
           await new Promise(resolve => setTimeout(resolve, 1000));
           
         } catch (error) {
-          productionLogger.error(`[MANUAL TRIGGER] Error processing job ${jobData.id}:`, error);
+          console.error(`[MANUAL TRIGGER] Error processing job ${jobData.id}:`, error);
         }
       }
       
-      productionLogger.debug('[MANUAL TRIGGER] Manual fix completed');
+      console.log('[MANUAL TRIGGER] Manual fix completed');
       
     } catch (error) {
-      productionLogger.error('[MANUAL TRIGGER] Error in manual fix process:', error);
+      console.error('[MANUAL TRIGGER] Error in manual fix process:', error);
     }
   }
   

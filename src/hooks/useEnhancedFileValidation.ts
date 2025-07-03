@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import { useState, useCallback } from 'react';
 import { handleError, FileValidationError } from '@/lib/errorHandler';
 import { useToast } from '@/hooks/use-toast';
@@ -24,23 +23,23 @@ export const useEnhancedFileValidation = () => {
     setIsValidating(true);
 
     try {
-      productionLogger.debug(`[FILE VALIDATION DEBUG] Starting validation for: ${file.name}`);
+      console.log(`[FILE VALIDATION DEBUG] Starting validation for: ${file.name}`);
 
       // Basic file validation
       const basicValidationError = validateBasicFileProperties(file, options);
       if (basicValidationError) {
-        productionLogger.debug(`[FILE VALIDATION DEBUG] Basic validation failed:`, basicValidationError);
+        console.log(`[FILE VALIDATION DEBUG] Basic validation failed:`, basicValidationError);
         return basicValidationError;
       }
 
       // Advanced validation - peek at file content
       const fileInfo = await analyzeFileStructure(file);
-      productionLogger.debug(`[FILE VALIDATION DEBUG] File structure analysis:`, fileInfo);
+      console.log(`[FILE VALIDATION DEBUG] File structure analysis:`, fileInfo);
 
       // Structure validation
       const structureValidationError = validateFileStructure(fileInfo, options);
       if (structureValidationError) {
-        productionLogger.debug(`[FILE VALIDATION DEBUG] Structure validation failed:`, structureValidationError);
+        console.log(`[FILE VALIDATION DEBUG] Structure validation failed:`, structureValidationError);
         return structureValidationError;
       }
 
@@ -48,7 +47,7 @@ export const useEnhancedFileValidation = () => {
       const warnings = generateValidationWarnings(file, fileInfo)
         .filter(warning => !warning.toLowerCase().includes('mime type') && !warning.toLowerCase().includes('unexpected mime type'));
 
-      productionLogger.debug(`[FILE VALIDATION DEBUG] Validation completed successfully:`, {
+      console.log(`[FILE VALIDATION DEBUG] Validation completed successfully:`, {
         fileInfo,
         warningCount: warnings.length,
         hasWarnings: warnings.length > 0
@@ -66,7 +65,7 @@ export const useEnhancedFileValidation = () => {
       };
 
     } catch (error) {
-      productionLogger.error(`[FILE VALIDATION DEBUG] Validation failed with error:`, error);
+      console.error(`[FILE VALIDATION DEBUG] Validation failed with error:`, error);
       
       const appError = error instanceof FileValidationError 
         ? error 

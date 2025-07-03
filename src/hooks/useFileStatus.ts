@@ -33,7 +33,7 @@ export const useFileStatus = (jobId?: string) => {
         });
       }
     } catch (error) {
-      productionLogger.error('Error checking file status:', error);
+      console.error('Error checking file status:', error);
     } finally {
       setIsChecking(false);
     }

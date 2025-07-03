@@ -34,7 +34,7 @@ export const generateSizeWarning = (fileSize: number, rowCount?: number): string
 };
 
 export const validateFile = (file: File): FileValidationResult => {
-  productionLogger.debug(`[FILE VALIDATION] Validating file: ${file.name}, size: ${file.size} bytes`);
+  console.log(`[FILE VALIDATION] Validating file: ${file.name}, size: ${file.size} bytes`);
 
   // Check file size
   if (file.size === 0) {
@@ -81,7 +81,7 @@ export const validateFile = (file: File): FileValidationResult => {
   ];
 
   if (file.type && !validMimeTypes.includes(file.type)) {
-    productionLogger.warn(`[FILE VALIDATION] Unexpected MIME type: ${file.type}, but extension is valid`);
+    console.warn(`[FILE VALIDATION] Unexpected MIME type: ${file.type}, but extension is valid`);
   }
 
   // Generate initial file info without time estimates
@@ -99,7 +99,7 @@ export const validateFile = (file: File): FileValidationResult => {
 };
 
 export const validatePayeeData = (data: any[], selectedColumn: string): FileValidationResult => {
-  productionLogger.debug(`[PAYEE VALIDATION] Validating ${data.length} rows for column: ${selectedColumn}`);
+  console.log(`[PAYEE VALIDATION] Validating ${data.length} rows for column: ${selectedColumn}`);
 
   if (!data || data.length === 0) {
     return {
@@ -158,7 +158,7 @@ export const validatePayeeData = (data: any[], selectedColumn: string): FileVali
   const uniquePayees = [...new Set(payeeNames)];
   const duplicateCount = payeeNames.length - uniquePayees.length;
 
-  productionLogger.debug(`[PAYEE VALIDATION] Found ${payeeNames.length} total payees, ${uniquePayees.length} unique, ${duplicateCount} duplicates`);
+  console.log(`[PAYEE VALIDATION] Found ${payeeNames.length} total payees, ${uniquePayees.length} unique, ${duplicateCount} duplicates`);
 
   // Generate enhanced file info without processing estimates
   const dataSize = JSON.stringify(data).length;

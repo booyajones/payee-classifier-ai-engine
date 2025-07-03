@@ -11,7 +11,7 @@ export async function classifyPayee(
   config: ClassificationConfig,
   useEnhanced: boolean = false
 ): Promise<ClassificationResult> {
-  productionLogger.debug(`Classifying "${payeeName}" with real OpenAI API (enhanced: ${useEnhanced})`);
+  console.log(`Classifying "${payeeName}" with real OpenAI API (enhanced: ${useEnhanced})`);
   
   try {
     if (useEnhanced) {
@@ -35,7 +35,7 @@ export async function classifyPayee(
       };
     }
   } catch (error) {
-    productionLogger.error(`Error classifying ${payeeName}:`, error);
+    console.error(`Error classifying ${payeeName}:`, error);
     throw error;
   }
 }

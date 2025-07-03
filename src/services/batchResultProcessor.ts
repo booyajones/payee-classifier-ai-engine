@@ -18,11 +18,11 @@ export async function processBatchResults(
   payeeData: PayeeRowData,
   job: BatchJob
 ): Promise<{ finalClassifications: PayeeClassification[], summary: BatchProcessingResult }> {
-  productionLogger.debug(`[BATCH PROCESSOR] Processing ${processedResults.length} results with SIC validation`);
+  console.log(`[BATCH PROCESSOR] Processing ${processedResults.length} results with SIC validation`);
   
   // Log sample of what we're receiving
   if (processedResults.length > 0) {
-    productionLogger.debug(`[BATCH PROCESSOR] Sample result structure:`, {
+    console.log(`[BATCH PROCESSOR] Sample result structure:`, {
       classification: processedResults[0].classification,
       confidence: processedResults[0].confidence,
       hasSicCode: !!processedResults[0].sicCode,

@@ -61,7 +61,7 @@ export class UnifiedClassificationEngine {
         sicDescription: this.config.enableSICCodes ? aiResult.sicDescription : undefined,
         keywordExclusion,
         matchingRules: aiResult.matchingRules,
-        similarityScores: aiResult.similarityScores
+        similarityScores: undefined // TODO: Implement if needed
       };
 
       logger.timeEnd(`classify-${payeeName}`, this.context);

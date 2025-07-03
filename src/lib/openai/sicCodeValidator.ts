@@ -71,7 +71,7 @@ export function validateOpenAIResponse(rawResult: any, payeeName: string): OpenA
   const errors: string[] = [];
   const warnings: string[] = [];
   
-  productionLogger.debug(`[SIC VALIDATOR] Validating OpenAI response for "${payeeName}"`);
+  console.log(`[SIC VALIDATOR] Validating OpenAI response for "${payeeName}"`);
   
   // Phase 1: Basic structure validation
   if (!rawResult?.response?.body?.choices?.[0]?.message?.content) {
@@ -89,7 +89,7 @@ export function validateOpenAIResponse(rawResult: any, payeeName: string): OpenA
   
   try {
     const parsed = JSON.parse(content);
-    productionLogger.debug(`[SIC VALIDATOR] Parsed response for "${payeeName}":`, {
+    console.log(`[SIC VALIDATOR] Parsed response for "${payeeName}":`, {
       classification: parsed.classification,
       confidence: parsed.confidence,
       hasSicCode: !!parsed.sicCode,
@@ -115,9 +115,9 @@ export function validateOpenAIResponse(rawResult: any, payeeName: string): OpenA
       hasSICCode = sicValidation.isValid;
       
       if (!sicValidation.isValid) {
-        productionLogger.error(`[SIC VALIDATOR] ❌ Business "${payeeName}" SIC validation failed:`, sicValidation.error);
+        console.error(`[SIC VALIDATOR] ❌ Business "${payeeName}" SIC validation failed:`, sicValidation.error);
       } else {
-        productionLogger.debug(`[SIC VALIDATOR] ✅ Business "${payeeName}" has valid SIC: ${sicValidation.sicCode}`);
+        console.log(`[SIC VALIDATOR] ✅ Business "${payeeName}" has valid SIC: ${sicValidation.sicCode}`);
       }
     }
     
@@ -132,7 +132,7 @@ export function validateOpenAIResponse(rawResult: any, payeeName: string): OpenA
   } catch (parseError) {
     const error = `JSON parse error: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`;
     errors.push(error);
-    productionLogger.error(`[SIC VALIDATOR] JSON parse failed for "${payeeName}":`, parseError);
+    console.error(`[SIC VALIDATOR] JSON parse failed for "${payeeName}":`, parseError);
     
     return {
       hasValidStructure: false,
@@ -168,9 +168,9 @@ export function validateSICPreservation(
   const isPreserved = errors.length === 0;
   
   if (isPreserved && originalSIC.sicCode) {
-    productionLogger.debug(`[SIC VALIDATOR] ✅ SIC preserved for "${payeeName}": ${processedSIC.sicCode}`);
+    console.log(`[SIC VALIDATOR] ✅ SIC preserved for "${payeeName}": ${processedSIC.sicCode}`);
   } else if (!isPreserved) {
-    productionLogger.error(`[SIC VALIDATOR] ❌ SIC preservation failed for "${payeeName}":`, errors);
+    console.error(`[SIC VALIDATOR] ❌ SIC preservation failed for "${payeeName}":`, errors);
   }
   
   return { isPreserved, errors, warnings };

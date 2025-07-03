@@ -11,14 +11,14 @@ export function createPayeeRowMapping(
   originalFileData: any[],
   payeeColumnName: string
 ): PayeeRowData {
-  productionLogger.debug(`[ROW MAPPING] === CREATING PAYEE ROW MAPPING WITH STANDARDIZATION ===`);
-  productionLogger.debug(`[ROW MAPPING] Input: ${originalFileData.length} rows, payee column: "${payeeColumnName}"`);
+  console.log(`[ROW MAPPING] === CREATING PAYEE ROW MAPPING WITH STANDARDIZATION ===`);
+  console.log(`[ROW MAPPING] Input: ${originalFileData.length} rows, payee column: "${payeeColumnName}"`);
   
   // Step 1: Extract all payee names for batch standardization
   const originalPayeeNames = originalFileData.map(row => row[payeeColumnName]);
   
   // Step 2: Perform comprehensive data standardization
-  productionLogger.debug(`[ROW MAPPING] Performing comprehensive data standardization...`);
+  console.log(`[ROW MAPPING] Performing comprehensive data standardization...`);
   const standardizationResults = batchStandardizeNames(originalPayeeNames);
   
   // Step 3: Create unique name mappings using ORIGINAL names for duplicate detection
@@ -28,7 +28,7 @@ export function createPayeeRowMapping(
   const rowMappings: RowMapping[] = [];
   const payeeToIndexMap = new Map<string, number>();
 
-  productionLogger.debug(`[ROW MAPPING] Creating unique payee mapping using ORIGINAL names for proper duplicate detection...`);
+  console.log(`[ROW MAPPING] Creating unique payee mapping using ORIGINAL names for proper duplicate detection...`);
 
   // Process EVERY single row to ensure complete mapping
   originalFileData.forEach((row, originalRowIndex) => {
@@ -45,7 +45,7 @@ export function createPayeeRowMapping(
       uniqueNormalizedNames.push(normalizedPayeeName); // Store normalized name for classification
       payeeToIndexMap.set(originalPayeeName, uniquePayeeIndex);
       
-      productionLogger.debug(`[ROW MAPPING] New unique payee ${uniquePayeeIndex}: "${originalPayeeName}" (normalized: "${normalizedPayeeName}")`);
+      console.log(`[ROW MAPPING] New unique payee ${uniquePayeeIndex}: "${originalPayeeName}" (normalized: "${normalizedPayeeName}")`);
     }
 
     // CRITICAL: Create mapping for EVERY row - no skipping
@@ -58,12 +58,12 @@ export function createPayeeRowMapping(
     });
     
     if (originalRowIndex < 10) {
-      productionLogger.debug(`[ROW MAPPING] Row ${originalRowIndex}: "${originalPayeeName}" → unique index ${uniquePayeeIndex} (normalized: "${normalizedPayeeName}")`);
+      console.log(`[ROW MAPPING] Row ${originalRowIndex}: "${originalPayeeName}" → unique index ${uniquePayeeIndex} (normalized: "${normalizedPayeeName}")`);
     }
   });
 
-  productionLogger.debug(`[ROW MAPPING] ✅ Created ${uniquePayeeNames.length} unique payees from ${originalFileData.length} rows`);
-  productionLogger.debug(`[ROW MAPPING] First 5 unique payees:`, uniquePayeeNames.slice(0, 5));
+  console.log(`[ROW MAPPING] ✅ Created ${uniquePayeeNames.length} unique payees from ${originalFileData.length} rows`);
+  console.log(`[ROW MAPPING] First 5 unique payees:`, uniquePayeeNames.slice(0, 5));
 
   // Validation and statistics calculations
   return validateAndCreatePayeeRowData(

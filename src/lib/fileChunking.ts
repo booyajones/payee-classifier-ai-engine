@@ -73,7 +73,7 @@ export const chunkPayeeData = (payeeRowData: PayeeRowData): FileChunk[] => {
     });
   }
 
-  productionLogger.debug(`[FILE CHUNKING] Split ${uniquePayeeNames.length} payees into ${totalChunks} chunks`);
+  console.log(`[FILE CHUNKING] Split ${uniquePayeeNames.length} payees into ${totalChunks} chunks`);
   return chunks;
 };
 

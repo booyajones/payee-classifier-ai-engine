@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import React, { useState, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';

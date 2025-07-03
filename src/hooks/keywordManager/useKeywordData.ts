@@ -25,9 +25,9 @@ export const useKeywordData = () => {
       const uniqueCategories = Array.from(new Set(categoryData));
       setCategories(['all', ...uniqueCategories]);
       
-      productionLogger.debug(`[KEYWORD EXCLUSION MANAGER] Loaded ${allKeywordData.length} total keywords with ${categoryData.length} categories`);
+      console.log(`[KEYWORD EXCLUSION MANAGER] Loaded ${allKeywordData.length} total keywords with ${categoryData.length} categories`);
     } catch (error) {
-      productionLogger.error('Error loading keywords:', error);
+      console.error('Error loading keywords:', error);
       toast({
         title: "Loading Error",
         description: "Failed to load exclusion keywords",

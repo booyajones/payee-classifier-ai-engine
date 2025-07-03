@@ -17,7 +17,7 @@ export const saveClassificationResultsWithValidation = async (
   results: PayeeClassification[],
   batchId?: string
 ): Promise<SICValidationStats> => {
-  productionLogger.debug(`[ENHANCED DB SERVICE] Saving ${results.length} results with comprehensive SIC and classification validation`);
+  console.log(`[ENHANCED DB SERVICE] Saving ${results.length} results with comprehensive SIC and classification validation`);
   
   const stats: SICValidationStats = {
     totalSaved: 0,
@@ -28,7 +28,7 @@ export const saveClassificationResultsWithValidation = async (
   };
 
   if (results.length === 0) {
-    productionLogger.debug('[ENHANCED DB SERVICE] No results to save');
+    console.log('[ENHANCED DB SERVICE] No results to save');
     return stats;
   }
 
@@ -42,19 +42,19 @@ export const saveClassificationResultsWithValidation = async (
       
       if (result.result.sicCode) {
         stats.sicCodeCount++;
-        productionLogger.debug(`[ENHANCED DB SERVICE] ✅ Business validation: "${result.payeeName}" has SIC: ${result.result.sicCode}`);
+        console.log(`[ENHANCED DB SERVICE] ✅ Business validation: "${result.payeeName}" has SIC: ${result.result.sicCode}`);
       } else {
         const error = `Business "${result.payeeName}" missing SIC code before database save`;
         stats.sicValidationErrors.push(error);
-        productionLogger.error(`[ENHANCED DB SERVICE] ❌ ${error}`);
+        console.error(`[ENHANCED DB SERVICE] ❌ ${error}`);
       }
     } else if (isIndividual) {
       stats.individualCount++;
-      productionLogger.debug(`[ENHANCED DB SERVICE] ✅ Individual validation: "${result.payeeName}" classified as Individual`);
+      console.log(`[ENHANCED DB SERVICE] ✅ Individual validation: "${result.payeeName}" classified as Individual`);
     } else {
       const error = `Unknown classification "${result.result.classification}" for "${result.payeeName}"`;
       stats.sicValidationErrors.push(error);
-      productionLogger.error(`[ENHANCED DB SERVICE] ❌ ${error}`);
+      console.error(`[ENHANCED DB SERVICE] ❌ ${error}`);
     }
 
     // CRITICAL FIX: Transform NULL values to match COALESCE constraint logic
@@ -87,7 +87,7 @@ export const saveClassificationResultsWithValidation = async (
     };
   });
 
-  productionLogger.debug(`[ENHANCED DB SERVICE] Validation complete: ${stats.businessCount} businesses, ${stats.individualCount} individuals, ${stats.sicCodeCount} with SIC codes`);
+  console.log(`[ENHANCED DB SERVICE] Validation complete: ${stats.businessCount} businesses, ${stats.individualCount} individuals, ${stats.sicCodeCount} with SIC codes`);
 
   // CRITICAL FIX: Use regular insert with duplicate handling instead of problematic upsert
   let successfulInserts = 0;
@@ -103,16 +103,16 @@ export const saveClassificationResultsWithValidation = async (
         if (error.code === '23505') {
           // Unique constraint violation - skip duplicate
           duplicateSkips++;
-          productionLogger.debug(`[ENHANCED DB SERVICE] Skipping duplicate: "${record.payee_name}" (batch: ${record.batch_id}, row: ${record.row_index})`);
+          console.log(`[ENHANCED DB SERVICE] Skipping duplicate: "${record.payee_name}" (batch: ${record.batch_id}, row: ${record.row_index})`);
         } else {
-          productionLogger.error(`[ENHANCED DB SERVICE] Insert failed for "${record.payee_name}":`, error.message);
+          console.error(`[ENHANCED DB SERVICE] Insert failed for "${record.payee_name}":`, error.message);
           stats.sicValidationErrors.push(`Insert failed for "${record.payee_name}": ${error.message}`);
         }
       } else {
         successfulInserts++;
       }
     } catch (insertError) {
-      productionLogger.error(`[ENHANCED DB SERVICE] Unexpected error inserting "${record.payee_name}":`, insertError);
+      console.error(`[ENHANCED DB SERVICE] Unexpected error inserting "${record.payee_name}":`, insertError);
       stats.sicValidationErrors.push(`Unexpected error for "${record.payee_name}": ${insertError}`);
     }
   }
@@ -120,11 +120,11 @@ export const saveClassificationResultsWithValidation = async (
   stats.totalSaved = successfulInserts;
   
   if (duplicateSkips > 0) {
-    productionLogger.debug(`[ENHANCED DB SERVICE] Skipped ${duplicateSkips} duplicate records, saved ${successfulInserts} new records`);
+    console.log(`[ENHANCED DB SERVICE] Skipped ${duplicateSkips} duplicate records, saved ${successfulInserts} new records`);
   }
   
   if (stats.sicValidationErrors.length > 0) {
-    productionLogger.warn(`[ENHANCED DB SERVICE] ${stats.sicValidationErrors.length} errors occurred during save (but processing continued)`);
+    console.warn(`[ENHANCED DB SERVICE] ${stats.sicValidationErrors.length} errors occurred during save (but processing continued)`);
   }
 
   // Post-save validation
@@ -139,20 +139,20 @@ export const saveClassificationResultsWithValidation = async (
       const savedIndividualCount = savedData.filter(r => r.classification === 'Individual').length;
       const savedSicCount = savedData.filter(r => r.sic_code).length;
       
-      productionLogger.debug(`[ENHANCED DB SERVICE] Post-save validation: ${savedSicCount}/${savedBusinessCount} businesses have SIC codes in database`);
-      productionLogger.debug(`[ENHANCED DB SERVICE] Post-save validation: ${savedBusinessCount} businesses, ${savedIndividualCount} individuals saved`);
+      console.log(`[ENHANCED DB SERVICE] Post-save validation: ${savedSicCount}/${savedBusinessCount} businesses have SIC codes in database`);
+      console.log(`[ENHANCED DB SERVICE] Post-save validation: ${savedBusinessCount} businesses, ${savedIndividualCount} individuals saved`);
       
       if (savedSicCount !== stats.sicCodeCount) {
         const error = `SIC code count mismatch after save: expected ${stats.sicCodeCount}, found ${savedSicCount}`;
         stats.sicValidationErrors.push(error);
-        productionLogger.error(`[ENHANCED DB SERVICE] ❌ ${error}`);
+        console.error(`[ENHANCED DB SERVICE] ❌ ${error}`);
       }
     }
   }
 
   const sicCoverage = stats.businessCount > 0 ? Math.round((stats.sicCodeCount / stats.businessCount) * 100) : 0;
-  productionLogger.debug(`[ENHANCED DB SERVICE] ✅ Save complete with validation: ${stats.sicCodeCount}/${stats.businessCount} businesses (${sicCoverage}%) have SIC codes`);
-  productionLogger.debug(`[ENHANCED DB SERVICE] ✅ Classification summary: ${stats.businessCount} businesses, ${stats.individualCount} individuals saved successfully`);
+  console.log(`[ENHANCED DB SERVICE] ✅ Save complete with validation: ${stats.sicCodeCount}/${stats.businessCount} businesses (${sicCoverage}%) have SIC codes`);
+  console.log(`[ENHANCED DB SERVICE] ✅ Classification summary: ${stats.businessCount} businesses, ${stats.individualCount} individuals saved successfully`);
 
   return stats;
 };
@@ -176,10 +176,10 @@ export const validateExportSICCodes = (exportData: any[]): {
 
   const sicCoverage = businessRows.length > 0 ? Math.round((sicRows.length / businessRows.length) * 100) : 0;
 
-  productionLogger.debug(`[EXPORT VALIDATOR] SIC validation: ${sicRows.length}/${businessRows.length} businesses (${sicCoverage}%) have SIC codes`);
+  console.log(`[EXPORT VALIDATOR] SIC validation: ${sicRows.length}/${businessRows.length} businesses (${sicCoverage}%) have SIC codes`);
   
   if (missingBusinesses.length > 0) {
-    productionLogger.warn(`[EXPORT VALIDATOR] Businesses missing SIC codes:`, missingBusinesses);
+    console.warn(`[EXPORT VALIDATOR] Businesses missing SIC codes:`, missingBusinesses);
   }
 
   return {

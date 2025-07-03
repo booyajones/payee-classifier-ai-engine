@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { PayeeClassification } from "@/lib/types";
 import ClassificationBadge from "./ClassificationBadge";

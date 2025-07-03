@@ -22,6 +22,6 @@ export function logProcessingStats(
   processedCount: number,
   stats: BatchProcessorStats
 ): void {
-  productionLogger.debug(`[ENHANCED BATCH PROCESSOR] Complete: ${processedCount} results processed`);
-  productionLogger.debug(`[ENHANCED BATCH PROCESSOR] Business: ${stats.businessCount}, Individual: ${stats.individualCount}, Excluded: ${stats.excludedCount}, SIC: ${stats.sicCodeCount}`);
+  console.log(`[ENHANCED BATCH PROCESSOR] Complete: ${processedCount} results processed`);
+  console.log(`[ENHANCED BATCH PROCESSOR] Business: ${stats.businessCount}, Individual: ${stats.individualCount}, Excluded: ${stats.excludedCount}, SIC: ${stats.sicCodeCount}`);
 }

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React from 'react';
 import { useBatchJobManager } from '@/hooks/useBatchJobManager';
 import BatchJobContainer from './BatchJobContainer';

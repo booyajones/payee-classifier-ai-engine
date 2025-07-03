@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import { useState, useRef } from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 
@@ -23,7 +22,7 @@ export const useBatchJobPolling = (
     // Don't start if already polling
     if (pollingStates[jobId]?.isPolling) return;
 
-    productionLogger.debug(`[POLLING] Manual refresh for job ${jobId}`);
+    console.log(`[POLLING] Manual refresh for job ${jobId}`);
     
     setPollingStates(prev => ({
       ...prev,
@@ -51,7 +50,7 @@ export const useBatchJobPolling = (
         const hasProgressChange = !lastUpdate || Math.abs(lastUpdate.progress - currentProgress) > 1;
         
         if (hasStatusChange || hasProgressChange) {
-          productionLogger.debug(`[POLLING] Meaningful change detected for job ${jobId.slice(-8)}: status=${job.status}, progress=${currentProgress.toFixed(1)}%`);
+          console.log(`[POLLING] Meaningful change detected for job ${jobId.slice(-8)}: status=${job.status}, progress=${currentProgress.toFixed(1)}%`);
           lastUpdateRef.current[jobId] = { status: job.status, progress: currentProgress };
         }
       }
@@ -67,7 +66,7 @@ export const useBatchJobPolling = (
         }
       }));
     } catch (error) {
-      productionLogger.error(`[POLLING] Error refreshing job ${jobId}:`, error);
+      console.error(`[POLLING] Error refreshing job ${jobId}:`, error);
       
       setPollingStates(prev => ({
         ...prev,

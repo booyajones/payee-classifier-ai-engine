@@ -31,7 +31,7 @@ async function loadAllKeywords(): Promise<string[]> {
     cacheTimestamp = now;
     return keywords;
   } catch (error) {
-    productionLogger.error('Error loading all keywords:', error);
+    console.error('Error loading all keywords:', error);
     return allKeywordsCache; // Return cached data if available
   }
 }
@@ -50,7 +50,7 @@ export function clearCustomKeywordsCache(): void {
 export async function getComprehensiveExclusionKeywords(): Promise<string[]> {
   const allKeywords = await loadAllKeywords();
   
-  productionLogger.debug(`[KEYWORD EXCLUSION] Loaded ${allKeywords.length} total keywords from database`);
+  console.log(`[KEYWORD EXCLUSION] Loaded ${allKeywords.length} total keywords from database`);
   
   return allKeywords;
 }
@@ -66,7 +66,7 @@ export async function getBuiltInExclusionKeywords(): Promise<string[]> {
       .map(k => k.keyword);
     return builtinKeywords;
   } catch (error) {
-    productionLogger.error('Error loading built-in keywords:', error);
+    console.error('Error loading built-in keywords:', error);
     return [];
   }
 }
@@ -82,7 +82,7 @@ export async function getCustomExclusionKeywords(): Promise<string[]> {
       .map(k => k.keyword);
     return customKeywords;
   } catch (error) {
-    productionLogger.error('Error loading custom keywords:', error);
+    console.error('Error loading custom keywords:', error);
     return [];
   }
 }

@@ -30,7 +30,7 @@ const FileCorruptionDetector = ({ file, onResult, autoCheck = true }: FileCorrup
     setProgress(0);
     
     try {
-      productionLogger.debug(`[CORRUPTION DETECTOR] Checking file: ${file.name}`);
+      console.log(`[CORRUPTION DETECTOR] Checking file: ${file.name}`);
       
       const issues: string[] = [];
       const warnings: string[] = [];
@@ -114,7 +114,7 @@ const FileCorruptionDetector = ({ file, onResult, autoCheck = true }: FileCorrup
         warnings
       };
 
-      productionLogger.debug(`[CORRUPTION DETECTOR] Check complete:`, finalResult);
+      console.log(`[CORRUPTION DETECTOR] Check complete:`, finalResult);
       setResult(finalResult);
       onResult(finalResult);
 

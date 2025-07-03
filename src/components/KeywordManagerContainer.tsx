@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import { Loader2 } from "lucide-react";
 import KeywordManagerHeader from "./KeywordManagerHeader";
 import KeywordManagerContent from "./KeywordManagerContent";

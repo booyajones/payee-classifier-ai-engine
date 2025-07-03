@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import { Progress } from "@/components/ui/progress";
 import { Clock, Loader2, CheckCircle, AlertCircle, Package } from "lucide-react";
 import { useMemo } from "react";

@@ -16,7 +16,7 @@ export async function testChristaIssue(): Promise<{
     finalVerification: string;
   };
 }> {
-  productionLogger.debug('[CHRISTA TEST] Testing the specific Christa duplicate issue...');
+  console.log('[CHRISTA TEST] Testing the specific Christa duplicate issue...');
   
   const testNames = ['Christa INC', 'CHRISTA', 'Christa'];
   
@@ -26,7 +26,7 @@ export async function testChristaIssue(): Promise<{
     normalized: normalizeForDuplicateDetection(name)
   }));
   
-  productionLogger.debug('[CHRISTA TEST] Normalization results:', normalization);
+  console.log('[CHRISTA TEST] Normalization results:', normalization);
   
   // Test 2: Entity checks
   const entityChecks = [];
@@ -41,7 +41,7 @@ export async function testChristaIssue(): Promise<{
     }
   }
   
-  productionLogger.debug('[CHRISTA TEST] Entity check results:', entityChecks);
+  console.log('[CHRISTA TEST] Entity check results:', entityChecks);
   
   // Test 3: Full duplicate detection
   const duplicateInput = testNames.map((name, index) => ({
@@ -51,7 +51,7 @@ export async function testChristaIssue(): Promise<{
   
   const duplicateDetectionResult = await detectDuplicates(duplicateInput);
   
-  productionLogger.debug('[CHRISTA TEST] Duplicate detection result:', duplicateDetectionResult);
+  console.log('[CHRISTA TEST] Duplicate detection result:', duplicateDetectionResult);
   
   // Test 4: Verification
   const duplicateGroups = duplicateDetectionResult.duplicate_groups;
@@ -64,7 +64,7 @@ export async function testChristaIssue(): Promise<{
     ? '✅ SUCCESS: All three Christa variants detected as duplicates in a single group'
     : `❌ FAILED: Expected 1 group with 3 members, got ${duplicateGroups.length} groups with ${duplicateGroups.map(g => g.members.length).join(', ')} members`;
   
-  productionLogger.debug(`[CHRISTA TEST] ${finalVerification}`);
+  console.log(`[CHRISTA TEST] ${finalVerification}`);
   
   return {
     success,
@@ -87,7 +87,7 @@ export async function testValleyExclusionIssue(): Promise<{
     finalVerification: string;
   };
 }> {
-  productionLogger.debug('[VALLEY TEST] Testing the Valley/VA exclusion issue...');
+  console.log('[VALLEY TEST] Testing the Valley/VA exclusion issue...');
   
   // Import the exclusion function
   const { checkEnhancedKeywordExclusion } = await import('@/lib/classification/enhancedExclusionLogic');
@@ -117,14 +117,14 @@ export async function testValleyExclusionIssue(): Promise<{
       reasoning: result.reasoning
     });
     
-    productionLogger.debug(`[VALLEY TEST] "${testCase.name}": Expected ${testCase.shouldBeExcluded ? 'EXCLUDED' : 'NOT EXCLUDED'}, Got ${result.isExcluded ? 'EXCLUDED' : 'NOT EXCLUDED'} - ${correct ? '✅' : '❌'}`);
+    console.log(`[VALLEY TEST] "${testCase.name}": Expected ${testCase.shouldBeExcluded ? 'EXCLUDED' : 'NOT EXCLUDED'}, Got ${result.isExcluded ? 'EXCLUDED' : 'NOT EXCLUDED'} - ${correct ? '✅' : '❌'}`);
   }
   
   const finalVerification = allCorrect
     ? '✅ SUCCESS: All Valley/VA test cases passed - VA matches whole words only'
     : `❌ FAILED: Some test cases failed - check detailed results`;
   
-  productionLogger.debug(`[VALLEY TEST] ${finalVerification}`);
+  console.log(`[VALLEY TEST] ${finalVerification}`);
   
   return {
     success: allCorrect,
@@ -139,19 +139,19 @@ export async function testValleyExclusionIssue(): Promise<{
  * Run all validation tests
  */
 export async function runAllValidationTests() {
-  productionLogger.debug('[VALIDATION] Running all validation tests...');
+  console.log('[VALIDATION] Running all validation tests...');
   
   const christaTest = await testChristaIssue();
   const valleyTest = await testValleyExclusionIssue();
   
   const allSuccess = christaTest.success && valleyTest.success;
   
-  productionLogger.debug('[VALIDATION] ========================================');
-  productionLogger.debug('[VALIDATION] FINAL VALIDATION RESULTS:');
-  productionLogger.debug(`[VALIDATION] Christa Duplicate Test: ${christaTest.success ? '✅ PASS' : '❌ FAIL'}`);
-  productionLogger.debug(`[VALIDATION] Valley Exclusion Test: ${valleyTest.success ? '✅ PASS' : '❌ FAIL'}`);
-  productionLogger.debug(`[VALIDATION] Overall Result: ${allSuccess ? '✅ ALL TESTS PASSED' : '❌ SOME TESTS FAILED'}`);
-  productionLogger.debug('[VALIDATION] ========================================');
+  console.log('[VALIDATION] ========================================');
+  console.log('[VALIDATION] FINAL VALIDATION RESULTS:');
+  console.log(`[VALIDATION] Christa Duplicate Test: ${christaTest.success ? '✅ PASS' : '❌ FAIL'}`);
+  console.log(`[VALIDATION] Valley Exclusion Test: ${valleyTest.success ? '✅ PASS' : '❌ FAIL'}`);
+  console.log(`[VALIDATION] Overall Result: ${allSuccess ? '✅ ALL TESTS PASSED' : '❌ SOME TESTS FAILED'}`);
+  console.log('[VALIDATION] ========================================');
   
   return {
     allSuccess,

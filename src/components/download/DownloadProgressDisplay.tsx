@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -93,10 +92,10 @@ const DownloadProgressDisplay: React.FC = () => {
   const { downloads, cancelDownload, clearDownload } = useDownloadProgress();
   const activeDownloads = Object.values(downloads);
 
-  productionLogger.debug(`[DOWNLOAD PROGRESS DISPLAY] Rendering with ${activeDownloads.length} downloads:`, activeDownloads);
+  console.log(`[DOWNLOAD PROGRESS DISPLAY] Rendering with ${activeDownloads.length} downloads:`, activeDownloads);
 
   if (activeDownloads.length === 0) {
-    productionLogger.debug(`[DOWNLOAD PROGRESS DISPLAY] No active downloads, hiding display`);
+    console.log(`[DOWNLOAD PROGRESS DISPLAY] No active downloads, hiding display`);
     return null;
   }
 

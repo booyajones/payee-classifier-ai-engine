@@ -11,7 +11,7 @@ export async function batchStandardizeNamesAsync(
   names: (string | null | undefined)[],
   onProgress?: (processed: number, total: number, percentage: number) => void
 ): Promise<DataStandardizationResult[]> {
-  productionLogger.debug(`[DATA STANDARDIZATION ASYNC] Processing ${names.length} names for standardization with chunked processing`);
+  console.log(`[DATA STANDARDIZATION ASYNC] Processing ${names.length} names for standardization with chunked processing`);
   
   const chunkOptions: ChunkProcessorOptions = {
     chunkSize: names.length > 10000 ? 200 : 100,
@@ -25,7 +25,7 @@ export async function batchStandardizeNamesAsync(
       const result = standardizePayeeName(name);
       
       if (index < 3) {
-        productionLogger.debug(`[DATA STANDARDIZATION ASYNC] Row ${index}: "${result.original}" → "${result.normalized}" (${result.cleaningSteps.length} steps)`);
+        console.log(`[DATA STANDARDIZATION ASYNC] Row ${index}: "${result.original}" → "${result.normalized}" (${result.cleaningSteps.length} steps)`);
       }
       
       return result;
@@ -38,7 +38,7 @@ export async function batchStandardizeNamesAsync(
     throw new Error(`CRITICAL: Async standardization failed 1:1 mapping - input: ${names.length}, output: ${results.length}`);
   }
   
-  productionLogger.debug(`[DATA STANDARDIZATION ASYNC] Successfully processed ${results.length} names with consistent normalization`);
+  console.log(`[DATA STANDARDIZATION ASYNC] Successfully processed ${results.length} names with consistent normalization`);
   return results;
 }
 
@@ -47,13 +47,13 @@ export async function batchStandardizeNamesAsync(
  * Maintains 1:1 record mapping
  */
 export function batchStandardizeNames(names: (string | null | undefined)[]): DataStandardizationResult[] {
-  productionLogger.debug(`[DATA STANDARDIZATION] Processing ${names.length} names for standardization`);
+  console.log(`[DATA STANDARDIZATION] Processing ${names.length} names for standardization`);
   
   const results = names.map((name, index) => {
     const result = standardizePayeeName(name);
     
     if (index < 3) {
-      productionLogger.debug(`[DATA STANDARDIZATION] Row ${index}: "${result.original}" → "${result.normalized}" (${result.cleaningSteps.length} steps)`);
+      console.log(`[DATA STANDARDIZATION] Row ${index}: "${result.original}" → "${result.normalized}" (${result.cleaningSteps.length} steps)`);
     }
     
     return result;
@@ -64,6 +64,6 @@ export function batchStandardizeNames(names: (string | null | undefined)[]): Dat
     throw new Error(`CRITICAL: Standardization failed 1:1 mapping - input: ${names.length}, output: ${results.length}`);
   }
   
-  productionLogger.debug(`[DATA STANDARDIZATION] Successfully processed ${results.length} names with consistent normalization`);
+  console.log(`[DATA STANDARDIZATION] Successfully processed ${results.length} names with consistent normalization`);
   return results;
 }

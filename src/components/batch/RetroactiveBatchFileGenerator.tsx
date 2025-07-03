@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -92,7 +91,7 @@ const RetroactiveBatchFileGenerator = ({ jobs, onComplete }: RetroactiveBatchFil
 
       onComplete(results);
     } catch (error) {
-      productionLogger.error('Bulk processing failed:', error);
+      console.error('Bulk processing failed:', error);
       toast({
         title: "Processing Failed",
         description: error instanceof Error ? error.message : "Unknown error occurred",

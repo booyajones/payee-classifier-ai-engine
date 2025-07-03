@@ -45,7 +45,7 @@ export function buildExclusionResult(
  */
 export function logATTDebugging(payeeName: string, result: KeywordExclusionResult): void {
   if (payeeName.toUpperCase().includes('AT') && (payeeName.includes('&') || payeeName.includes('T'))) {
-    productionLogger.debug(`[ENHANCED EXCLUSION] [AT&T DEBUG] Final result for "${payeeName}":`, {
+    console.log(`[ENHANCED EXCLUSION] [AT&T DEBUG] Final result for "${payeeName}":`, {
       isExcluded: result.isExcluded,
       matchedKeywords: result.matchedKeywords,
       confidence: result.confidence
@@ -57,8 +57,8 @@ export function logATTDebugging(payeeName: string, result: KeywordExclusionResul
  * Log general exclusion results
  */
 export function logExclusionResult(payeeName: string, result: KeywordExclusionResult): void {
-  productionLogger.debug(`[ENHANCED EXCLUSION] Result for "${payeeName}": ${result.isExcluded ? 'EXCLUDED' : 'NOT EXCLUDED'} (${result.confidence}% confidence)`);
+  console.log(`[ENHANCED EXCLUSION] Result for "${payeeName}": ${result.isExcluded ? 'EXCLUDED' : 'NOT EXCLUDED'} (${result.confidence}% confidence)`);
   if (result.isExcluded) {
-    productionLogger.debug(`[ENHANCED EXCLUSION] Matched: ${result.matchedKeywords.join(', ')}`);
+    console.log(`[ENHANCED EXCLUSION] Matched: ${result.matchedKeywords.join(', ')}`);
   }
 }

@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import { useState, useCallback } from 'react';
 import { parseUploadedFile } from '@/lib/utils';
 import { validateFile, validatePayeeData } from '@/lib/fileValidation';
@@ -75,7 +74,7 @@ export const useIntelligentFileProcessor = () => {
     setIsProcessing(true);
     
     try {
-      productionLogger.debug(`[INTELLIGENT PROCESSOR] Processing file with comprehensive standardization and SIC code support: ${file.name}`);
+      console.log(`[INTELLIGENT PROCESSOR] Processing file with comprehensive standardization and SIC code support: ${file.name}`);
 
       // Step 1: Validate file
       const fileValidation = validateFile(file);
@@ -126,12 +125,12 @@ export const useIntelligentFileProcessor = () => {
       }
 
       // Step 6: Create row mapping WITH COMPREHENSIVE STANDARDIZATION
-      productionLogger.debug(`[INTELLIGENT PROCESSOR] Creating payee mappings with comprehensive data standardization and SIC code preparation...`);
+      console.log(`[INTELLIGENT PROCESSOR] Creating payee mappings with comprehensive data standardization and SIC code preparation...`);
       const payeeRowData = createPayeeRowMapping(cleanedData, detectedColumn);
 
       // Enhanced logging with standardization stats
       const { standardizationStats } = payeeRowData;
-      productionLogger.debug(`[INTELLIGENT PROCESSOR] Successfully processed with standardization:`, {
+      console.log(`[INTELLIGENT PROCESSOR] Successfully processed with standardization:`, {
         totalRows: cleanedData.length,
         uniquePayees: payeeRowData.uniquePayeeNames.length,
         namesImproved: standardizationStats.changesDetected,
@@ -152,7 +151,7 @@ export const useIntelligentFileProcessor = () => {
       };
 
     } catch (error) {
-      productionLogger.error('[INTELLIGENT PROCESSOR] Processing failed:', error);
+      console.error('[INTELLIGENT PROCESSOR] Processing failed:', error);
       return {
         success: false,
         errorMessage: `Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`,

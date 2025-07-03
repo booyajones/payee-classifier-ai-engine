@@ -3,7 +3,7 @@ import { BatchProcessingResult } from '@/lib/types';
 export const useEnhancedDownload = () => {
   const downloadFile = async (data: BatchProcessingResult, format: 'csv' | 'excel') => {
     try {
-      productionLogger.debug(`Downloading ${format} file with data:`, data);
+      console.log(`Downloading ${format} file with data:`, data);
       
       // Simple fallback download implementation
       const filename = `results_${new Date().toISOString().split('T')[0]}.${format}`;
@@ -19,7 +19,7 @@ export const useEnhancedDownload = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      productionLogger.error('Enhanced download failed:', error);
+      console.error('Enhanced download failed:', error);
       throw error;
     }
   };

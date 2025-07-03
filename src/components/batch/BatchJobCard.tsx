@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,6 @@ import BatchJobHeader from './BatchJobHeader';
 import BatchJobCardContent from './BatchJobCardContent';
 import BatchJobActions from './BatchJobActions';
 import BatchJobStatusIndicator from './BatchJobStatusIndicator';
-import BatchJobRecoveryButton from './BatchJobRecoveryButton';
 
 interface BatchJobCardProps {
   job: BatchJob;
@@ -89,34 +87,29 @@ const BatchJobCard = ({
                     ))}
                   </ul>
                 </div>
-                 <div className="flex gap-2 mt-3">
-                   <Button
-                     size="sm"
-                     variant="outline"
-                     onClick={onRefresh}
-                     disabled={isRefreshing}
-                     className="text-xs"
-                   >
-                     <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
-                     Force Refresh
-                   </Button>
-                   <BatchJobRecoveryButton
-                     jobId={job.id}
-                     status={job.status}
-                     onRecovery={onRefresh}
-                   />
-                   {stalledJobActions?.canCancel && (
-                     <Button
-                       size="sm"
-                       variant="destructive"
-                       onClick={onCancel}
-                       className="text-xs"
-                     >
-                       <X className="h-3 w-3 mr-1" />
-                       Cancel & Retry
-                     </Button>
-                   )}
-                 </div>
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onRefresh}
+                    disabled={isRefreshing}
+                    className="text-xs"
+                  >
+                    <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    Force Refresh
+                  </Button>
+                  {stalledJobActions?.canCancel && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={onCancel}
+                      className="text-xs"
+                    >
+                      <X className="h-3 w-3 mr-1" />
+                      Cancel & Retry
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

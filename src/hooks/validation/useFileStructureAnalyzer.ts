@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import { useState, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 
@@ -64,7 +63,7 @@ export const useFileStructureAnalyzer = () => {
                   encoding: 'Excel Format'
                 });
               } catch (excelError) {
-                productionLogger.warn('[FILE STRUCTURE ANALYZER] Excel parsing failed:', excelError);
+                console.warn('[FILE STRUCTURE ANALYZER] Excel parsing failed:', excelError);
                 resolve({
                   hasHeaders: false,
                   estimatedRows: 0,
@@ -101,7 +100,7 @@ export const useFileStructureAnalyzer = () => {
               });
             }
           } catch (error) {
-            productionLogger.warn('[FILE STRUCTURE ANALYZER] Could not analyze file structure:', error);
+            console.warn('[FILE STRUCTURE ANALYZER] Could not analyze file structure:', error);
             resolve({});
           }
         };

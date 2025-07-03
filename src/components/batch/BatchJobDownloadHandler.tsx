@@ -22,7 +22,7 @@ export const useBatchJobDownloadHandler = ({ payeeDataMap }: BatchJobDownloadHan
     }
 
     try {
-      productionLogger.debug(`[DOWNLOAD] Starting enhanced download for job ${job.id}`);
+      console.log(`[DOWNLOAD] Starting enhanced download for job ${job.id}`);
       
       const payeeData = payeeDataMap[job.id];
       if (!payeeData) {
@@ -31,7 +31,7 @@ export const useBatchJobDownloadHandler = ({ payeeDataMap }: BatchJobDownloadHan
 
       // Get raw OpenAI results
       const rawResults = await getBatchJobResults(job, payeeData.uniquePayeeNames);
-      productionLogger.debug(`[DOWNLOAD] Retrieved ${rawResults.length} raw results from OpenAI`);
+      console.log(`[DOWNLOAD] Retrieved ${rawResults.length} raw results from OpenAI`);
       
       // Process through enhanced pipeline to get properly formatted results
       const { processEnhancedBatchResults } = await import('@/services/batchProcessor/enhancedProcessor');
@@ -42,13 +42,13 @@ export const useBatchJobDownloadHandler = ({ payeeDataMap }: BatchJobDownloadHan
         job
       });
       
-      productionLogger.debug(`[DOWNLOAD] Processed ${finalClassifications.length} enhanced results`);
+      console.log(`[DOWNLOAD] Processed ${finalClassifications.length} enhanced results`);
       
       // Map results to original rows with ALL DATA PRESERVATION
       const { mapResultsToOriginalRows } = await import('@/lib/rowMapping/resultMapper');
       const mappedResults = mapResultsToOriginalRows(finalClassifications, payeeData);
       
-      productionLogger.debug(`[DOWNLOAD] Mapped to ${mappedResults.length} complete rows with original data`);
+      console.log(`[DOWNLOAD] Mapped to ${mappedResults.length} complete rows with original data`);
       
       // Create comprehensive CSV with ALL original columns + classification data
       if (mappedResults.length === 0) {
@@ -57,7 +57,7 @@ export const useBatchJobDownloadHandler = ({ payeeDataMap }: BatchJobDownloadHan
       
       // Get all column headers (original + new classification columns)
       const allColumns = Object.keys(mappedResults[0]);
-      productionLogger.debug(`[DOWNLOAD] Creating CSV with ${allColumns.length} total columns`);
+      console.log(`[DOWNLOAD] Creating CSV with ${allColumns.length} total columns`);
       
       // Create CSV header
       const csvHeader = allColumns.map(col => `"${col}"`).join(',') + '\n';
@@ -87,10 +87,10 @@ export const useBatchJobDownloadHandler = ({ payeeDataMap }: BatchJobDownloadHan
         description: `Downloaded ${mappedResults.length} rows with ${allColumns.length} columns (original + AI classifications)`,
       });
       
-      productionLogger.debug(`[DOWNLOAD] Successfully downloaded complete results with data integrity preserved`);
+      console.log(`[DOWNLOAD] Successfully downloaded complete results with data integrity preserved`);
       
     } catch (error) {
-      productionLogger.error('[DOWNLOAD] Failed to download results:', error);
+      console.error('[DOWNLOAD] Failed to download results:', error);
       toast({
         title: "Download Failed",
         description: error instanceof Error ? error.message : 'Failed to download results',

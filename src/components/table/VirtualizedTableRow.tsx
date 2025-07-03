@@ -1,29 +1,41 @@
-// @ts-nocheck
-import { memo } from 'react';
-import { TableCell } from './TableCell';
+
+import React from 'react';
+import { TableRow, TableCell } from '@/components/ui/table';
+import { PayeeClassification } from '@/lib/types';
+import TableCellComponent from './TableCell';
 
 interface VirtualizedTableRowProps {
-  result?: any;
-  index?: number;
+  result: PayeeClassification;
+  columns: Array<{ key: string; label: string; isOriginal: boolean }>;
+  index: number;
   style: React.CSSProperties;
-  columns: any[];
-  onViewDetails?: (result: any) => void;
-  rowIndex?: number;
-  data?: any[];
+  onViewDetails: (result: PayeeClassification) => void;
 }
 
-export const VirtualizedTableRow = memo(
-  ({ result, index, rowIndex, data, style, columns, onViewDetails }: VirtualizedTableRowProps) => {
-    const row = result || (data && data[rowIndex || index || 0]);
-
-    return (
-      <div className="table-row" style={style}>
+const VirtualizedTableRow = React.memo(({ 
+  result, 
+  columns, 
+  index, 
+  style, 
+  onViewDetails 
+}: VirtualizedTableRowProps) => {
+  return (
+    <div style={style}>
+      <TableRow>
         {columns.map((column) => (
-          <TableCell key={`${index || rowIndex}-${column.key}`} value={row[column.key]} column={column} />
+          <TableCell key={column.key} className="whitespace-nowrap">
+            <TableCellComponent 
+              result={result} 
+              column={column} 
+              onViewDetails={onViewDetails}
+            />
+          </TableCell>
         ))}
-      </div>
-    );
-  }
-);
+      </TableRow>
+    </div>
+  );
+});
 
 VirtualizedTableRow.displayName = 'VirtualizedTableRow';
+
+export default VirtualizedTableRow;

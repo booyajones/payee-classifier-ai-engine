@@ -1,6 +1,5 @@
 
 // Unified type system for the entire application
-import type { SimilarityScores } from '@/lib/classification/stringMatching';
 
 // Base types
 export interface BaseEntity {
@@ -20,7 +19,7 @@ export interface ClassificationResult {
   sicDescription?: string;
   keywordExclusion?: KeywordExclusionResult;
   matchingRules?: string[];
-  similarityScores?: SimilarityScores;
+  similarityScores?: Record<string, number>;
 }
 
 export interface PayeeClassification extends BaseEntity {

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useState, useEffect } from 'react';
 import { productionLogger } from '@/lib/logging/productionLogger';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';

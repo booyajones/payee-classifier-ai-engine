@@ -16,7 +16,7 @@ interface TableCellProps {
 }
 
 const TableCell = React.memo(({ result, column, onViewDetails }: TableCellProps) => {
-  productionLogger.debug('[TABLE CELL] Rendering cell for column:', column.key, 'isOriginal:', column.isOriginal);
+  console.log('[TABLE CELL] Rendering cell for column:', column.key, 'isOriginal:', column.isOriginal);
   
   const handleViewDetails = useCallback(() => {
     onViewDetails(result);
@@ -25,7 +25,7 @@ const TableCell = React.memo(({ result, column, onViewDetails }: TableCellProps)
   const cellContent = useMemo(() => {
     if (column.isOriginal) {
       const value = result.originalData?.[column.key];
-      productionLogger.debug('[TABLE CELL] Original data value for', column.key, ':', value);
+      console.log('[TABLE CELL] Original data value for', column.key, ':', value);
       return value || '';
     }
     
@@ -48,7 +48,7 @@ const TableCell = React.memo(({ result, column, onViewDetails }: TableCellProps)
         );
       case 'sicCode':
         const sicCode = result.result.sicCode;
-        productionLogger.debug('[TABLE CELL] SIC Code for result:', sicCode, 'Classification:', result.result.classification);
+        console.log('[TABLE CELL] SIC Code for result:', sicCode, 'Classification:', result.result.classification);
         return sicCode ? (
           <Badge variant="outline" className="font-mono text-blue-700 bg-blue-50">
             {sicCode}
@@ -60,7 +60,7 @@ const TableCell = React.memo(({ result, column, onViewDetails }: TableCellProps)
         );
       case 'sicDescription':
         const sicDescription = result.result.sicDescription;
-        productionLogger.debug('[TABLE CELL] SIC Description for result:', sicDescription?.substring(0, 50));
+        console.log('[TABLE CELL] SIC Description for result:', sicDescription?.substring(0, 50));
         return sicDescription ? (
           <div className="max-w-xs truncate" title={sicDescription}>
             <span className="text-sm text-gray-700">{sicDescription}</span>
@@ -72,7 +72,7 @@ const TableCell = React.memo(({ result, column, onViewDetails }: TableCellProps)
         );
       case 'keywordExclusion':
         const isExcluded = result.result.keywordExclusion?.isExcluded;
-        productionLogger.debug('[TABLE CELL] Keyword exclusion for result:', isExcluded, result.result.keywordExclusion);
+        console.log('[TABLE CELL] Keyword exclusion for result:', isExcluded, result.result.keywordExclusion);
         return (
           <Badge variant={isExcluded ? 'destructive' : 'secondary'}>
             {isExcluded ? 'Yes' : 'No'}
@@ -80,7 +80,7 @@ const TableCell = React.memo(({ result, column, onViewDetails }: TableCellProps)
         );
       case 'matchedKeywords':
         const keywords = result.result.keywordExclusion?.matchedKeywords || [];
-        productionLogger.debug('[TABLE CELL] Matched keywords:', keywords);
+        console.log('[TABLE CELL] Matched keywords:', keywords);
         return keywords.length > 0 ? (
           <div className="max-w-xs truncate" title={keywords.join(', ')}>
             <span className="text-sm text-orange-700">{keywords.join(', ')}</span>
@@ -88,7 +88,7 @@ const TableCell = React.memo(({ result, column, onViewDetails }: TableCellProps)
         ) : '-';
       case 'keywordReasoning':
         const reasoning = result.result.keywordExclusion?.reasoning;
-        productionLogger.debug('[TABLE CELL] Keyword reasoning:', reasoning);
+        console.log('[TABLE CELL] Keyword reasoning:', reasoning);
         return reasoning || '-';
       case 'details':
         return (
@@ -97,7 +97,7 @@ const TableCell = React.memo(({ result, column, onViewDetails }: TableCellProps)
           </Button>
         );
       default:
-        productionLogger.warn('[TABLE CELL] Unknown column key:', column.key);
+        console.warn('[TABLE CELL] Unknown column key:', column.key);
         return '';
     }
   }, [result, column, handleViewDetails]);

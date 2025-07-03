@@ -6,11 +6,11 @@ import { validateExclusionKeywords, getKeywordStatistics } from './keywordUtils'
  * Get the comprehensive exclusion keywords list
  */
 export function getComprehensiveExclusionKeywords(): string[] {
-  productionLogger.debug(`[EXCLUSION UTILS] Returning ${COMPREHENSIVE_EXCLUSION_KEYWORDS.length} comprehensive keywords`);
+  console.log(`[EXCLUSION UTILS] Returning ${COMPREHENSIVE_EXCLUSION_KEYWORDS.length} comprehensive keywords`);
   
   // Log some sample keywords to verify they're loaded
   const bankKeywords = COMPREHENSIVE_EXCLUSION_KEYWORDS.filter(k => k.toUpperCase().includes('BANK'));
-  productionLogger.debug(`[EXCLUSION UTILS] BANK-related keywords found: [${bankKeywords.join(', ')}]`);
+  console.log(`[EXCLUSION UTILS] BANK-related keywords found: [${bankKeywords.join(', ')}]`);
   
   return COMPREHENSIVE_EXCLUSION_KEYWORDS;
 }
