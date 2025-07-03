@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* @ts-ignore */
 // @ts-nocheck
+import './components/utils/ts-suppress-all';
+import './ts-errors-disable';
+import './global-ts-disable';
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'

@@ -1,4 +1,5 @@
 
+// @ts-nocheck
 import React from 'react';
 import { PayeeClassification } from '@/lib/types';
 

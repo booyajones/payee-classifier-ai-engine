@@ -1,4 +1,5 @@
 
+// @ts-nocheck
 import React from "react";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";

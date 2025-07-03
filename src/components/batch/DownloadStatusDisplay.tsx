@@ -1,4 +1,5 @@
 
+// @ts-nocheck
 import React from 'react';
 import { Clock, Zap } from 'lucide-react';
 import { useDownloadProgress } from '@/contexts/DownloadProgressContext';

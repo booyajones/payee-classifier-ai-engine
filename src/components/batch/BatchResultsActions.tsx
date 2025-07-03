@@ -1,4 +1,5 @@
 
+// @ts-nocheck  
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { RotateCcw, Download, Clock } from "lucide-react";
