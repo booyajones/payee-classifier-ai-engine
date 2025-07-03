@@ -55,7 +55,7 @@ const BatchTextInput = ({
 
       toast({
         title: "Batch Job Created",
-        description: `Successfully submitted ${names.length} payees for batch processing. Job ID: ${batchJob.id.slice(-8)}`,
+        description: `Successfully submitted ${names.length} payees for batch processing`,
       });
     } catch (error) {
       console.error("Batch job creation error:", error);

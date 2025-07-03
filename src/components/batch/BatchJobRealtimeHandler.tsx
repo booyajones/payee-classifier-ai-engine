@@ -21,7 +21,7 @@ export const useBatchJobRealtimeHandler = ({ onJobUpdate }: BatchJobRealtimeHand
         updatedJob.id.length > 20) {
       toast({
         title: "Job Status Updated",
-        description: `Batch job (...${updatedJob.id.slice(-8)}) is now ${updatedJob.status}`,
+        description: `Batch job is now ${updatedJob.status}`,
         variant: updatedJob.status === 'completed' ? 'default' : 'destructive'
       });
     }

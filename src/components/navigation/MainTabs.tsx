@@ -88,7 +88,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
       
       toast({
         title: "Batch Job Created",
-        description: `Created job ${newBatchJob.id.slice(0, 8)}... for ${payeeRowData.uniquePayeeNames.length} payees`,
+        description: `Created batch job for ${payeeRowData.uniquePayeeNames.length} payees`,
       });
       
       // Switch to jobs tab
