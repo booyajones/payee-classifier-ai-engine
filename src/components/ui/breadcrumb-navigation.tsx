@@ -21,11 +21,11 @@ const BreadcrumbNavigation = ({ items, className }: BreadcrumbNavigationProps) =
     >
       <Home className="h-4 w-4" />
       {items.map((item, index) => (
-        <React.Fragment key={index}>
+        <div key={index} className="flex items-center">
           <ChevronRight className="h-4 w-4" />
           <span 
             className={cn(
-              "truncate",
+              "truncate ml-1",
               item.active 
                 ? "text-foreground font-medium" 
                 : "text-muted-foreground hover:text-foreground"
@@ -34,7 +34,7 @@ const BreadcrumbNavigation = ({ items, className }: BreadcrumbNavigationProps) =
           >
             {item.label}
           </span>
-        </React.Fragment>
+        </div>
       ))}
     </nav>
   );
