@@ -46,8 +46,14 @@ export const useBatchJobAutoPolling = ({
     const hasProgressChange = lastState.completed !== job.request_counts.completed;
     const timeSinceLastUpdate = now - lastState.lastUpdate;
     
-    // Force update every 30 seconds for in-progress jobs
-    const shouldForceUpdate = job.status === 'in_progress' && timeSinceLastUpdate > 30000;
+    // PERFORMANCE FIX: Reduce polling frequency for long-running jobs
+    const createdTime = new Date(job.created_at * 1000);
+    const jobAge = now - createdTime.getTime();
+    const isOldJob = jobAge > 2 * 60 * 60 * 1000; // Over 2 hours old
+    
+    // Adaptive polling intervals based on job age and progress
+    const baseInterval = isOldJob ? 60000 : 30000; // 1 minute for old jobs, 30s for new
+    const shouldForceUpdate = job.status === 'in_progress' && timeSinceLastUpdate > baseInterval;
     
     const hasChanged = hasStatusChange || hasProgressChange || shouldForceUpdate;
     
@@ -57,7 +63,11 @@ export const useBatchJobAutoPolling = ({
         completed: job.request_counts.completed,
         lastUpdate: now
       };
-      // Job state changed - polling will refresh
+      
+      // Log reduced activity for performance monitoring
+      if (isOldJob) {
+        productionLogger.debug(`Reduced polling for old job ${job.id.substring(0, 8)}`, { jobAge: Math.round(jobAge/60000) }, 'BATCH_POLLING');
+      }
     }
     
     return hasChanged;
@@ -79,9 +89,26 @@ export const useBatchJobAutoPolling = ({
           return;
         }
 
-        // Only poll active jobs - NEVER poll completed jobs
+        // PERFORMANCE: Smart polling with timeout detection
         const isActiveJob = ['validating', 'in_progress', 'finalizing'].includes(job.status);
-        const shouldPoll = isActiveJob && (job.status === 'in_progress' || hasJobChanged(job) || Math.random() < 0.4);
+        
+        // Check for runaway jobs and stop polling them
+        const createdTime = new Date(job.created_at * 1000);
+        const jobAge = Date.now() - createdTime.getTime();
+        const isRunawayJob = jobAge > 4 * 60 * 60 * 1000; // Over 4 hours
+        
+        if (isRunawayJob && job.status === 'in_progress') {
+          productionLogger.error(`Detected runaway job ${jobId.substring(0, 8)} - stopping polling to prevent system overload`, { jobAge: Math.round(jobAge/60000) }, 'BATCH_POLLING');
+          cleanupPolling(jobId);
+          setAutoPollingJobs(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(jobId);
+            return newSet;
+          });
+          return;
+        }
+        
+        const shouldPoll = isActiveJob && (job.status === 'in_progress' || hasJobChanged(job) || Math.random() < 0.3);
         
         if (shouldPoll) {
           await handleRefreshJob(jobId, true);
@@ -92,8 +119,19 @@ export const useBatchJobAutoPolling = ({
         const isStillActive = updatedJob && ['validating', 'in_progress', 'finalizing'].includes(updatedJob.status);
         
         if (isStillActive) {
-          // More frequent polling intervals
-          const delay = updatedJob.status === 'in_progress' ? 10000 : 8000; // 10s for in_progress, 8s for others
+          // PERFORMANCE: Adaptive polling intervals based on job age
+          const updatedJobAge = Date.now() - new Date(updatedJob.created_at * 1000).getTime();
+          const isOldJob = updatedJobAge > 2 * 60 * 60 * 1000; // Over 2 hours
+          
+          let delay;
+          if (isOldJob) {
+            delay = 45000; // 45 seconds for old jobs
+          } else if (updatedJob.status === 'in_progress') {
+            delay = 15000; // 15 seconds for active in-progress
+          } else {
+            delay = 10000; // 10 seconds for other active states
+          }
+          
           pollTimeouts.current[jobId] = setTimeout(poll, delay);
         } else {
           // Job completed or no longer exists - cleanup polling immediately

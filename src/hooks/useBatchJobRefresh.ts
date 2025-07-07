@@ -27,25 +27,38 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
   const detectStalledJob = (job: BatchJob): boolean => {
     if (job.status !== 'in_progress') return false;
     
-    // Check if job has been processing for too long with no progress
+    // Check if job has been processing for too long
     const createdTime = new Date(job.created_at * 1000);
     const timeSinceCreated = Date.now() - createdTime.getTime();
     
-    // Dynamic timeout based on job size - simple jobs should be faster
+    // CRITICAL: Detect runaway jobs (more than 4 hours = timeout)
+    const CRITICAL_TIMEOUT = 4 * 60 * 60 * 1000; // 4 hours
+    const isCriticalTimeout = timeSinceCreated > CRITICAL_TIMEOUT;
+    
+    // Dynamic stall thresholds based on job size  
     const jobSize = job.request_counts.total;
     const isSimpleJob = jobSize <= 100;
     const isSmallJob = jobSize <= 500;
+    const isLargeJob = jobSize > 5000;
     
-    const stallThreshold = isSimpleJob ? 5 * 60 * 1000 : // 5 minutes for simple jobs
-                          isSmallJob ? 15 * 60 * 1000 :   // 15 minutes for small jobs  
-                          30 * 60 * 1000;                  // 30 minutes for large jobs
+    const stallThreshold = isSimpleJob ? 5 * 60 * 1000 :  // 5 minutes
+                          isSmallJob ? 15 * 60 * 1000 :    // 15 minutes
+                          isLargeJob ? 60 * 60 * 1000 :    // 1 hour for large jobs
+                          30 * 60 * 1000;                  // 30 minutes default
     
     const hasNoProgress = job.request_counts.completed === 0 && job.request_counts.total > 0;
+    const hasMinimalProgress = job.request_counts.completed < (job.request_counts.total * 0.05); // Less than 5% done
     const isTakingTooLong = timeSinceCreated > stallThreshold;
+    const isStalled = (hasNoProgress || hasMinimalProgress) && isTakingTooLong;
     
-    console.log(`[STALL DETECTION] Job ${job.id}: progress=${job.request_counts.completed}/${job.request_counts.total}, time=${Math.round(timeSinceCreated/60000)}min, threshold=${Math.round(stallThreshold/60000)}min, stalled=${hasNoProgress && isTakingTooLong}`);
+    console.log(`[TIMEOUT DETECTION] Job ${job.id}: progress=${job.request_counts.completed}/${job.request_counts.total}, time=${Math.round(timeSinceCreated/60000)}min, threshold=${Math.round(stallThreshold/60000)}min, critical=${isCriticalTimeout}, stalled=${isStalled}`);
     
-    return hasNoProgress && isTakingTooLong;
+    // Mark critical timeouts for immediate cancellation
+    if (isCriticalTimeout) {
+      console.error(`[CRITICAL TIMEOUT] Job ${job.id} has been running for ${Math.round(timeSinceCreated/60000)} minutes - IMMEDIATE CANCELLATION REQUIRED`);
+    }
+    
+    return isStalled || isCriticalTimeout;
   };
 
   const handleRefreshJob = async (jobId: string, silent: boolean = false) => {
@@ -55,12 +68,46 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
       const updatedJob = await refreshJobWithRetry(jobId);
       console.log(`[JOB REFRESH] Job ${jobId} status: ${updatedJob.status}, progress: ${updatedJob.request_counts.completed}/${updatedJob.request_counts.total}`);
       
-      // Check if job appears stalled
-      if (detectStalledJob(updatedJob)) {
+      // Check for critical timeouts that need immediate action
+      const createdTime = new Date(updatedJob.created_at * 1000);
+      const timeSinceCreated = Date.now() - createdTime.getTime();
+      const CRITICAL_TIMEOUT = 4 * 60 * 60 * 1000; // 4 hours
+      const isCriticalTimeout = timeSinceCreated > CRITICAL_TIMEOUT;
+      
+      if (isCriticalTimeout && updatedJob.status === 'in_progress') {
+        console.error(`[CRITICAL TIMEOUT] Job ${jobId} running for ${Math.round(timeSinceCreated/60000)} minutes - FORCING CANCELLATION`);
+        toast({
+          title: "🚨 Critical Timeout - Canceling Job",
+          description: `Job ${jobId.substring(0, 8)}... has been running for over 4 hours and will be automatically canceled to prevent system issues.`,
+          variant: "destructive",
+          duration: 15000,
+        });
+        
+        // Force cancel the runaway job
+        try {
+          const { cancelBatchJob } = await import('@/lib/openai/trueBatchAPI');
+          await cancelBatchJob(jobId);
+          console.log(`[CRITICAL TIMEOUT] Successfully canceled runaway job ${jobId}`);
+          
+          toast({
+            title: "✅ Runaway Job Canceled",
+            description: `Job ${jobId.substring(0, 8)}... has been canceled due to timeout. System performance should improve.`,
+            duration: 10000,
+          });
+        } catch (cancelError) {
+          console.error(`[CRITICAL TIMEOUT] Failed to cancel job ${jobId}:`, cancelError);
+          toast({
+            title: "❌ Failed to Cancel Job",
+            description: `Could not cancel runaway job ${jobId.substring(0, 8)}... Please try manual cancellation.`,
+            variant: "destructive",
+            duration: 15000,
+          });
+        }
+      } else if (detectStalledJob(updatedJob)) {
         console.warn(`[JOB REFRESH] STALLED JOB DETECTED: ${jobId}`);
         toast({
           title: "⚠️ Stalled Job Detected",
-          description: `Job ${jobId.substring(0, 8)}... appears stuck with no progress after ${Math.round((Date.now() - new Date(updatedJob.created_at * 1000).getTime())/60000)} minutes. Consider canceling and retrying.`,
+          description: `Job ${jobId.substring(0, 8)}... appears stuck with no progress after ${Math.round(timeSinceCreated/60000)} minutes. Consider canceling and retrying.`,
           variant: "destructive",
           duration: 10000,
         });

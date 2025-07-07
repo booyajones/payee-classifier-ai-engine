@@ -5,6 +5,7 @@ import { useBatchJobAutoPolling } from '@/components/batch/BatchJobAutoPolling';
 import { useBatchJobRealtimeHandler } from '@/components/batch/BatchJobRealtimeHandler';
 import { useBatchJobDownloadHandler } from '@/components/batch/BatchJobDownloadHandler';
 import { useBatchJobActionsHandler } from '@/components/batch/BatchJobActionsHandler';
+import { BatchJobTimeoutManager } from '@/components/batch/BatchJobTimeoutManager';
 
 export const useBatchJobManager = () => {
   const {
@@ -75,6 +76,8 @@ export const useBatchJobManager = () => {
     handleCancelJob,
     handleDownload,
     handleCancel,
-    handleJobDelete
+    handleJobDelete,
+    // Timeout manager component
+    TimeoutManager: BatchJobTimeoutManager
   };
 };

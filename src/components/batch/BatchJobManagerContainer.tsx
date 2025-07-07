@@ -12,21 +12,27 @@ const BatchJobManagerContainer = () => {
     handleRefreshJob,
     handleDownloadResults,
     handleCancelJob,
-    handleJobDelete
+    handleJobDelete,
+    TimeoutManager
   } = useBatchJobManager();
 
   return (
-    <BatchJobContainer
-      jobs={jobs}
-      payeeRowDataMap={payeeDataMap}
-      refreshingJobs={refreshingJobs}
-      pollingStates={pollingStates}
-      stalledJobActions={stalledJobActions}
-      onRefresh={handleRefreshJob}
-      onDownload={handleDownloadResults}
-      onCancel={handleCancelJob}
-      onJobDelete={handleJobDelete}
-    />
+    <>
+      {/* Timeout manager runs in background */}
+      <TimeoutManager jobs={jobs} onJobCancel={handleCancelJob} />
+      
+      <BatchJobContainer
+        jobs={jobs}
+        payeeRowDataMap={payeeDataMap}
+        refreshingJobs={refreshingJobs}
+        pollingStates={pollingStates}
+        stalledJobActions={stalledJobActions}
+        onRefresh={handleRefreshJob}
+        onDownload={handleDownloadResults}
+        onCancel={handleCancelJob}
+        onJobDelete={handleJobDelete}
+      />
+    </>
   );
 };
 

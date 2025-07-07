@@ -12,6 +12,21 @@ export const useBatchJobRealtimeHandler = ({ onJobUpdate }: BatchJobRealtimeHand
 
   const handleRealtimeJobUpdate = useCallback((updatedJob: BatchJob) => {
     console.log('[REALTIME] Received job update:', updatedJob.id.substring(0, 8), 'status:', updatedJob.status);
+    
+    // PERFORMANCE: Throttle updates for runaway jobs
+    const createdTime = new Date(updatedJob.created_at * 1000);
+    const jobAge = Date.now() - createdTime.getTime();
+    const isRunawayJob = jobAge > 4 * 60 * 60 * 1000; // Over 4 hours
+    
+    if (isRunawayJob && updatedJob.status === 'in_progress') {
+      console.warn(`[REALTIME] Throttling updates for runaway job ${updatedJob.id.substring(0, 8)} to prevent performance issues`);
+      // Still update but less frequently - every 5th update
+      if (Math.random() > 0.8) {
+        onJobUpdate(updatedJob);
+      }
+      return;
+    }
+    
     onJobUpdate(updatedJob);
     
     // Show toast notification for significant status changes
