@@ -1,7 +1,7 @@
 
 import React, { useMemo, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Upload, Play, TestTube, Users, Eye, Activity } from "lucide-react";
+import { FileText, Upload, Play, TestTube, Users, Eye, Activity, BarChart3 } from "lucide-react";
 import SingleClassificationForm from "@/components/SingleClassificationForm";
 import HealthCheckPanel from "@/components/testing/HealthCheckPanel";
 import ImplementationSummary from "@/components/testing/ImplementationSummary";
@@ -10,6 +10,7 @@ import LoadingSpinner from "@/components/ui/loading-spinner";
 import { useEnhancedNotifications } from "@/components/ui/enhanced-notifications";
 import useKeyboardShortcuts from "@/hooks/useKeyboardShortcuts";
 import CelebrationAnimation from "@/components/ui/celebration-animation";
+import CodeQualityDashboard from "@/components/quality/CodeQualityDashboard";
 
 import SmartFileUpload from "@/components/SmartFileUpload";
 import KeywordExclusionManager from "@/components/KeywordExclusionManager";
@@ -168,7 +169,8 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
         upload: 'File Upload',
         jobs: 'Batch Jobs',
         keywords: 'Keyword Management',
-        health: 'System Health'
+        health: 'System Health',
+        quality: 'Code Quality'
       }[activeTab] || 'Dashboard',
       active: true
     }
@@ -188,7 +190,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
       />
       
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-5" role="tablist">
+        <TabsList className="grid w-full grid-cols-6" role="tablist">
           <TabsTrigger 
             value="single" 
             className="flex items-center gap-2"
@@ -228,6 +230,14 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
           >
             <Activity className="h-4 w-4" />
             Health
+          </TabsTrigger>
+          <TabsTrigger 
+            value="quality" 
+            className="flex items-center gap-2"
+            aria-label="Code Quality (Alt+6)"
+          >
+            <BarChart3 className="h-4 w-4" />
+            Quality
           </TabsTrigger>
         </TabsList>
 
@@ -269,6 +279,10 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
                 <ImplementationSummary />
                 <HealthCheckPanel />
               </div>
+            </TabsContent>
+
+            <TabsContent value="quality" className="mt-6" role="tabpanel">
+              <CodeQualityDashboard />
             </TabsContent>
           </>
         )}
