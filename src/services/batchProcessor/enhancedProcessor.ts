@@ -27,7 +27,33 @@ export async function processEnhancedBatchResults({
     sicCodeCount: 0
   };
 
-  // Process results in chunks to prevent browser blocking with ORIGINAL DATA PRESERVATION
+  // RUN DUPLICATE DETECTION FIRST before processing individual results
+  console.log(`[ENHANCED BATCH PROCESSOR] Running duplicate detection on ${uniquePayeeNames.length} unique payees`);
+  try {
+    const duplicateInput = uniquePayeeNames.map((name, index) => ({
+      payee_id: `payee_${index}`,
+      payee_name: name
+    }));
+
+    console.log(`[ENHANCED BATCH PROCESSOR] Duplicate detection input:`, duplicateInput);
+    const duplicateResults = await detectDuplicates(duplicateInput, DEFAULT_DUPLICATE_CONFIG);
+    
+    console.log(`[ENHANCED BATCH PROCESSOR] Duplicate detection complete:`, {
+      duplicates_found: duplicateResults.statistics.duplicates_found,
+      processed_records_count: duplicateResults.processed_records.length,
+      duplicate_groups_count: duplicateResults.duplicate_groups.length
+    });
+    
+    // Store duplicate detection results in payeeData for use in row mapping
+    payeeData.duplicateDetectionResults = duplicateResults;
+    
+  } catch (error) {
+    console.warn('[ENHANCED BATCH PROCESSOR] Duplicate detection failed:', error);
+    // Continue without duplicate detection if it fails
+    payeeData.duplicateDetectionResults = undefined;
+  }
+
+  // Process results in chunks to prevent browser blocking with ORIGINAL DATA + DUPLICATE DATA PRESERVATION
   const { results } = await processInChunks(
     rawResults,
     async (result, index) => {
@@ -49,8 +75,31 @@ export async function processEnhancedBatchResults({
       } else {
         console.warn(`[ENHANCED PROCESSOR] No original data found for "${payeeName}" at index ${index}`);
       }
+
+      // CRITICAL: Find and attach duplicate detection data for this payee
+      let duplicateData = {};
+      if (payeeData.duplicateDetectionResults) {
+        const duplicateRecord = payeeData.duplicateDetectionResults.processed_records.find(
+          (record: any) => {
+            const recordIndex = parseInt(record.payee_id.replace('payee_', ''));
+            return recordIndex === index;
+          }
+        );
+        
+        if (duplicateRecord) {
+          duplicateData = {
+            is_potential_duplicate: duplicateRecord.is_potential_duplicate,
+            duplicate_of_payee_id: duplicateRecord.duplicate_of_payee_id,
+            duplicate_confidence_score: duplicateRecord.final_duplicate_score || 0,
+            duplicate_detection_method: duplicateRecord.judgement_method || 'Algorithmic Analysis',
+            duplicate_group_id: duplicateRecord.duplicate_group_id,
+            ai_duplicate_reasoning: duplicateRecord.ai_judgment?.reasoning || duplicateRecord.ai_judgement_reasoning || ''
+          };
+          console.log(`[ENHANCED PROCESSOR] ✅ Found duplicate data for "${payeeName}" (index ${index}):`, duplicateData);
+        }
+      }
       
-      return await processIndividualResult(result, index, payeeName, job.id, stats, originalRowData);
+      return await processIndividualResult(result, index, payeeName, job.id, stats, originalRowData, duplicateData);
     },
     {
       chunkSize: rawResults.length > 5000 ? 100 : 50,
@@ -60,35 +109,6 @@ export async function processEnhancedBatchResults({
   );
 
   processedResults.push(...results);
-
-  // RUN DUPLICATE DETECTION on the unique payee names
-  console.log(`[ENHANCED BATCH PROCESSOR] Running duplicate detection on ${uniquePayeeNames.length} unique payees:`, uniquePayeeNames);
-  try {
-    const duplicateInput = uniquePayeeNames.map((name, index) => ({
-      payee_id: `payee_${index}`,
-      payee_name: name
-    }));
-
-    console.log(`[ENHANCED BATCH PROCESSOR] Duplicate detection input:`, duplicateInput);
-    const duplicateResults = await detectDuplicates(duplicateInput, DEFAULT_DUPLICATE_CONFIG);
-    
-    console.log(`[ENHANCED BATCH PROCESSOR] Duplicate detection complete:`, {
-      duplicates_found: duplicateResults.statistics.duplicates_found,
-      processed_records_count: duplicateResults.processed_records.length,
-      duplicate_groups_count: duplicateResults.duplicate_groups.length
-    });
-    
-    // Log first few results for debugging
-    console.log(`[ENHANCED BATCH PROCESSOR] Sample duplicate results:`, duplicateResults.processed_records.slice(0, 5));
-    
-    // Store duplicate detection results in payeeData for use in row mapping
-    payeeData.duplicateDetectionResults = duplicateResults;
-    
-  } catch (error) {
-    console.warn('[ENHANCED BATCH PROCESSOR] Duplicate detection failed:', error);
-    // Continue without duplicate detection if it fails
-    payeeData.duplicateDetectionResults = undefined;
-  }
 
   const summary = buildBatchSummary(processedResults, stats, payeeData.originalFileData);
 

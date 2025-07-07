@@ -9,7 +9,8 @@ export async function processIndividualResult(
   payeeName: string,
   jobId: string,
   stats: BatchProcessorStats,
-  originalRowData?: any
+  originalRowData?: any,
+  duplicateData?: any
 ): Promise<PayeeClassification> {
   console.log(`[RESULT PROCESSOR] Processing result ${index} for "${payeeName}" with original data preservation`);
   
@@ -66,7 +67,9 @@ export async function processIndividualResult(
     timestamp: new Date(),
     // PRESERVE COMPLETE ORIGINAL ROW DATA - this is critical for data integrity
     originalData: originalRowData || result.originalData || {},
-    rowIndex: index
+    rowIndex: index,
+    // CRITICAL: Attach duplicate detection data directly to the classification result
+    ...(duplicateData || {})
   };
 
   console.log(`[RESULT PROCESSOR] Processed "${payeeName}": ${finalClassification} (${confidence}%) with ${Object.keys(processedResult.originalData || {}).length} original columns`);
