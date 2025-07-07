@@ -89,38 +89,63 @@ export const saveClassificationResultsWithValidation = async (
 
   console.log(`[ENHANCED DB SERVICE] Validation complete: ${stats.businessCount} businesses, ${stats.individualCount} individuals, ${stats.sicCodeCount} with SIC codes`);
 
-  // CRITICAL FIX: Use regular insert with duplicate handling instead of problematic upsert
+  // CRITICAL FIX: Use proper upsert logic to handle duplicate detection data updates
   let successfulInserts = 0;
-  let duplicateSkips = 0;
+  let duplicateUpdates = 0;
   
   for (const record of validatedResults) {
     try {
-      const { error } = await supabase
+      // First try to insert the record
+      const { error: insertError } = await supabase
         .from('payee_classifications')
         .insert([record]);
       
-      if (error) {
-        if (error.code === '23505') {
-          // Unique constraint violation - skip duplicate
-          duplicateSkips++;
-          console.log(`[ENHANCED DB SERVICE] Skipping duplicate: "${record.payee_name}" (batch: ${record.batch_id}, row: ${record.row_index})`);
+      if (insertError && insertError.code === '23505') {
+        // Unique constraint violation - update existing record with duplicate detection data
+        const { error: updateError } = await supabase
+          .from('payee_classifications')
+          .update({
+            // Update duplicate detection fields specifically
+            is_potential_duplicate: record.is_potential_duplicate,
+            duplicate_of_payee_id: record.duplicate_of_payee_id,
+            duplicate_confidence_score: record.duplicate_confidence_score,
+            duplicate_detection_method: record.duplicate_detection_method,
+            duplicate_group_id: record.duplicate_group_id,
+            ai_duplicate_reasoning: record.ai_duplicate_reasoning,
+            // Also update other fields that might have changed
+            classification: record.classification,
+            confidence: record.confidence,
+            reasoning: record.reasoning,
+            sic_code: record.sic_code,
+            sic_description: record.sic_description
+          })
+          .eq('payee_name', record.payee_name)
+          .eq('batch_id', record.batch_id)
+          .eq('row_index', record.row_index);
+        
+        if (updateError) {
+          console.error(`[ENHANCED DB SERVICE] Update failed for "${record.payee_name}":`, updateError.message);
+          stats.sicValidationErrors.push(`Update failed for "${record.payee_name}": ${updateError.message}`);
         } else {
-          console.error(`[ENHANCED DB SERVICE] Insert failed for "${record.payee_name}":`, error.message);
-          stats.sicValidationErrors.push(`Insert failed for "${record.payee_name}": ${error.message}`);
+          duplicateUpdates++;
+          console.log(`[ENHANCED DB SERVICE] Updated duplicate detection data for: "${record.payee_name}"`);
         }
+      } else if (insertError) {
+        console.error(`[ENHANCED DB SERVICE] Insert failed for "${record.payee_name}":`, insertError.message);
+        stats.sicValidationErrors.push(`Insert failed for "${record.payee_name}": ${insertError.message}`);
       } else {
         successfulInserts++;
       }
-    } catch (insertError) {
-      console.error(`[ENHANCED DB SERVICE] Unexpected error inserting "${record.payee_name}":`, insertError);
-      stats.sicValidationErrors.push(`Unexpected error for "${record.payee_name}": ${insertError}`);
+    } catch (unexpectedError) {
+      console.error(`[ENHANCED DB SERVICE] Unexpected error for "${record.payee_name}":`, unexpectedError);
+      stats.sicValidationErrors.push(`Unexpected error for "${record.payee_name}": ${unexpectedError}`);
     }
   }
 
-  stats.totalSaved = successfulInserts;
+  stats.totalSaved = successfulInserts + duplicateUpdates;
   
-  if (duplicateSkips > 0) {
-    console.log(`[ENHANCED DB SERVICE] Skipped ${duplicateSkips} duplicate records, saved ${successfulInserts} new records`);
+  if (duplicateUpdates > 0) {
+    console.log(`[ENHANCED DB SERVICE] Updated ${duplicateUpdates} existing records with duplicate detection data, saved ${successfulInserts} new records`);
   }
   
   if (stats.sicValidationErrors.length > 0) {
