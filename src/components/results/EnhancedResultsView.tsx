@@ -24,6 +24,8 @@ const EnhancedResultsView = ({
 }: EnhancedResultsViewProps) => {
   const [showFilters, setShowFilters] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [sortField, setSortField] = useState('payeeName');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   
   const { showSuccess, showError, showInfo } = useEnhancedNotifications();
   const { 
@@ -50,94 +52,24 @@ const EnhancedResultsView = ({
     exportFilteredResults
   } = useAdvancedFiltering(results);
 
-  // Memoized table columns
+  // Simplified table columns (matching OptimizedVirtualizedTable interface)
   const tableColumns = useMemo(() => [
-    { 
-      key: 'payeeName', 
-      label: 'Payee Name', 
-      isOriginal: false,
-      render: (item: PayeeClassification) => (
-        <div className="font-medium">{item.payeeName}</div>
-      )
-    },
-    { 
-      key: 'classification', 
-      label: 'Type', 
-      isOriginal: false,
-      render: (item: PayeeClassification) => (
-        <Badge 
-          variant={
-            item.result?.classification === 'Business' ? 'default' : 
-            item.result?.classification === 'Individual' ? 'secondary' : 
-            'outline'
-          }
-        >
-          {item.result?.classification || 'Unknown'}
-        </Badge>
-      )
-    },
-    { 
-      key: 'confidence', 
-      label: 'Confidence', 
-      isOriginal: false,
-      render: (item: PayeeClassification) => (
-        <div className="flex items-center gap-2">
-          <Progress 
-            value={(item.result?.confidence || 0) * 100} 
-            className="w-16 h-2"
-          />
-          <span className="text-xs text-muted-foreground">
-            {((item.result?.confidence || 0) * 100).toFixed(0)}%
-          </span>
-        </div>
-      )
-    },
-    { 
-      key: 'sicCode', 
-      label: 'SIC Code', 
-      isOriginal: false,
-      render: (item: PayeeClassification) => (
-        <div className="text-sm">
-          {item.result?.sicCode && (
-            <div>
-              <div className="font-mono">{item.result.sicCode}</div>
-              {item.result.sicDescription && (
-                <div className="text-xs text-muted-foreground truncate max-w-32">
-                  {item.result.sicDescription}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )
-    },
-    { 
-      key: 'processingTier', 
-      label: 'Method', 
-      isOriginal: false,
-      render: (item: PayeeClassification) => (
-        <Badge variant="outline" className="text-xs">
-          {item.result?.processingTier || 'Unknown'}
-        </Badge>
-      )
-    },
-    { 
-      key: 'actions', 
-      label: 'Actions', 
-      isOriginal: false,
-      render: (item: PayeeClassification) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onViewDetails?.(item)}
-          className="flex items-center gap-1"
-        >
-          <Eye className="h-3 w-3" />
-          View
-        </Button>
-      )
+    { key: 'payeeName', label: 'Payee Name', isOriginal: false },
+    { key: 'classification', label: 'Type', isOriginal: false },
+    { key: 'confidence', label: 'Confidence', isOriginal: false },
+    { key: 'sicCode', label: 'SIC Code', isOriginal: false },
+    { key: 'processingTier', label: 'Method', isOriginal: false },
+    { key: 'actions', label: 'Actions', isOriginal: false }
+  ], []);
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
     }
-  ], [onViewDetails]);
+  };
 
   const virtualizationConfig = getVirtualizationConfig(filteredResults.length, 60);
   const performanceWarnings = getPerformanceWarnings();
@@ -299,13 +231,12 @@ const EnhancedResultsView = ({
             </div>
           ) : (
             <OptimizedVirtualizedTable
-              data={filteredResults}
+              results={filteredResults}
               columns={tableColumns}
-              height={virtualizationConfig.height}
-              itemHeight={virtualizationConfig.itemHeight}
-              overscan={virtualizationConfig.overscan}
-              onViewDetails={onViewDetails}
-              className="border-0"
+              sortField={sortField}
+              sortDirection={sortDirection}
+              onSort={handleSort}
+              onViewDetails={onViewDetails || (() => {})}
             />
           )}
         </CardContent>
