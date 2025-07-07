@@ -30,12 +30,20 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
     // Check if job has been processing for too long with no progress
     const createdTime = new Date(job.created_at * 1000);
     const timeSinceCreated = Date.now() - createdTime.getTime();
-    const thirtyMinutes = 30 * 60 * 1000;
+    
+    // Dynamic timeout based on job size - simple jobs should be faster
+    const jobSize = job.request_counts.total;
+    const isSimpleJob = jobSize <= 100;
+    const isSmallJob = jobSize <= 500;
+    
+    const stallThreshold = isSimpleJob ? 5 * 60 * 1000 : // 5 minutes for simple jobs
+                          isSmallJob ? 15 * 60 * 1000 :   // 15 minutes for small jobs  
+                          30 * 60 * 1000;                  // 30 minutes for large jobs
     
     const hasNoProgress = job.request_counts.completed === 0 && job.request_counts.total > 0;
-    const isTakingTooLong = timeSinceCreated > thirtyMinutes;
+    const isTakingTooLong = timeSinceCreated > stallThreshold;
     
-    console.log(`[STALL DETECTION] Job ${job.id}: progress=${job.request_counts.completed}/${job.request_counts.total}, time=${Math.round(timeSinceCreated/60000)}min, stalled=${hasNoProgress && isTakingTooLong}`);
+    console.log(`[STALL DETECTION] Job ${job.id}: progress=${job.request_counts.completed}/${job.request_counts.total}, time=${Math.round(timeSinceCreated/60000)}min, threshold=${Math.round(stallThreshold/60000)}min, stalled=${hasNoProgress && isTakingTooLong}`);
     
     return hasNoProgress && isTakingTooLong;
   };
@@ -52,7 +60,7 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
         console.warn(`[JOB REFRESH] STALLED JOB DETECTED: ${jobId}`);
         toast({
           title: "⚠️ Stalled Job Detected",
-          description: `Job ${jobId.substring(0, 8)}... appears stuck with no progress after 30+ minutes. Consider canceling and retrying.`,
+          description: `Job ${jobId.substring(0, 8)}... appears stuck with no progress after ${Math.round((Date.now() - new Date(updatedJob.created_at * 1000).getTime())/60000)} minutes. Consider canceling and retrying.`,
           variant: "destructive",
           duration: 10000,
         });
