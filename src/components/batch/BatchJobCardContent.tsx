@@ -18,13 +18,17 @@ interface BatchJobCardContentProps {
   payeeRowData?: PayeeRowData;
   isCompleted: boolean;
   onDownload: () => void;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 const BatchJobCardContent = ({
   job,
   payeeRowData,
   isCompleted,
-  onDownload
+  onDownload,
+  onRefresh,
+  isRefreshing = false
 }: BatchJobCardContentProps) => {
   const { downloads } = useDownloadProgress();
   const { toast } = useToast();
@@ -104,7 +108,11 @@ const BatchJobCardContent = ({
 
   return (
     <div className="space-y-3">
-      <BatchJobProgress job={job} />
+      <BatchJobProgress 
+        job={job} 
+        onManualRefresh={onRefresh}
+        isRefreshing={isRefreshing}
+      />
       <BatchJobRequestCounts job={job} />
       <BatchJobStuckWarning job={job} />
       <BatchJobActiveDownload activeDownload={activeDownload} />

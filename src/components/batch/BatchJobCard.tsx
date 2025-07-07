@@ -120,6 +120,8 @@ const BatchJobCard = ({
           payeeRowData={payeeRowData}
           isCompleted={isCompleted}
           onDownload={onDownload}
+          onRefresh={onRefresh}
+          isRefreshing={isRefreshing}
         />
       </div>
     </Card>
