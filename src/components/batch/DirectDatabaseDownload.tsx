@@ -82,7 +82,14 @@ const DirectDatabaseDownload = ({ jobId, className }: DirectDatabaseDownloadProp
               reasoning: 'No classification result found',
               processingTier: 'Failed'
             },
-            timestamp: new Date()
+            timestamp: new Date(),
+            // Add default duplicate detection data
+            is_potential_duplicate: false,
+            duplicate_of_payee_id: null,
+            duplicate_confidence_score: 0,
+            duplicate_detection_method: 'Not Analyzed',
+            duplicate_group_id: null,
+            ai_duplicate_reasoning: null
           };
         }
 
@@ -103,7 +110,14 @@ const DirectDatabaseDownload = ({ jobId, className }: DirectDatabaseDownloadProp
           },
           timestamp: new Date(dbClassification.created_at),
           originalData: dbClassification.original_data,
-          rowIndex: dbClassification.row_index
+          rowIndex: dbClassification.row_index,
+          // CRITICAL: Include duplicate detection data from database
+          is_potential_duplicate: dbClassification.is_potential_duplicate || false,
+          duplicate_of_payee_id: dbClassification.duplicate_of_payee_id,
+          duplicate_confidence_score: dbClassification.duplicate_confidence_score || 0,
+          duplicate_detection_method: dbClassification.duplicate_detection_method || 'Not Analyzed',
+          duplicate_group_id: dbClassification.duplicate_group_id,
+          ai_duplicate_reasoning: dbClassification.ai_duplicate_reasoning
         };
       });
 

@@ -38,8 +38,9 @@ export function createMappedRow(originalRow: any, classificationResult: any, map
     mappedRow.data_quality_improved = mapping.standardizationResult?.original !== mapping.standardizationResult?.normalized ? 'Yes' : 'No';
   }
   
-  // DUPLICATE DETECTION DATA - Find duplicate info by INDEX, not name
+  // DUPLICATE DETECTION DATA - Handle both live processing and database export formats
   if (payeeRowData?.duplicateDetectionResults) {
+    // LIVE PROCESSING PATH: Use duplicateDetectionResults structure
     console.log(`[ROW MAPPER] Searching for duplicate data for "${mapping.payeeName}" (index ${mapping.uniquePayeeIndex})`);
     console.log(`[ROW MAPPER] Available duplicate records:`, payeeRowData.duplicateDetectionResults.processed_records.length);
     
@@ -86,8 +87,23 @@ export function createMappedRow(originalRow: any, classificationResult: any, map
       mappedRow.duplicate_group_id = '';
       mappedRow.ai_duplicate_reasoning = '';
     }
+  } else if ((classificationResult as any).is_potential_duplicate !== undefined) {
+    // DATABASE EXPORT PATH: Use duplicate data directly from classification result
+    console.log(`[ROW MAPPER] Using database duplicate data for "${mapping.payeeName}"`);
+    console.log(`[ROW MAPPER] Database duplicate data:`, {
+      is_potential_duplicate: (classificationResult as any).is_potential_duplicate,
+      duplicate_detection_method: (classificationResult as any).duplicate_detection_method,
+      duplicate_confidence_score: (classificationResult as any).duplicate_confidence_score
+    });
+    
+    mappedRow.is_potential_duplicate = (classificationResult as any).is_potential_duplicate ? 'Yes' : 'No';
+    mappedRow.duplicate_of_payee_name = (classificationResult as any).duplicate_of_payee_name || '';
+    mappedRow.duplicate_confidence_score = (classificationResult as any).duplicate_confidence_score || 0;
+    mappedRow.duplicate_detection_method = (classificationResult as any).duplicate_detection_method || 'Not Analyzed';
+    mappedRow.duplicate_group_id = (classificationResult as any).duplicate_group_id || '';
+    mappedRow.ai_duplicate_reasoning = (classificationResult as any).ai_duplicate_reasoning || '';
   } else {
-    console.warn(`[ROW MAPPER] ❌ No duplicate detection results available for any records`);
+    console.warn(`[ROW MAPPER] ❌ No duplicate detection data available in any format`);
     // Default duplicate values if no duplicate detection results available
     mappedRow.is_potential_duplicate = 'No';
     mappedRow.duplicate_of_payee_name = '';
