@@ -13,15 +13,33 @@ export const useBatchJobRealtimeHandler = ({ onJobUpdate }: BatchJobRealtimeHand
   const handleRealtimeJobUpdate = useCallback((updatedJob: BatchJob) => {
     console.log('[REALTIME] Received job update:', updatedJob.id.substring(0, 8), 'status:', updatedJob.status);
     
-    // PERFORMANCE: Throttle updates for runaway jobs
+    // PERFORMANCE: Prevent unresponsiveness by throttling updates for problematic jobs
     const createdTime = new Date(updatedJob.created_at * 1000);
     const jobAge = Date.now() - createdTime.getTime();
-    const isRunawayJob = jobAge > 4 * 60 * 60 * 1000; // Over 4 hours
+    const isVeryOldJob = jobAge > 24 * 60 * 60 * 1000; // Over 24 hours
+    const isExtremelyOldJob = jobAge > 48 * 60 * 60 * 1000; // Over 48 hours
     
-    if (isRunawayJob && updatedJob.status === 'in_progress') {
-      console.warn(`[REALTIME] Throttling updates for runaway job ${updatedJob.id.substring(0, 8)} to prevent performance issues`);
-      // Still update but less frequently - every 5th update
-      if (Math.random() > 0.8) {
+    // Block updates from extremely old jobs that could cause unresponsiveness
+    if (isExtremelyOldJob && updatedJob.status === 'in_progress') {
+      console.warn(`[REALTIME] Blocking updates for extremely old job ${updatedJob.id.substring(0, 8)} to prevent unresponsiveness`);
+      return; // Don't process this update at all
+    }
+    
+    // Heavily throttle very old jobs
+    if (isVeryOldJob && updatedJob.status === 'in_progress') {
+      console.warn(`[REALTIME] Heavily throttling updates for very old job ${updatedJob.id.substring(0, 8)}`);
+      // Only process 1 in 10 updates for very old jobs
+      if (Math.random() > 0.9) {
+        onJobUpdate(updatedJob);
+      }
+      return;
+    }
+    
+    // Light throttling for jobs over 4 hours
+    const isOldJob = jobAge > 4 * 60 * 60 * 1000;
+    if (isOldJob && updatedJob.status === 'in_progress') {
+      // Only process 1 in 3 updates for old jobs
+      if (Math.random() > 0.66) {
         onJobUpdate(updatedJob);
       }
       return;

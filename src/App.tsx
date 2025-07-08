@@ -8,6 +8,7 @@ import Index from '@/pages/Index';
 import About from '@/pages/About';
 import NotFound from '@/pages/NotFound';
 import ErrorBoundaryEnhanced from '@/components/ErrorBoundaryEnhanced';
+import { UnresponsiveErrorBoundary } from '@/components/ui/unresponsive-error-boundary';
 
 import './App.css';
 
@@ -16,21 +17,23 @@ const queryClient = new QueryClient();
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ErrorBoundaryEnhanced>
-        <DownloadProgressProvider>
-          <Router>
-            <div className="min-h-screen bg-background">
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/about" element={<About />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </div>
-            <Toaster />
-            <DownloadProgressDisplay />
-          </Router>
-        </DownloadProgressProvider>
-      </ErrorBoundaryEnhanced>
+      <UnresponsiveErrorBoundary>
+        <ErrorBoundaryEnhanced>
+          <DownloadProgressProvider>
+            <Router>
+              <div className="min-h-screen bg-background">
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/about" element={<About />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </div>
+              <Toaster />
+              <DownloadProgressDisplay />
+            </Router>
+          </DownloadProgressProvider>
+        </ErrorBoundaryEnhanced>
+      </UnresponsiveErrorBoundary>
     </QueryClientProvider>
   );
 }
