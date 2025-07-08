@@ -16,6 +16,7 @@ const BatchJobManagerContainer = () => {
     handleJobDelete,
     largeJobOptimization,
     performCleanup,
+    forceCleanup,
     TimeoutManager
   } = useBatchJobManager();
 
@@ -37,6 +38,7 @@ const BatchJobManagerContainer = () => {
         onCancel={handleCancelJob}
         onJobDelete={handleJobDelete}
         onCleanup={performCleanup}
+        onForceCleanup={forceCleanup}
       />
     </>
   );

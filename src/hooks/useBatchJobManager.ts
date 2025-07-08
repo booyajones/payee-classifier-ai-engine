@@ -11,6 +11,7 @@ import { debouncedStoreUpdater } from '@/lib/performance/debounceStore';
 import { emergencyStop } from '@/lib/performance/emergencyStop';
 import { useJobStatusSync } from '@/hooks/useJobStatusSync';
 import { useAutomaticJobCleanup } from '@/hooks/useAutomaticJobCleanup';
+import { usePerformanceCleanup } from '@/hooks/batch/usePerformanceCleanup';
 
 export const useBatchJobManager = () => {
   const {
@@ -44,7 +45,7 @@ export const useBatchJobManager = () => {
     }, 2000);
     
     return () => clearTimeout(resetTimer);
-  });
+  }, []); // FIXED: Empty dependency array to prevent this useEffect itself from causing renders
 
   // PERFORMANCE: Debounced job update handler to prevent cascading renders
   const debouncedUpdateJob = useCallback((job: any) => {
@@ -53,33 +54,35 @@ export const useBatchJobManager = () => {
       return;
     }
 
-    // CIRCUIT BREAKER: Prevent updates for completed jobs
+    // CIRCUIT BREAKER: Prevent updates for completed jobs that haven't changed
     if (['completed', 'failed', 'cancelled', 'expired'].includes(job.status)) {
       const existingJob = jobs.find(j => j.id === job.id);
-      if (existingJob && ['completed', 'failed', 'cancelled', 'expired'].includes(existingJob.status)) {
-        console.warn(`[BATCH JOB MANAGER] Blocking update for already ${existingJob.status} job`);
+      if (existingJob && existingJob.status === job.status) {
+        // Job status hasn't changed, skip update to prevent render loops
         return;
       }
     }
 
     debouncedStoreUpdater.scheduleUpdate(job, updateJob);
-  }, [jobs, updateJob]);
+  }, [updateJob]); // FIXED: Removed jobs dependency to prevent recreation
 
   // PERFORMANCE: Memoize jobs to prevent unnecessary recalculations
   const stableJobs = useMemo(() => {
-    const jobsString = JSON.stringify(jobs.map(j => ({ id: j.id, status: j.status, created_at: j.created_at })));
+    // FIXED: Only update when job count or status actually changes to prevent render loops
+    const jobsString = JSON.stringify(jobs.map(j => ({ id: j.id, status: j.status })));
     if (lastJobsRef.current === jobsString) {
-      return lastJobsRef.current === '' ? jobs : jobs; // Return the same reference if nothing changed
+      return jobs; // Return the same jobs array to maintain reference equality
     }
     lastJobsRef.current = jobsString;
     return jobs;
-  }, [jobs]);
+  }, [jobs.length, jobs.map(j => j.status).join(',')]);
 
   // Initialize large job optimization
   const largeJobOptimization = useLargeJobOptimization();
 
   // AUTOMATIC MANAGEMENT: Background cleanup and maintenance
   const { performCleanup } = useAutomaticJobCleanup({ jobs: stableJobs });
+  const { forceCleanup } = usePerformanceCleanup();
 
   // EMERGENCY FIX: Add status sync for recovery from completion update blocks
   const { syncJobStatus, syncAllJobStatuses } = useJobStatusSync({ onJobUpdate: debouncedUpdateJob });
@@ -168,6 +171,7 @@ export const useBatchJobManager = () => {
     largeJobOptimization,
     // AUTOMATIC CLEANUP: Background maintenance
     performCleanup,
+    forceCleanup,
     // STATUS SYNC: Manual recovery functions
     syncJobStatus,
     syncAllJobStatuses,
@@ -183,6 +187,7 @@ export const useBatchJobManager = () => {
     handleJobDelete,
     largeJobOptimization,
     performCleanup,
+    forceCleanup,
     syncJobStatus,
     syncAllJobStatuses
   ]);

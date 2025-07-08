@@ -52,10 +52,18 @@ export const useBatchJobAutoPolling = ({
         return false;
       }
       
-      // CIRCUIT BREAKER: Stop polling jobs older than 48 hours
+      // CIRCUIT BREAKER: Stop polling jobs older than 24 hours (reduced from 48h)
       const jobAge = Date.now() - new Date(job.created_at * 1000).getTime();
-      if (jobAge > 48 * 60 * 60 * 1000) {
+      if (jobAge > 24 * 60 * 60 * 1000) {
         productionLogger.warn(`Auto-polling: Excluding ancient job ${job.id.substring(0, 8)} (age: ${Math.round(jobAge/3600000)}h)`, undefined, 'BATCH_POLLING');
+        if (autoPollingJobs.has(job.id)) {
+          cleanupPolling(job.id);
+          setAutoPollingJobs(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(job.id);
+            return newSet;
+          });
+        }
         return false;
       }
       
@@ -88,7 +96,7 @@ export const useBatchJobAutoPolling = ({
         });
       }
     }
-  }, [jobs.length, autoPollingJobs.size, startPolling, cleanupPolling]); // Only re-run when counts change
+  }, [jobs.length, autoPollingJobs.size]); // FIXED: Removed function dependencies that cause renders
 
   // Cleanup on unmount
   useEffect(() => {

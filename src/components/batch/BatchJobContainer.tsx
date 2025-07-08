@@ -24,6 +24,7 @@ interface BatchJobContainerProps {
   onCancel: (jobId: string) => void;
   onJobDelete: (jobId: string) => void;
   onCleanup?: () => void; // Automatic cleanup function
+  onForceCleanup?: () => void; // Force performance cleanup function
 }
 
 const BatchJobContainer = ({
@@ -38,7 +39,8 @@ const BatchJobContainer = ({
   onDownload,
   onCancel,
   onJobDelete,
-  onCleanup
+  onCleanup,
+  onForceCleanup
 }: BatchJobContainerProps) => {
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
   const { toast } = useToast();
@@ -112,6 +114,22 @@ const BatchJobContainer = ({
           </div>
         </div>
         <div className="flex gap-2">
+          {onForceCleanup && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                onForceCleanup();
+                toast({
+                  title: "Performance Cleanup",
+                  description: "Cleared completed jobs from memory",
+                });
+              }}
+            >
+              <Zap className="h-4 w-4 mr-2" />
+              Cleanup
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"

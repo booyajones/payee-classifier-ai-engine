@@ -46,12 +46,12 @@ export const useEmergencyPageRecovery = () => {
       }, 500);
     };
 
-    // ONLY run emergency recovery if there are many jobs or performance issues detected
-    const shouldRunRecovery = jobs.length > 20 || 
-                             jobs.filter(j => ['completed', 'failed', 'cancelled', 'expired'].includes(j.status)).length > 10;
+    // REFINED: Only run emergency recovery when there are real performance issues
+    const completedJobs = jobs.filter(j => ['completed', 'failed', 'cancelled', 'expired'].includes(j.status)).length;
+    const shouldRunRecovery = jobs.length > 50 || completedJobs > 30; // Much higher thresholds
     
     if (shouldRunRecovery) {
-      console.log('[EMERGENCY RECOVERY] Performance issue detected, running recovery');
+      console.log('[EMERGENCY RECOVERY] Severe performance issue detected, running recovery');
       performEmergencyRecovery();
     } else {
       console.log('[EMERGENCY RECOVERY] No recovery needed - app is healthy');

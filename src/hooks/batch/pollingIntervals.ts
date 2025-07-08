@@ -11,35 +11,34 @@ export const calculatePollingDelay = (job: BatchJob): number => {
   const jobAge = now - createdTime.getTime();
   
   // AUTOMATIC MANAGEMENT: Dramatically reduce polling for old jobs to prevent unresponsiveness
-  if (jobAge > 48 * 60 * 60 * 1000) { // Over 48 hours
-    console.warn(`[POLLING] Job ${job.id.substring(0, 8)} is over 48 hours old - stopping polling`);
+  if (jobAge > 24 * 60 * 60 * 1000) { // Over 24 hours
+    console.warn(`[POLLING] Job ${job.id.substring(0, 8)} is over 24 hours old - stopping polling`);
     return Infinity; // Stop polling completely for ancient jobs
   }
   
-  if (jobAge > 24 * 60 * 60 * 1000) { // Over 24 hours
-    console.warn(`[POLLING] Job ${job.id.substring(0, 8)} is over 24 hours old - using maximum polling interval`);
-    return 30 * 60 * 1000; // 30 minutes for very old jobs
-  }
-  
   if (jobAge > 12 * 60 * 60 * 1000) { // Over 12 hours
-    return 15 * 60 * 1000; // 15 minutes for old jobs
+    return 15 * 60 * 1000; // 15 minutes for very old jobs
   }
   
   if (jobAge > 6 * 60 * 60 * 1000) { // Over 6 hours
-    return 10 * 60 * 1000; // 10 minutes
+    return 10 * 60 * 1000; // 10 minutes for old jobs
   }
   
   if (jobAge > 2 * 60 * 60 * 1000) { // Over 2 hours
     return 5 * 60 * 1000; // 5 minutes
   }
   
+  if (jobAge > 1 * 60 * 60 * 1000) { // Over 1 hour
+    return 3 * 60 * 1000; // 3 minutes
+  }
+  
   if (jobAge > 30 * 60 * 1000) { // Over 30 minutes
     return 2 * 60 * 1000; // 2 minutes
   }
   
-  // Fresh jobs get more frequent polling
+  // Fresh jobs get more frequent polling but not too aggressive
   const hasProgress = job.request_counts.completed > 0;
-  return hasProgress ? 30 * 1000 : 60 * 1000; // 30-60 seconds for new jobs
+  return hasProgress ? 60 * 1000 : 120 * 1000; // 1-2 minutes for new jobs (reduced from 30-60 seconds)
 };
 
 export const getInitialPollingDelay = (job: BatchJob): number => {
