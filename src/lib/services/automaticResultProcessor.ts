@@ -17,7 +17,7 @@ export class AutomaticResultProcessor {
     try {
       console.log(`[AUTO PROCESSOR] Starting automatic processing for completed job ${batchJob.id}`);
       
-      // Check if results already exist for this job
+      // Check if results already exist for this job to prevent duplicate processing
       const { data: existingResults, error: checkError } = await supabase
         .from('payee_classifications')
         .select('id')
@@ -30,8 +30,8 @@ export class AutomaticResultProcessor {
       }
       
       if (existingResults && existingResults.length > 0) {
-        console.log(`[AUTO PROCESSOR] Results already exist for job ${batchJob.id}, skipping processing`);
-        return true;
+        console.log(`[AUTO PROCESSOR] Results already exist for job ${batchJob.id} - skipping duplicate processing`);
+        return true; // Already processed, consider it successful
       }
       
       // Get the payee data from the batch job

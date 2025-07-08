@@ -103,44 +103,17 @@ export const saveClassificationResultsWithValidation = async (
     for (const record of batchRecords) {
       try {
         await circuitBreaker(async () => {
-          // Wrap database operations in exponential backoff
+          // Use efficient upsert to eliminate constraint violations and improve performance
           await exponentialBackoff(async () => {
-            // First try to insert the record
-            const { error: insertError } = await supabase
+            const { error } = await supabase
               .from('payee_classifications')
-              .insert([record]);
+              .upsert([record], {
+                onConflict: 'payee_name,row_index,batch_id',
+                ignoreDuplicates: false
+              });
             
-            if (insertError && insertError.code === '23505') {
-              // Unique constraint violation - update existing record with duplicate detection data
-              const { error: updateError } = await supabase
-                .from('payee_classifications')
-                .update({
-                  // Update duplicate detection fields specifically
-                  is_potential_duplicate: record.is_potential_duplicate,
-                  duplicate_of_payee_id: record.duplicate_of_payee_id,
-                  duplicate_confidence_score: record.duplicate_confidence_score,
-                  duplicate_detection_method: record.duplicate_detection_method,
-                  duplicate_group_id: record.duplicate_group_id,
-                  ai_duplicate_reasoning: record.ai_duplicate_reasoning,
-                  // Also update other fields that might have changed
-                  classification: record.classification,
-                  confidence: record.confidence,
-                  reasoning: record.reasoning,
-                  sic_code: record.sic_code,
-                  sic_description: record.sic_description
-                })
-                .eq('payee_name', record.payee_name)
-                .eq('batch_id', record.batch_id)
-                .eq('row_index', record.row_index);
-              
-              if (updateError) {
-                throw new DatabaseError(`Update failed for "${record.payee_name}": ${updateError.message}`, updateError.code, true);
-              } else {
-                duplicateUpdates++;
-                console.log(`[RESILIENT DB] Updated duplicate detection data for: "${record.payee_name}"`);
-              }
-            } else if (insertError) {
-              throw new DatabaseError(`Insert failed for "${record.payee_name}": ${insertError.message}`, insertError.code, true);
+            if (error) {
+              throw new DatabaseError(`Upsert failed for "${record.payee_name}": ${error.message}`, error.code, true);
             } else {
               successfulInserts++;
             }
