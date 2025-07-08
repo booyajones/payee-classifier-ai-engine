@@ -1,24 +1,30 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, CheckCircle, Clock, AlertCircle, Loader2 } from 'lucide-react';
+import { Download, CheckCircle, Clock, AlertCircle, Loader2, Trash2 } from 'lucide-react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import DirectDatabaseDownload from '@/components/batch/DirectDatabaseDownload';
 import { Badge } from '@/components/ui/badge';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface UnifiedDownloadCenterProps {
   jobs: BatchJob[];
   payeeRowDataMap: Record<string, PayeeRowData>;
   onDownload: (job: BatchJob) => Promise<void>;
+  onDelete?: (jobId: string) => Promise<void>;
 }
 
 const UnifiedDownloadCenter = ({
   jobs,
   payeeRowDataMap,
-  onDownload
+  onDownload,
+  onDelete
 }: UnifiedDownloadCenterProps) => {
   const [downloadingJobs, setDownloadingJobs] = useState<Set<string>>(new Set());
+  const [deletingJobs, setDeletingJobs] = useState<Set<string>>(new Set());
+  const { toast } = useToast();
 
   // Filter jobs that are available for download
   const downloadableJobs = jobs.filter(job => 
@@ -32,6 +38,31 @@ const UnifiedDownloadCenter = ({
       await onDownload(job);
     } finally {
       setDownloadingJobs(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(job.id);
+        return newSet;
+      });
+    }
+  };
+
+  const handleJobDelete = async (job: BatchJob) => {
+    if (!onDelete) return;
+    
+    setDeletingJobs(prev => new Set(prev).add(job.id));
+    try {
+      await onDelete(job.id);
+      toast({
+        title: "Job Deleted",
+        description: `Job ${job.metadata?.job_name || job.id.substring(0, 8)} has been deleted successfully.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Delete Failed", 
+        description: `Failed to delete job: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingJobs(prev => {
         const newSet = new Set(prev);
         newSet.delete(job.id);
         return newSet;
@@ -138,6 +169,43 @@ const UnifiedDownloadCenter = ({
                       jobId={job.id}
                       className="h-9"
                     />
+                    
+                    {onDelete && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-9 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            disabled={deletingJobs.has(job.id)}
+                          >
+                            {deletingJobs.has(job.id) ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Job</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete "{job.metadata?.job_name || `Job ${job.id.substring(0, 8)}`}"? 
+                              This action cannot be undone and will permanently remove all job data and results.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleJobDelete(job)}
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              Delete Job
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
                 </div>
               );
@@ -160,8 +228,47 @@ const UnifiedDownloadCenter = ({
                         {job.status}
                       </Badge>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      {job.request_counts.completed}/{job.request_counts.total} processed
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs text-muted-foreground">
+                        {job.request_counts.completed}/{job.request_counts.total} processed
+                      </div>
+                      
+                      {onDelete && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              disabled={deletingJobs.has(job.id)}
+                            >
+                              {deletingJobs.has(job.id) ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Job</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete "{job.metadata?.job_name || `Job ${job.id.substring(0, 8)}`}"? 
+                                This action cannot be undone and will permanently remove all job data and results.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleJobDelete(job)}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                Delete Job
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
                     </div>
                   </div>
                 ))}

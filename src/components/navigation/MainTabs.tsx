@@ -290,6 +290,14 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
                   const { handleDownload } = useBatchJobDownloadHandler({ payeeDataMap });
                   await handleDownload(job);
                 }}
+                onDelete={async (jobId) => {
+                  // Import the job deletion logic
+                  const { useBatchJobStore } = await import('@/stores/batchJobStore');
+                  const { removeJob } = useBatchJobStore.getState();
+                  
+                  // Remove from store - this will automatically update the jobs array
+                  removeJob(jobId);
+                }}
               />
             </TabsContent>
 
