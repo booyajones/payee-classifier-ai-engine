@@ -10,6 +10,7 @@ import { useLargeJobOptimization } from '@/hooks/batch/useLargeJobOptimization';
 import { debouncedStoreUpdater } from '@/lib/performance/debounceStore';
 import { emergencyStop } from '@/lib/performance/emergencyStop';
 import { useJobStatusSync } from '@/hooks/useJobStatusSync';
+import { useEmergencyKillSwitch } from '@/hooks/useEmergencyKillSwitch';
 
 export const useBatchJobManager = () => {
   const {
@@ -79,6 +80,9 @@ export const useBatchJobManager = () => {
 
   // EMERGENCY FIX: Add status sync for recovery from completion update blocks
   const { syncJobStatus, syncAllJobStatuses } = useJobStatusSync({ onJobUpdate: debouncedUpdateJob });
+
+  // EMERGENCY KILL SWITCH: Stop all jobs if system becomes unresponsive
+  const { emergencyKillAll, quickReset, isEmergencyActive } = useEmergencyKillSwitch();
 
   // DEBOUNCED: Handle real-time updates with debouncing
   useBatchJobRealtimeHandler({ onJobUpdate: debouncedUpdateJob });
@@ -165,6 +169,10 @@ export const useBatchJobManager = () => {
     // EMERGENCY FIX: Status sync functions for manual recovery
     syncJobStatus,
     syncAllJobStatuses,
+    // EMERGENCY KILL SWITCH
+    emergencyKillAll,
+    quickReset,
+    isEmergencyActive,
     // Timeout manager component
     TimeoutManager: BatchJobTimeoutManager
   }), [
@@ -177,6 +185,9 @@ export const useBatchJobManager = () => {
     handleJobDelete,
     largeJobOptimization,
     syncJobStatus,
-    syncAllJobStatuses
+    syncAllJobStatuses,
+    emergencyKillAll,
+    quickReset,
+    isEmergencyActive
   ]);
 };
