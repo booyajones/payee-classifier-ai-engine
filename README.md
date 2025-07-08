@@ -71,3 +71,7 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Upload Limitations & Troubleshooting
+
+Large files are parsed using a Web Worker. If the worker fails to start (some browsers or extensions may block it), the app falls back to main‑thread parsing. Progress may update slower in this mode. If uploads appear stuck, try disabling extensions or switching browsers.
