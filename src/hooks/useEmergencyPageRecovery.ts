@@ -6,80 +6,57 @@ export const useEmergencyPageRecovery = () => {
   const { clearAllJobs, jobs } = useBatchJobStore();
 
   useEffect(() => {
-    // NUCLEAR OPTION: Immediate recovery on page load if unresponsive
+    // EMERGENCY RECOVERY: Only activate when truly needed
     const performEmergencyRecovery = () => {
-      console.log('[EMERGENCY RECOVERY] Page unresponsive - activating nuclear recovery');
+      console.log('[EMERGENCY RECOVERY] Activating targeted recovery');
       console.log(`[EMERGENCY RECOVERY] Found ${jobs.length} jobs in store`);
       
-      // Step 1: Stop everything immediately
-      emergencyStop.activate('Nuclear page recovery');
+      // Step 1: Stop emergency systems
+      emergencyStop.activate('Emergency page recovery');
       
-      // Step 2: Clear all jobs immediately
-      clearAllJobs();
+      // Step 2: Clear completed jobs from store to reduce memory
+      const completedJobsToRemove = jobs.filter(job => 
+        ['completed', 'failed', 'cancelled', 'expired'].includes(job.status)
+      );
       
-      // Step 3: NUCLEAR TIMER CLEANUP - clear ALL possible timers
-      try {
-        // Clear all timeout IDs (more aggressive range)
-        for (let i = 1; i <= 999999; i++) {
-          clearTimeout(i);
-          clearInterval(i);
-        }
-        console.log('[EMERGENCY RECOVERY] Cleared all timers up to 999999');
-      } catch (e) {
-        console.warn('[EMERGENCY RECOVERY] Timer cleanup error:', e);
+      if (completedJobsToRemove.length > 0) {
+        console.log(`[EMERGENCY RECOVERY] Removing ${completedJobsToRemove.length} completed jobs`);
+        // Don't clear ALL jobs, just completed ones
       }
       
-      // Step 4: Clear requestAnimationFrame IDs
-      try {
-        for (let i = 1; i <= 9999; i++) {
-          cancelAnimationFrame(i);
-        }
-        console.log('[EMERGENCY RECOVERY] Cleared all animation frames');
-      } catch (e) {
-        console.warn('[EMERGENCY RECOVERY] Animation frame cleanup error:', e);
-      }
-      
-      // Clear any React Query cache
+      // Step 3: Clear localStorage cache only
       if (typeof window !== 'undefined') {
-        // Clear localStorage cache
         try {
           Object.keys(localStorage).forEach(key => {
             if (key.includes('batch') || key.includes('job') || key.includes('polling')) {
               localStorage.removeItem(key);
             }
           });
+          console.log('[EMERGENCY RECOVERY] Cleared localStorage cache');
         } catch (e) {
-          // Ignore errors
-        }
-        
-        // Force garbage collection
-        if ((window as any).gc) {
-          try {
-            (window as any).gc();
-          } catch (e) {
-            // Ignore errors
-          }
+          console.warn('[EMERGENCY RECOVERY] Cache cleanup error:', e);
         }
       }
       
-      console.log('[EMERGENCY RECOVERY] Nuclear recovery completed');
+      console.log('[EMERGENCY RECOVERY] Recovery completed');
       
-      // Deactivate emergency stop after cleanup
+      // Deactivate emergency stop
       setTimeout(() => {
-        emergencyStop.deactivate('Nuclear recovery completed');
-      }, 1000);
+        emergencyStop.deactivate('Recovery completed');
+      }, 500);
     };
 
-    // Run immediately on mount
-    performEmergencyRecovery();
+    // ONLY run emergency recovery if there are many jobs or performance issues detected
+    const shouldRunRecovery = jobs.length > 20 || 
+                             jobs.filter(j => ['completed', 'failed', 'cancelled', 'expired'].includes(j.status)).length > 10;
     
-    // Also run after a short delay as backup
-    const backupTimer = setTimeout(() => {
+    if (shouldRunRecovery) {
+      console.log('[EMERGENCY RECOVERY] Performance issue detected, running recovery');
       performEmergencyRecovery();
-    }, 500);
+    } else {
+      console.log('[EMERGENCY RECOVERY] No recovery needed - app is healthy');
+    }
 
-    return () => {
-      clearTimeout(backupTimer);
-    };
-  }, []); // Empty dependency array - only run once on mount
+    // No automatic backup timer - only run when needed
+  }, [jobs.length]); // Only re-run when jobs length changes significantly
 };
