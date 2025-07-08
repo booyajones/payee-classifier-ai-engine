@@ -79,8 +79,16 @@ export const useBatchJobManager = () => {
   // DEBOUNCED: Handle real-time updates with debouncing
   useBatchJobRealtimeHandler({ onJobUpdate: debouncedUpdateJob });
 
-  // PERFORMANCE: Memoize batch job actions to prevent recreation
-  const batchJobActions = useMemo(() => {
+  // FIXED: Call hooks at top level (not inside useMemo - this was causing the infinite loop!)
+  const batchJobActions = useBatchJobActions({
+    jobs: stableJobs,
+    payeeRowDataMap: payeeDataMap,
+    onJobUpdate: debouncedUpdateJob,
+    onJobComplete: () => {} // Handle job completion if needed
+  });
+
+  // Emergency circuit breaker for the batch job actions
+  const safeBatchJobActions = useMemo(() => {
     if (emergencyStop.check()) {
       return {
         refreshingJobs: new Set<string>(),
@@ -92,21 +100,15 @@ export const useBatchJobManager = () => {
         detectStalledJob: () => false
       };
     }
-
-    return useBatchJobActions({
-      jobs: stableJobs,
-      payeeRowDataMap: payeeDataMap,
-      onJobUpdate: debouncedUpdateJob,
-      onJobComplete: () => {} // Handle job completion if needed
-    });
-  }, [stableJobs, payeeDataMap, debouncedUpdateJob]);
+    return batchJobActions;
+  }, [batchJobActions]);
 
   // Initialize auto-polling for active jobs (only if not in emergency mode)
   useBatchJobAutoPolling({
     jobs: emergencyStop.check() ? [] : stableJobs,
     autoPollingJobs,
     setAutoPollingJobs,
-    handleRefreshJob: batchJobActions.handleRefreshJob
+    handleRefreshJob: safeBatchJobActions.handleRefreshJob
   });
 
   // Download handler
