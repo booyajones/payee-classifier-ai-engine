@@ -11,6 +11,7 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
   const {
     refreshingJobs,
     handleRefreshJob,
+    handleForceRefresh,
     isRefreshRetrying,
     detectStalledJob
   } = useBatchJobRefreshCore(onJobUpdate);
@@ -20,6 +21,7 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
   return {
     refreshingJobs,
     handleRefreshJob,
+    handleForceRefresh,
     handleForceStatusSync,
     isRefreshRetrying,
     detectStalledJob

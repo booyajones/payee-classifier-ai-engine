@@ -36,7 +36,7 @@ export const useBatchJobActions = ({
   const memoizedJobs = useMemo(() => jobs, [JSON.stringify(jobs.map(j => ({ id: j.id, status: j.status, created_at: j.created_at })))]);
 
   // Initialize hooks with safe callbacks
-  const { refreshingJobs, handleRefreshJob: baseHandleRefreshJob, handleForceStatusSync, detectStalledJob } = useBatchJobRefresh(wrappedOnJobUpdate);
+  const { refreshingJobs, handleRefreshJob: baseHandleRefreshJob, handleForceRefresh, handleForceStatusSync, detectStalledJob } = useBatchJobRefresh(wrappedOnJobUpdate);
   const { pollingStates, refreshSpecificJob } = useBatchJobPolling(memoizedJobs, wrappedOnJobUpdate);
   const { handleCancelJob } = useBatchJobCancellation(wrappedOnJobUpdate);
   
@@ -68,6 +68,7 @@ export const useBatchJobActions = ({
     
     // Enhanced actions with comprehensive error handling
     handleRefreshJob: actionHandlers.handleRefreshJob,
+    handleForceRefresh, // FORCE REFRESH: Bypasses rate limits for debugging
     handleForceStatusSync, // EMERGENCY FIX: Direct database sync
     handleDownloadResults: actionHandlers.handleDownloadResults,
     handleCancelJob: actionHandlers.handleCancelJob,

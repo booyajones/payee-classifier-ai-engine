@@ -170,6 +170,7 @@ export const useBatchJobManager = () => {
     pollingStates: batchJobActions.pollingStates,
     stalledJobActions,
     handleRefreshJob: batchJobActions.handleRefreshJob,
+    handleForceRefresh: batchJobActions.handleForceRefresh, // FORCE REFRESH: Debug capability
     handleForceStatusSync: batchJobActions.handleForceStatusSync, // EMERGENCY FIX
     handleDownloadResults: batchJobActions.handleDownloadResults,
     handleCancelJob: batchJobActions.handleCancelJob,

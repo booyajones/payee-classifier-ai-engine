@@ -75,8 +75,10 @@ export const usePollingOrchestrator = ({
 
         const isActiveJob = isActiveJobStatus(job.status);
         
-        // More conservative polling decision
-        const shouldPoll = isActiveJob && (hasJobChanged(job) || Math.random() < 0.1); // Reduced from 0.3 to 0.1
+        // More responsive polling decision - increased probability
+        const shouldPoll = isActiveJob && (hasJobChanged(job) || Math.random() < 0.5); // Increased from 0.1 to 0.5
+        
+        console.log(`[POLLING] Job ${jobId.substring(0, 8)}: active=${isActiveJob}, changed=${hasJobChanged(job)}, shouldPoll=${shouldPoll}`);
         
         if (shouldPoll) {
           await handleRefreshJob(jobId, true);

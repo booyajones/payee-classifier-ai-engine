@@ -64,48 +64,54 @@ export const useBatchJobStore = create<BatchJobState & BatchJobActions>()(
       jobs: [...state.jobs.filter(j => j.id !== job.id), job] 
     })),
     updateJob: (job) => set((state) => {
-      // EMERGENCY CIRCUIT BREAKER: Only block updates if emergency stop is actively interfering
-      if (typeof window !== 'undefined' && (window as any).__EMERGENCY_STOP_ACTIVE && 
-          ['in_progress', 'validating'].includes(job.status)) {
-        console.warn(`[STORE] Emergency stop active, blocking active job update for ${job.id.substring(0, 8)}`);
-        return state;
+      console.log(`[STORE] Updating job ${job.id.substring(0, 8)} with status: ${job.status}`);
+      
+      // Only block updates during true emergencies (rendering issues), not normal operation
+      const isEmergencyActive = typeof window !== 'undefined' && (window as any).__EMERGENCY_STOP_ACTIVE;
+      if (isEmergencyActive) {
+        console.log(`[STORE] Emergency stop active but allowing data update for ${job.id.substring(0, 8)}`);
+        // Allow data updates but log them during emergency stop
       }
 
-      // EMERGENCY OPTIMIZATION: More aggressive filtering for completed jobs
+      // Smart filtering for completed jobs - only skip if truly no changes
       if (['completed', 'failed', 'cancelled', 'expired'].includes(job.status)) {
         const existingJob = state.jobs.find(j => j.id === job.id);
         if (existingJob && 
             existingJob.status === job.status && 
             existingJob.request_counts?.completed === job.request_counts?.completed &&
-            existingJob.output_file_id === job.output_file_id) {
+            existingJob.output_file_id === job.output_file_id &&
+            existingJob.metadata === job.metadata) {
+          console.log(`[STORE] Skipping identical update for completed job ${job.id.substring(0, 8)}`);
           return state; // No meaningful changes for completed jobs
         }
       }
 
-      // EMERGENCY: More aggressive age filtering (12 hours instead of 24)
+      // Extended job age limit to 24 hours for better user experience
       const jobAge = Date.now() - new Date(job.created_at * 1000).getTime();
-      if (jobAge > 12 * 60 * 60 * 1000) {
-        console.warn(`[STORE] Blocking update for ancient job ${job.id.substring(0, 8)} (age: ${Math.round(jobAge/3600000)}h)`);
+      if (jobAge > 24 * 60 * 60 * 1000) {
+        console.warn(`[STORE] Blocking update for very old job ${job.id.substring(0, 8)} (age: ${Math.round(jobAge/3600000)}h)`);
         return state;
       }
 
-      // EMERGENCY: Simplified change detection for critical fields only
+      // More permissive change detection - allow updates for active jobs
       const existingJob = state.jobs.find(j => j.id === job.id);
-      if (existingJob) {
+      if (existingJob && ['completed', 'failed', 'cancelled', 'expired'].includes(job.status)) {
         const statusChanged = existingJob.status !== job.status;
         const progressChanged = existingJob.request_counts?.completed !== job.request_counts?.completed;
         const outputChanged = existingJob.output_file_id !== job.output_file_id;
         
         if (!statusChanged && !progressChanged && !outputChanged) {
-          return state; // Skip update if no critical changes
+          console.log(`[STORE] Skipping non-critical update for ${job.id.substring(0, 8)}`);
+          return state; // Skip update if no critical changes for completed jobs
         }
       }
 
-      // EMERGENCY: Limit job store size to prevent memory bloat
+      // Update job with better logging
       let updatedJobs = state.jobs.map(j => j.id === job.id ? job : j);
       
       // If adding new job, ensure we don't exceed limit
       if (!existingJob) {
+        console.log(`[STORE] Adding new job ${job.id.substring(0, 8)} to store`);
         updatedJobs = [...updatedJobs, job];
         
         // Keep only latest 50 jobs to prevent memory issues
@@ -113,7 +119,10 @@ export const useBatchJobStore = create<BatchJobState & BatchJobActions>()(
           updatedJobs = updatedJobs
             .sort((a, b) => b.created_at - a.created_at)
             .slice(0, 50);
+          console.log(`[STORE] Trimmed job store to 50 jobs`);
         }
+      } else {
+        console.log(`[STORE] Updated existing job ${job.id.substring(0, 8)}: ${existingJob.status} -> ${job.status}`);
       }
 
       return { jobs: updatedJobs };

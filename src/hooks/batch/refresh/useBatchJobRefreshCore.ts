@@ -36,11 +36,11 @@ export const useBatchJobRefreshCore = (onJobUpdate: (job: BatchJob) => void) => 
   });
 
   const handleRefreshJob = useCallback(async (jobId: string, silent: boolean = false) => {
-    // Circuit breaker: prevent rapid repeated requests
+    // More lenient circuit breaker: allow refreshes every 1 second instead of 2
     const now = Date.now();
     const lastRequest = lastRequestTime.current.get(jobId);
-    if (lastRequest && now - lastRequest < 2000) {
-      console.log(`[JOB REFRESH] Rate limited refresh request for ${jobId.substring(0, 8)} - too soon`);
+    if (lastRequest && now - lastRequest < 1000) {
+      console.log(`[JOB REFRESH] Rate limited refresh request for ${jobId.substring(0, 8)} - too soon (${now - lastRequest}ms ago)`);
       return;
     }
 
@@ -52,6 +52,7 @@ export const useBatchJobRefreshCore = (onJobUpdate: (job: BatchJob) => void) => 
       activeRequests.current.delete(jobId);
     }
 
+    console.log(`[JOB REFRESH] Starting refresh for job ${jobId.substring(0, 8)} (silent: ${silent})`);
     setRefreshingJobs(prev => new Set(prev).add(jobId));
     lastRequestTime.current.set(jobId, now);
     
@@ -112,18 +113,41 @@ export const useBatchJobRefreshCore = (onJobUpdate: (job: BatchJob) => void) => 
       
       handleRefreshError(error, jobId, () => handleRefreshJob(jobId, silent));
     } finally {
-      // Always clean up refresh state
+      // Always clean up refresh state, even during emergency stop
+      console.log(`[JOB REFRESH] Cleaning up refresh state for ${jobId.substring(0, 8)}`);
       setRefreshingJobs(prev => {
         const newSet = new Set(prev);
         newSet.delete(jobId);
         return newSet;
       });
+      
+      // Ensure cleanup happens even during emergency conditions
+      activeRequests.current.delete(jobId);
     }
   }, [onJobUpdate, toast, detectStalledJob, handleRefreshError]);
+
+  // Force refresh bypasses rate limiting for debugging
+  const handleForceRefresh = useCallback(async (jobId: string) => {
+    console.log(`[JOB REFRESH] FORCE REFRESH for job ${jobId.substring(0, 8)} - bypassing rate limits`);
+    
+    // Cancel any existing request
+    const existingRequest = activeRequests.current.get(jobId);
+    if (existingRequest) {
+      existingRequest.cancel();
+      activeRequests.current.delete(jobId);
+    }
+
+    // Reset rate limiting for this job
+    lastRequestTime.current.delete(jobId);
+    
+    // Call normal refresh
+    return handleRefreshJob(jobId, false);
+  }, [handleRefreshJob]);
 
   return {
     refreshingJobs,
     handleRefreshJob,
+    handleForceRefresh,
     isRefreshRetrying,
     detectStalledJob
   };
