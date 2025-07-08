@@ -18,14 +18,12 @@ interface BatchJobContainerProps {
   pollingStates: Record<string, any>;
   stalledJobActions?: Record<string, any>;
   largeJobOptimization?: any;
-  isEmergencyActive?: boolean;
   onRefresh: (jobId: string, silent?: boolean) => Promise<void>;
   onForceSync?: (jobId: string) => Promise<BatchJob>; // EMERGENCY FIX
   onDownload: (job: BatchJob) => Promise<void>;
   onCancel: (jobId: string) => void;
   onJobDelete: (jobId: string) => void;
-  onEmergencyKill?: () => Promise<void>; // EMERGENCY KILL
-  onQuickReset?: () => void; // QUICK RESET
+  onCleanup?: () => void; // Automatic cleanup function
 }
 
 const BatchJobContainer = ({
@@ -35,14 +33,12 @@ const BatchJobContainer = ({
   pollingStates,
   stalledJobActions = {},
   largeJobOptimization,
-  isEmergencyActive = false,
   onRefresh,
   onForceSync,
   onDownload,
   onCancel,
   onJobDelete,
-  onEmergencyKill,
-  onQuickReset
+  onCleanup
 }: BatchJobContainerProps) => {
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
   const { toast } = useToast();
@@ -116,38 +112,11 @@ const BatchJobContainer = ({
           </div>
         </div>
         <div className="flex gap-2">
-          {/* EMERGENCY CONTROLS */}
-          {(activeJobs.length > 0 || isEmergencyActive) && (
-            <>
-              {onQuickReset && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onQuickReset}
-                  className="text-orange-600 border-orange-300 hover:bg-orange-50"
-                >
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Quick Reset
-                </Button>
-              )}
-              {onEmergencyKill && activeJobs.length > 0 && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={onEmergencyKill}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  <Zap className="h-4 w-4 mr-2" />
-                  Kill All Jobs
-                </Button>
-              )}
-            </>
-          )}
           <Button
             variant="outline"
             size="sm"
             onClick={handleRefreshAll}
-            disabled={isRefreshingAll || isEmergencyActive}
+            disabled={isRefreshingAll}
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshingAll ? 'animate-spin' : ''}`} />
             Refresh All

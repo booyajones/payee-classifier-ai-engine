@@ -15,9 +15,7 @@ const BatchJobManagerContainer = () => {
     handleCancelJob,
     handleJobDelete,
     largeJobOptimization,
-    emergencyKillAll,
-    quickReset,
-    isEmergencyActive,
+    performCleanup,
     TimeoutManager
   } = useBatchJobManager();
 
@@ -33,14 +31,12 @@ const BatchJobManagerContainer = () => {
         pollingStates={pollingStates}
         stalledJobActions={stalledJobActions}
         largeJobOptimization={largeJobOptimization}
-        isEmergencyActive={isEmergencyActive}
         onRefresh={handleRefreshJob}
         onForceSync={handleForceStatusSync}
         onDownload={handleDownloadResults}
         onCancel={handleCancelJob}
         onJobDelete={handleJobDelete}
-        onEmergencyKill={emergencyKillAll}
-        onQuickReset={quickReset}
+        onCleanup={performCleanup}
       />
     </>
   );

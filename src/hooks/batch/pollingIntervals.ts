@@ -7,35 +7,51 @@ export const calculatePollingDelay = (job: BatchJob): number => {
   }
 
   const now = Date.now();
-  const jobAge = now - new Date(job.created_at * 1000).getTime();
-  const isRecentJob = jobAge < 30 * 60 * 1000; // Under 30 minutes
-  const isOldJob = jobAge > 2 * 60 * 60 * 1000; // Over 2 hours
-  const isVeryOldJob = jobAge > 12 * 60 * 60 * 1000; // Over 12 hours
-  const isExtremelyOldJob = jobAge > 24 * 60 * 60 * 1000; // Over 24 hours
-  const isTooOld = jobAge > 48 * 60 * 60 * 1000; // Over 48 hours
+  const createdTime = new Date(job.created_at * 1000);
+  const jobAge = now - createdTime.getTime();
+  
+  // AUTOMATIC MANAGEMENT: Dramatically reduce polling for old jobs to prevent unresponsiveness
+  if (jobAge > 48 * 60 * 60 * 1000) { // Over 48 hours
+    console.warn(`[POLLING] Job ${job.id.substring(0, 8)} is over 48 hours old - stopping polling`);
+    return Infinity; // Stop polling completely for ancient jobs
+  }
+  
+  if (jobAge > 24 * 60 * 60 * 1000) { // Over 24 hours
+    console.warn(`[POLLING] Job ${job.id.substring(0, 8)} is over 24 hours old - using maximum polling interval`);
+    return 30 * 60 * 1000; // 30 minutes for very old jobs
+  }
+  
+  if (jobAge > 12 * 60 * 60 * 1000) { // Over 12 hours
+    return 15 * 60 * 1000; // 15 minutes for old jobs
+  }
+  
+  if (jobAge > 6 * 60 * 60 * 1000) { // Over 6 hours
+    return 10 * 60 * 1000; // 10 minutes
+  }
+  
+  if (jobAge > 2 * 60 * 60 * 1000) { // Over 2 hours
+    return 5 * 60 * 1000; // 5 minutes
+  }
+  
+  if (jobAge > 30 * 60 * 1000) { // Over 30 minutes
+    return 2 * 60 * 1000; // 2 minutes
+  }
+  
+  // Fresh jobs get more frequent polling
   const hasProgress = job.request_counts.completed > 0;
-  
-  // CIRCUIT BREAKER: Stop polling jobs older than 48 hours
-  if (isTooOld) {
-    return Infinity; // Complete circuit breaker for ancient jobs
-  }
-  
-  // AGGRESSIVE PERFORMANCE: Dramatically reduce polling for old jobs
-  if (isExtremelyOldJob) {
-    return 1800000; // 30 minutes for extremely old jobs (was 10 minutes)
-  } else if (isVeryOldJob) {
-    return hasProgress ? 900000 : 1800000; // 15-30 minutes for very old jobs (was 5-10 minutes)
-  } else if (isOldJob) {
-    return 300000; // 5 minutes for old jobs (was 2 minutes)
-  } else if (isRecentJob && hasProgress) {
-    return 30000; // 30 seconds for recent active jobs (was 15 seconds)
-  } else {
-    return 60000; // 1 minute default (was 45 seconds)
-  }
+  return hasProgress ? 30 * 1000 : 60 * 1000; // 30-60 seconds for new jobs
 };
 
 export const getInitialPollingDelay = (job: BatchJob): number => {
-  return job.status === 'in_progress' ? 2000 : 5000;
+  const jobAge = Date.now() - new Date(job.created_at * 1000).getTime();
+  
+  // Immediate polling for very fresh jobs
+  if (jobAge < 5 * 60 * 1000) { // Under 5 minutes
+    return job.status === 'in_progress' ? 2000 : 5000;
+  }
+  
+  // Longer initial delay for older jobs
+  return 10000; // 10 seconds for older jobs
 };
 
 export const getErrorRetryDelay = (): number => {

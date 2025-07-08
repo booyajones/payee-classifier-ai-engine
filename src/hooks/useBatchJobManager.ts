@@ -10,7 +10,7 @@ import { useLargeJobOptimization } from '@/hooks/batch/useLargeJobOptimization';
 import { debouncedStoreUpdater } from '@/lib/performance/debounceStore';
 import { emergencyStop } from '@/lib/performance/emergencyStop';
 import { useJobStatusSync } from '@/hooks/useJobStatusSync';
-import { useEmergencyKillSwitch } from '@/hooks/useEmergencyKillSwitch';
+import { useAutomaticJobCleanup } from '@/hooks/useAutomaticJobCleanup';
 
 export const useBatchJobManager = () => {
   const {
@@ -78,11 +78,11 @@ export const useBatchJobManager = () => {
   // Initialize large job optimization
   const largeJobOptimization = useLargeJobOptimization();
 
+  // AUTOMATIC MANAGEMENT: Background cleanup and maintenance
+  const { performCleanup } = useAutomaticJobCleanup({ jobs: stableJobs });
+
   // EMERGENCY FIX: Add status sync for recovery from completion update blocks
   const { syncJobStatus, syncAllJobStatuses } = useJobStatusSync({ onJobUpdate: debouncedUpdateJob });
-
-  // EMERGENCY KILL SWITCH: Stop all jobs if system becomes unresponsive
-  const { emergencyKillAll, quickReset, isEmergencyActive } = useEmergencyKillSwitch();
 
   // DEBOUNCED: Handle real-time updates with debouncing
   useBatchJobRealtimeHandler({ onJobUpdate: debouncedUpdateJob });
@@ -166,13 +166,11 @@ export const useBatchJobManager = () => {
     handleJobDelete,
     // Large job optimization
     largeJobOptimization,
-    // EMERGENCY FIX: Status sync functions for manual recovery
+    // AUTOMATIC CLEANUP: Background maintenance
+    performCleanup,
+    // STATUS SYNC: Manual recovery functions
     syncJobStatus,
     syncAllJobStatuses,
-    // EMERGENCY KILL SWITCH
-    emergencyKillAll,
-    quickReset,
-    isEmergencyActive,
     // Timeout manager component
     TimeoutManager: BatchJobTimeoutManager
   }), [
@@ -184,10 +182,8 @@ export const useBatchJobManager = () => {
     handleCancel,
     handleJobDelete,
     largeJobOptimization,
+    performCleanup,
     syncJobStatus,
-    syncAllJobStatuses,
-    emergencyKillAll,
-    quickReset,
-    isEmergencyActive
+    syncAllJobStatuses
   ]);
 };
