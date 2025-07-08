@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useBatchJobStore } from '@/stores/batchJobStore';
 import { useBatchJobActions } from '@/components/batch/useBatchJobActions';
-import { useBatchJobAutoPolling } from '@/components/batch/BatchJobAutoPolling';
+import { useBatchJobAutoPolling } from '@/hooks/batch/useBatchJobAutoPolling';
 import { useBatchJobRealtimeHandler } from '@/components/batch/BatchJobRealtimeHandler';
 import { useBatchJobDownloadHandler } from '@/components/batch/BatchJobDownloadHandler';
 import { useBatchJobActionsHandler } from '@/components/batch/BatchJobActionsHandler';
