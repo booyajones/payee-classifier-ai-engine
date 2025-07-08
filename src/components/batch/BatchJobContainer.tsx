@@ -7,6 +7,7 @@ import { PayeeRowData } from '@/lib/rowMapping';
 import BatchJobList from './BatchJobList';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { PerformanceCircuitBreaker } from '@/components/performance/PerformanceCircuitBreaker';
 
 
 interface BatchJobContainerProps {
@@ -116,17 +117,19 @@ const BatchJobContainer = ({
         </div>
       )}
 
-      <BatchJobList
-        jobs={jobs}
-        payeeRowDataMap={payeeRowDataMap}
-        refreshingJobs={refreshingJobs}
-        pollingStates={pollingStates}
-        stalledJobActions={stalledJobActions}
-        onRefresh={onRefresh}
-        onDownload={onDownload}
-        onCancel={onCancel}
-        onJobDelete={onJobDelete}
-      />
+      <PerformanceCircuitBreaker>
+        <BatchJobList
+          jobs={jobs}
+          payeeRowDataMap={payeeRowDataMap}
+          refreshingJobs={refreshingJobs}
+          pollingStates={pollingStates}
+          stalledJobActions={stalledJobActions}
+          onRefresh={onRefresh}
+          onDownload={onDownload}
+          onCancel={onCancel}
+          onJobDelete={onJobDelete}
+        />
+      </PerformanceCircuitBreaker>
     </div>
   );
 };

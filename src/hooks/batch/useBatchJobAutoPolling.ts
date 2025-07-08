@@ -35,9 +35,21 @@ export const useBatchJobAutoPolling = ({
   });
 
   useEffect(() => {
-    const activeJobs = jobs.filter(job => isActiveJobStatus(job.status));
+    // CIRCUIT BREAKER: Only poll truly active jobs, exclude completed and ancient jobs
+    const activeJobs = jobs.filter(job => {
+      if (!isActiveJobStatus(job.status)) return false;
+      
+      // CIRCUIT BREAKER: Stop polling jobs older than 48 hours
+      const jobAge = Date.now() - new Date(job.created_at * 1000).getTime();
+      if (jobAge > 48 * 60 * 60 * 1000) {
+        productionLogger.warn(`Auto-polling: Excluding ancient job ${job.id.substring(0, 8)} (age: ${Math.round(jobAge/3600000)}h)`, undefined, 'BATCH_POLLING');
+        return false;
+      }
+      
+      return true;
+    });
 
-    productionLogger.debug(`Auto-polling: checking ${activeJobs.length} active jobs`, undefined, 'BATCH_POLLING');
+    productionLogger.debug(`Auto-polling: checking ${activeJobs.length} active jobs (${jobs.length - activeJobs.length} excluded)`, undefined, 'BATCH_POLLING');
 
     // Start polling for new active jobs
     for (const job of activeJobs) {
@@ -47,10 +59,14 @@ export const useBatchJobAutoPolling = ({
       }
     }
 
-    // Stop polling for completed/failed jobs
+    // AGGRESSIVE CLEANUP: Stop polling for ALL non-active jobs
     const activeJobIds = new Set(activeJobs.map(j => j.id));
-    for (const jobId of autoPollingJobs) {
-      if (!activeJobIds.has(jobId)) {
+    const jobsToCleanup = Array.from(autoPollingJobs).filter(jobId => !activeJobIds.has(jobId));
+    
+    if (jobsToCleanup.length > 0) {
+      productionLogger.info(`Auto-polling: Cleaning up ${jobsToCleanup.length} inactive job(s)`, { jobsToCleanup: jobsToCleanup.map(id => id.substring(0, 8)) }, 'BATCH_POLLING');
+      
+      for (const jobId of jobsToCleanup) {
         cleanupPolling(jobId);
         setAutoPollingJobs(prev => {
           const newSet = new Set(prev);

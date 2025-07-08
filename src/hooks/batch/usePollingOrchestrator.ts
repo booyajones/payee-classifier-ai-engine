@@ -47,17 +47,36 @@ export const usePollingOrchestrator = ({
           return;
         }
 
-        // PERFORMANCE: Smart polling with timeout detection
+        // CIRCUIT BREAKER: Stop polling completed jobs immediately
+        if (['completed', 'failed', 'cancelled', 'expired'].includes(job.status)) {
+          productionLogger.info(`Job ${jobId.substring(0, 8)}... is ${job.status} - stopping all polling immediately`, undefined, 'BATCH_POLLING');
+          cleanupPolling(jobId);
+          setAutoPollingJobs(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(jobId);
+            return newSet;
+          });
+          return;
+        }
+
+        // CIRCUIT BREAKER: Stop polling jobs older than 48 hours
+        const jobAge = Date.now() - new Date(job.created_at * 1000).getTime();
+        const isTooOld = jobAge > 48 * 60 * 60 * 1000; // Over 48 hours
+        if (isTooOld) {
+          productionLogger.warn(`Job ${jobId.substring(0, 8)}... is too old (${Math.round(jobAge/3600000)}h) - circuit breaker activated`, undefined, 'BATCH_POLLING');
+          cleanupPolling(jobId);
+          setAutoPollingJobs(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(jobId);
+            return newSet;
+          });
+          return;
+        }
+
         const isActiveJob = isActiveJobStatus(job.status);
         
-        // PERFORMANCE: Adaptive polling for long-running batch jobs
-        if (isLongRunningJob(job) && job.status === 'in_progress') {
-          const jobAge = Date.now() - new Date(job.created_at * 1000).getTime();
-          productionLogger.debug(`Long-running batch job ${jobId.substring(0, 8)} - reducing polling frequency`, { jobAge: Math.round(jobAge/60000) }, 'BATCH_POLLING');
-          // Continue with reduced frequency instead of stopping
-        }
-        
-        const shouldPoll = isActiveJob && (job.status === 'in_progress' || hasJobChanged(job) || Math.random() < 0.3);
+        // More conservative polling decision
+        const shouldPoll = isActiveJob && (hasJobChanged(job) || Math.random() < 0.1); // Reduced from 0.3 to 0.1
         
         if (shouldPoll) {
           await handleRefreshJob(jobId, true);

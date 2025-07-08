@@ -63,9 +63,27 @@ export const useBatchJobStore = create<BatchJobState & BatchJobActions>()(
     addJob: (job) => set((state) => ({ 
       jobs: [...state.jobs.filter(j => j.id !== job.id), job] 
     })),
-    updateJob: (job) => set((state) => ({
-      jobs: state.jobs.map(j => j.id === job.id ? job : j)
-    })),
+    updateJob: (job) => set((state) => {
+      // CIRCUIT BREAKER: Don't update completed jobs in store to prevent unnecessary re-renders
+      if (['completed', 'failed', 'cancelled', 'expired'].includes(job.status)) {
+        const existingJob = state.jobs.find(j => j.id === job.id);
+        if (existingJob && ['completed', 'failed', 'cancelled', 'expired'].includes(existingJob.status)) {
+          console.warn(`[STORE] Blocking update for already ${existingJob.status} job ${job.id.substring(0, 8)}`);
+          return state; // No update needed for already completed jobs
+        }
+      }
+
+      // CIRCUIT BREAKER: Don't update ancient jobs (over 48 hours)
+      const jobAge = Date.now() - new Date(job.created_at * 1000).getTime();
+      if (jobAge > 48 * 60 * 60 * 1000) {
+        console.warn(`[STORE] Blocking update for ancient job ${job.id.substring(0, 8)} (age: ${Math.round(jobAge/3600000)}h)`);
+        return state;
+      }
+
+      return {
+        jobs: state.jobs.map(j => j.id === job.id ? job : j)
+      };
+    }),
     removeJob: (jobId) => set((state) => ({
       jobs: state.jobs.filter(j => j.id !== jobId),
       payeeDataMap: Object.fromEntries(
