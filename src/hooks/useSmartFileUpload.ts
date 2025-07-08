@@ -1,6 +1,7 @@
 
 import { useState, useRef } from 'react';
 import { parseUploadedFile } from '@/lib/utils';
+import { useWebWorkerFileProcessor } from './useWebWorkerFileProcessor';
 import { createPayeeRowMapping, PayeeRowData } from '@/lib/rowMapping';
 import { useUnifiedProgress } from '@/contexts/UnifiedProgressContext';
 import { useEnhancedFileValidation } from './useEnhancedFileValidation';
@@ -41,6 +42,7 @@ export const useSmartFileUpload = () => {
   const { updateProgress, completeProgress, clearProgress } = useUnifiedProgress();
   const { validateFile } = useEnhancedFileValidation();
   const { toast } = useToast();
+  const { parseFileWithWorker } = useWebWorkerFileProcessor();
 
   const UPLOAD_ID = 'file-upload';
 
@@ -130,8 +132,15 @@ export const useSmartFileUpload = () => {
 
       debugLog('Starting memory-aware file processing');
 
-      // Direct file processing without memory management
-      const data = await parseUploadedFile(file);
+      let data: any[];
+      try {
+        data = await parseFileWithWorker(file, (p) => {
+          updateProgress(UPLOAD_ID, 'Reading file contents...', 30 + (p / 100) * 30);
+        });
+      } catch (workerError) {
+        debugLog('Worker parsing failed, falling back to main thread', workerError);
+        data = await parseUploadedFile(file);
+      }
 
       debugLog('File parsing completed', {
         rowsFound: data?.length || 0
