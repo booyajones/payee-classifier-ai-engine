@@ -31,34 +31,29 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
     const createdTime = new Date(job.created_at * 1000);
     const timeSinceCreated = Date.now() - createdTime.getTime();
     
-    // CRITICAL: Detect runaway jobs (more than 4 hours = timeout)
-    const CRITICAL_TIMEOUT = 4 * 60 * 60 * 1000; // 4 hours
-    const isCriticalTimeout = timeSinceCreated > CRITICAL_TIMEOUT;
-    
-    // Dynamic stall thresholds based on job size  
+    // Dynamic stall thresholds based on job size and progress status
     const jobSize = job.request_counts.total;
-    const isSimpleJob = jobSize <= 100;
-    const isSmallJob = jobSize <= 500;
-    const isLargeJob = jobSize > 5000;
+    const hasStartedProcessing = job.request_counts.completed > 0;
     
-    const stallThreshold = isSimpleJob ? 5 * 60 * 1000 :  // 5 minutes
-                          isSmallJob ? 15 * 60 * 1000 :    // 15 minutes
-                          isLargeJob ? 60 * 60 * 1000 :    // 1 hour for large jobs
-                          30 * 60 * 1000;                  // 30 minutes default
+    // More generous thresholds for OpenAI Batch API
+    const queueThreshold = jobSize <= 100 ? 30 * 60 * 1000 :    // 30 minutes for small jobs
+                          jobSize <= 1000 ? 2 * 60 * 60 * 1000 : // 2 hours for medium jobs  
+                          4 * 60 * 60 * 1000;                    // 4 hours for large jobs
     
-    const hasNoProgress = job.request_counts.completed === 0 && job.request_counts.total > 0;
-    const hasMinimalProgress = job.request_counts.completed < (job.request_counts.total * 0.05); // Less than 5% done
-    const isTakingTooLong = timeSinceCreated > stallThreshold;
-    const isStalled = (hasNoProgress || hasMinimalProgress) && isTakingTooLong;
+    // Only flag jobs that haven't started processing after reasonable queue time
+    const hasNoProgress = !hasStartedProcessing && timeSinceCreated > queueThreshold;
     
-    console.log(`[TIMEOUT DETECTION] Job ${job.id}: progress=${job.request_counts.completed}/${job.request_counts.total}, time=${Math.round(timeSinceCreated/60000)}min, threshold=${Math.round(stallThreshold/60000)}min, critical=${isCriticalTimeout}, stalled=${isStalled}`);
+    // For jobs that started processing, be much more lenient
+    // Only flag if job has made minimal progress and hasn't advanced in a very long time
+    const hasMinimalProgress = hasStartedProcessing && 
+                              job.request_counts.completed < (job.request_counts.total * 0.02) && // Less than 2% done
+                              timeSinceCreated > (6 * 60 * 60 * 1000); // AND been running over 6 hours
     
-    // Mark critical timeouts for immediate cancellation
-    if (isCriticalTimeout) {
-      console.error(`[CRITICAL TIMEOUT] Job ${job.id} has been running for ${Math.round(timeSinceCreated/60000)} minutes - IMMEDIATE CANCELLATION REQUIRED`);
-    }
+    const isStalled = hasNoProgress || hasMinimalProgress;
     
-    return isStalled || isCriticalTimeout;
+    console.log(`[STALL DETECTION] Job ${job.id}: progress=${job.request_counts.completed}/${job.request_counts.total}, time=${Math.round(timeSinceCreated/60000)}min, started=${hasStartedProcessing}, stalled=${isStalled}`);
+    
+    return isStalled;
   };
 
   const handleRefreshJob = async (jobId: string, silent: boolean = false) => {
@@ -68,48 +63,20 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
       const updatedJob = await refreshJobWithRetry(jobId);
       console.log(`[JOB REFRESH] Job ${jobId} status: ${updatedJob.status}, progress: ${updatedJob.request_counts.completed}/${updatedJob.request_counts.total}`);
       
-      // Check for critical timeouts that need immediate action
-      const createdTime = new Date(updatedJob.created_at * 1000);
-      const timeSinceCreated = Date.now() - createdTime.getTime();
-      const CRITICAL_TIMEOUT = 4 * 60 * 60 * 1000; // 4 hours
-      const isCriticalTimeout = timeSinceCreated > CRITICAL_TIMEOUT;
-      
-      if (isCriticalTimeout && updatedJob.status === 'in_progress') {
-        console.error(`[CRITICAL TIMEOUT] Job ${jobId} running for ${Math.round(timeSinceCreated/60000)} minutes - FORCING CANCELLATION`);
-        toast({
-          title: "🚨 Critical Timeout - Canceling Job",
-          description: `Job ${jobId.substring(0, 8)}... has been running for over 4 hours and will be automatically canceled to prevent system issues.`,
-          variant: "destructive",
-          duration: 15000,
-        });
-        
-        // Force cancel the runaway job
-        try {
-          const { cancelBatchJob } = await import('@/lib/openai/trueBatchAPI');
-          await cancelBatchJob(jobId);
-          console.log(`[CRITICAL TIMEOUT] Successfully canceled runaway job ${jobId}`);
-          
-          toast({
-            title: "✅ Runaway Job Canceled",
-            description: `Job ${jobId.substring(0, 8)}... has been canceled due to timeout. System performance should improve.`,
-            duration: 10000,
-          });
-        } catch (cancelError) {
-          console.error(`[CRITICAL TIMEOUT] Failed to cancel job ${jobId}:`, cancelError);
-          toast({
-            title: "❌ Failed to Cancel Job",
-            description: `Could not cancel runaway job ${jobId.substring(0, 8)}... Please try manual cancellation.`,
-            variant: "destructive",
-            duration: 15000,
-          });
-        }
-      } else if (detectStalledJob(updatedJob)) {
+      // Check for truly stalled jobs (no forced cancellation)
+      if (detectStalledJob(updatedJob)) {
+        const createdTime = new Date(updatedJob.created_at * 1000);
+        const timeSinceCreated = Date.now() - createdTime.getTime();
         console.warn(`[JOB REFRESH] STALLED JOB DETECTED: ${jobId}`);
+        const hasStartedProcessing = updatedJob.request_counts.completed > 0;
+        
         toast({
-          title: "⚠️ Stalled Job Detected",
-          description: `Job ${jobId.substring(0, 8)}... appears stuck with no progress after ${Math.round(timeSinceCreated/60000)} minutes. Consider canceling and retrying.`,
-          variant: "destructive",
-          duration: 10000,
+          title: hasStartedProcessing ? "⚠️ Job Progress Stalled" : "⏳ Long Queue Time",
+          description: hasStartedProcessing 
+            ? `Job ${jobId.substring(0, 8)}... has made minimal progress in ${Math.round(timeSinceCreated/60000)} minutes. OpenAI batch jobs can take 12-24+ hours for large batches. Manual cancellation available if needed.`
+            : `Job ${jobId.substring(0, 8)}... has been queued for ${Math.round(timeSinceCreated/60000)} minutes. This is normal during high demand periods.`,
+          variant: hasStartedProcessing ? "destructive" : "default",
+          duration: 12000,
         });
       }
       
