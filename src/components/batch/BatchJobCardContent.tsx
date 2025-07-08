@@ -7,6 +7,7 @@ import { InstantDownloadService } from '@/lib/services/instantDownloadService';
 import { ForceFileGenerationService } from '@/lib/services/forceFileGenerationService';
 import { useToast } from '@/hooks/use-toast';
 import BatchJobProgress from './BatchJobProgress';
+import EnhancedBatchJobProgress from './EnhancedBatchJobProgress';
 import BatchJobRequestCounts from './BatchJobRequestCounts';
 import BatchJobStuckWarning from './BatchJobStuckWarning';
 import BatchJobActiveDownload from './BatchJobActiveDownload';
@@ -36,6 +37,12 @@ const BatchJobCardContent = ({
   // Check for active download for this job
   const downloadId = `batch-${job.id}`;
   const activeDownload = downloads[downloadId];
+  
+  // Determine if this is a large job that needs enhanced progress display
+  const isLargeJob = job.request_counts.total > 1000;
+  const createdTime = new Date(job.created_at * 1000);
+  const ageInHours = (Date.now() - createdTime.getTime()) / (1000 * 60 * 60);
+  const isLongRunning = ageInHours > 2;
   
   // Track instant download status
   const [downloadStatus, setDownloadStatus] = useState<{
@@ -108,11 +115,19 @@ const BatchJobCardContent = ({
 
   return (
     <div className="space-y-3">
-      <BatchJobProgress 
-        job={job} 
-        onManualRefresh={onRefresh}
-        isRefreshing={isRefreshing}
-      />
+      {(isLargeJob || isLongRunning) && job.status === 'in_progress' ? (
+        <EnhancedBatchJobProgress 
+          job={job} 
+          onManualRefresh={onRefresh}
+          isRefreshing={isRefreshing}
+        />
+      ) : (
+        <BatchJobProgress 
+          job={job} 
+          onManualRefresh={onRefresh}
+          isRefreshing={isRefreshing}
+        />
+      )}
       <BatchJobRequestCounts job={job} />
       <BatchJobStuckWarning job={job} />
       <BatchJobActiveDownload activeDownload={activeDownload} />

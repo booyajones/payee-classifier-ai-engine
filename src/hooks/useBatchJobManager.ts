@@ -6,6 +6,7 @@ import { useBatchJobRealtimeHandler } from '@/components/batch/BatchJobRealtimeH
 import { useBatchJobDownloadHandler } from '@/components/batch/BatchJobDownloadHandler';
 import { useBatchJobActionsHandler } from '@/components/batch/BatchJobActionsHandler';
 import { BatchJobTimeoutManager } from '@/components/batch/BatchJobTimeoutManager';
+import { useLargeJobOptimization } from '@/hooks/batch/useLargeJobOptimization';
 
 export const useBatchJobManager = () => {
   const {
@@ -19,6 +20,9 @@ export const useBatchJobManager = () => {
   } = useBatchJobStore();
   
   const [autoPollingJobs, setAutoPollingJobs] = useState<Set<string>>(new Set());
+
+  // Initialize large job optimization
+  const largeJobOptimization = useLargeJobOptimization();
 
   // Handle real-time updates
   useBatchJobRealtimeHandler({ onJobUpdate: updateJob });
@@ -77,6 +81,8 @@ export const useBatchJobManager = () => {
     handleDownload,
     handleCancel,
     handleJobDelete,
+    // Large job optimization
+    largeJobOptimization,
     // Timeout manager component
     TimeoutManager: BatchJobTimeoutManager
   };

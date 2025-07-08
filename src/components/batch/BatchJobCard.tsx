@@ -9,6 +9,8 @@ import BatchJobHeader from './BatchJobHeader';
 import BatchJobCardContent from './BatchJobCardContent';
 import BatchJobActions from './BatchJobActions';
 import BatchJobStatusIndicator from './BatchJobStatusIndicator';
+import LargeJobStatusIndicator from './LargeJobStatusIndicator';
+import LargeJobManagementPanel from './LargeJobManagementPanel';
 
 interface BatchJobCardProps {
   job: BatchJob;
@@ -39,6 +41,12 @@ const BatchJobCard = ({
   const isActive = ['validating', 'in_progress', 'finalizing'].includes(job.status);
   const isStalled = stalledJobActions?.isStalled || false;
   const lastChecked = pollingState?.lastStatus ? new Date() : undefined;
+  
+  // Determine if this is a large job that needs enhanced handling
+  const isLargeJob = job.request_counts.total > 1000;
+  const createdTime = new Date(job.created_at * 1000);
+  const ageInHours = (Date.now() - createdTime.getTime()) / (1000 * 60 * 60);
+  const isLongRunning = ageInHours > 2;
 
   return (
     <Card className={`transition-all duration-200 ${
@@ -60,13 +68,23 @@ const BatchJobCard = ({
           />
         </div>
 
-        <BatchJobStatusIndicator
-          job={job}
-          isPolling={isPolling}
-          isRefreshing={isRefreshing}
-          isStalled={isStalled}
-          lastChecked={lastChecked}
-        />
+        {isLargeJob || isLongRunning ? (
+          <LargeJobStatusIndicator
+            job={job}
+            isPolling={isPolling}
+            isRefreshing={isRefreshing}
+            isStalled={isStalled}
+            lastChecked={lastChecked}
+          />
+        ) : (
+          <BatchJobStatusIndicator
+            job={job}
+            isPolling={isPolling}
+            isRefreshing={isRefreshing}
+            isStalled={isStalled}
+            lastChecked={lastChecked}
+          />
+        )}
 
         {/* Stalled Job Warning and Actions */}
         {isStalled && (
@@ -123,6 +141,16 @@ const BatchJobCard = ({
           onRefresh={onRefresh}
           isRefreshing={isRefreshing}
         />
+
+        {/* Enhanced management panel for large jobs */}
+        {(isLargeJob || isLongRunning) && isActive && (
+          <LargeJobManagementPanel
+            job={job}
+            onRefresh={onRefresh}
+            isPolling={isPolling}
+            isRefreshing={isRefreshing}
+          />
+        )}
       </div>
     </Card>
   );

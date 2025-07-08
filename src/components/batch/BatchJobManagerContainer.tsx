@@ -13,6 +13,7 @@ const BatchJobManagerContainer = () => {
     handleDownloadResults,
     handleCancelJob,
     handleJobDelete,
+    largeJobOptimization,
     TimeoutManager
   } = useBatchJobManager();
 
@@ -27,6 +28,7 @@ const BatchJobManagerContainer = () => {
         refreshingJobs={refreshingJobs}
         pollingStates={pollingStates}
         stalledJobActions={stalledJobActions}
+        largeJobOptimization={largeJobOptimization}
         onRefresh={handleRefreshJob}
         onDownload={handleDownloadResults}
         onCancel={handleCancelJob}

@@ -8,6 +8,7 @@ import {
   isLongRunningJob,
   isActiveJobStatus
 } from './pollingIntervals';
+import { useLargeJobOptimization } from './useLargeJobOptimization';
 
 interface UsePollingOrchestratorProps {
   jobs: BatchJob[];
@@ -28,6 +29,7 @@ export const usePollingOrchestrator = ({
   pollTimeouts,
   isPollingRef
 }: UsePollingOrchestratorProps) => {
+  const { getPollingInterval, updatePollingInterval } = useLargeJobOptimization();
 
   const startPolling = useCallback(async (jobId: string) => {
     if (isPollingRef.current.has(jobId)) {
@@ -66,7 +68,12 @@ export const usePollingOrchestrator = ({
         const isStillActive = updatedJob && isActiveJobStatus(updatedJob.status);
         
         if (isStillActive) {
-          const delay = calculatePollingDelay(updatedJob);
+          // Use optimized polling for large jobs, fallback to standard calculation
+          const optimizedDelay = getPollingInterval(updatedJob);
+          const standardDelay = calculatePollingDelay(updatedJob);
+          const delay = Math.max(optimizedDelay, standardDelay); // Use the more conservative interval
+          
+          updatePollingInterval(jobId, delay);
           pollTimeouts.current[jobId] = setTimeout(poll, delay);
         } else {
           // Job completed or no longer exists - cleanup polling immediately

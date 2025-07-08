@@ -15,6 +15,7 @@ interface BatchJobContainerProps {
   refreshingJobs: Set<string>;
   pollingStates: Record<string, any>;
   stalledJobActions?: Record<string, any>;
+  largeJobOptimization?: any;
   onRefresh: (jobId: string, silent?: boolean) => Promise<void>;
   onDownload: (job: BatchJob) => Promise<void>;
   onCancel: (jobId: string) => void;
@@ -27,6 +28,7 @@ const BatchJobContainer = ({
   refreshingJobs,
   pollingStates,
   stalledJobActions = {},
+  largeJobOptimization,
   onRefresh,
   onDownload,
   onCancel,
