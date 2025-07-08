@@ -43,7 +43,7 @@ export class MemoryManager {
     const now = Date.now();
     const maxAgeMs = this.options.maxJobAgeHours * 60 * 60 * 1000;
 
-    // Separate active and completed jobs
+    // AGGRESSIVE CLEANUP: Separate active and completed jobs
     const activeJobs = jobs.filter(job => 
       ['validating', 'in_progress', 'finalizing'].includes(job.status)
     );
@@ -55,26 +55,32 @@ export class MemoryManager {
     // Keep all active jobs
     let cleanedJobs = [...activeJobs];
 
+    // EMERGENCY CLEANUP: If too many jobs, be more aggressive
+    const isEmergencyCleanup = jobs.length > 50;
+    const effectiveMaxAge = isEmergencyCleanup ? maxAgeMs / 2 : maxAgeMs; // Half the age limit in emergency
+    const effectiveMaxJobs = isEmergencyCleanup ? Math.floor(this.options.maxCompletedJobs / 2) : this.options.maxCompletedJobs;
+
     // Clean up old completed jobs
     const recentCompletedJobs = completedJobs.filter(job => {
       const jobAge = now - new Date(job.created_at * 1000).getTime();
-      return jobAge <= maxAgeMs;
+      return jobAge <= effectiveMaxAge;
     });
 
     // Keep only the most recent completed jobs up to the limit
     const sortedRecentCompleted = recentCompletedJobs
       .sort((a, b) => b.created_at - a.created_at)
-      .slice(0, this.options.maxCompletedJobs);
+      .slice(0, effectiveMaxJobs);
 
     cleanedJobs.push(...sortedRecentCompleted);
 
     const removedCount = jobs.length - cleanedJobs.length;
     if (removedCount > 0) {
-      productionLogger.info(`[MEMORY MANAGER] Cleaned up ${removedCount} old jobs`, {
+      productionLogger.info(`[MEMORY MANAGER] ${isEmergencyCleanup ? 'EMERGENCY ' : ''}Cleaned up ${removedCount} old jobs`, {
         totalJobs: jobs.length,
         remainingJobs: cleanedJobs.length,
         activeJobs: activeJobs.length,
-        completedJobs: sortedRecentCompleted.length
+        completedJobs: sortedRecentCompleted.length,
+        emergencyMode: isEmergencyCleanup
       }, 'MEMORY');
     }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useBatchJobStore } from '@/stores/batchJobStore';
 import { useBatchJobActions } from '@/components/batch/useBatchJobActions';
 import { useBatchJobAutoPolling } from '@/hooks/batch/useBatchJobAutoPolling';
@@ -57,17 +57,21 @@ export const useBatchJobManager = () => {
   // Actions handler
   const { handleCancel, handleJobDelete: baseHandleJobDelete } = useBatchJobActionsHandler();
 
-  // Wrapper for job delete to pass removeJob function
-  const handleJobDelete = (jobId: string) => baseHandleJobDelete(jobId, removeJob);
+  // PERFORMANCE: Memoize job delete handler
+  const handleJobDelete = useCallback((jobId: string) => {
+    baseHandleJobDelete(jobId, removeJob);
+  }, [baseHandleJobDelete, removeJob]);
 
-  // Generate stalled job actions for all jobs
-  const stalledJobActions = jobs.reduce((acc, job) => {
-    const stalledAction = getStalledJobActions(job);
-    if (stalledAction) {
-      acc[job.id] = stalledAction;
-    }
-    return acc;
-  }, {} as Record<string, any>);
+  // PERFORMANCE: Memoize expensive stalled job actions calculation
+  const stalledJobActions = useMemo(() => {
+    return jobs.reduce((acc, job) => {
+      const stalledAction = getStalledJobActions(job);
+      if (stalledAction) {
+        acc[job.id] = stalledAction;
+      }
+      return acc;
+    }, {} as Record<string, any>);
+  }, [jobs, getStalledJobActions]);
 
   return {
     jobs,
