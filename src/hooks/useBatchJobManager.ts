@@ -68,14 +68,14 @@ export const useBatchJobManager = () => {
 
   // PERFORMANCE: Memoize jobs to prevent unnecessary recalculations
   const stableJobs = useMemo(() => {
-    // FIXED: Only update when job count or status actually changes to prevent render loops
-    const jobsString = JSON.stringify(jobs.map(j => ({ id: j.id, status: j.status })));
-    if (lastJobsRef.current === jobsString) {
-      return jobs; // Return the same jobs array to maintain reference equality
+    // FIXED: More stable memoization that only changes when meaningful changes occur
+    const currentJobsHash = jobs.map(j => `${j.id}:${j.status}:${j.request_counts?.completed || 0}`).join('|');
+    if (lastJobsRef.current === currentJobsHash) {
+      return jobs;
     }
-    lastJobsRef.current = jobsString;
-    return jobs;
-  }, [jobs.length, jobs.map(j => j.status).join(',')]);
+    lastJobsRef.current = currentJobsHash;
+    return [...jobs]; // Return new array reference only when content actually changes
+  }, [jobs]);
 
   // Initialize large job optimization
   const largeJobOptimization = useLargeJobOptimization();

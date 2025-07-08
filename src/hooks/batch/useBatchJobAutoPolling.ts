@@ -96,7 +96,7 @@ export const useBatchJobAutoPolling = ({
         });
       }
     }
-  }, [jobs.length, autoPollingJobs.size]); // FIXED: Removed function dependencies that cause renders
+  }, []); // CRITICAL: No dependencies to prevent render loops - job changes handled via refs
 
   // Cleanup on unmount
   useEffect(() => {

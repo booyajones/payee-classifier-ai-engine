@@ -105,10 +105,12 @@ export const saveClassificationResultsWithValidation = async (
         await circuitBreaker(async () => {
           // Use efficient upsert to eliminate constraint violations and improve performance
           await exponentialBackoff(async () => {
+            // CRITICAL FIX: Use the actual unique index name instead of column names
+            // The constraint uses COALESCE functions which can't be directly referenced in onConflict
             const { error } = await supabase
               .from('payee_classifications')
               .upsert([record], {
-                onConflict: 'payee_name,row_index,batch_id',
+                onConflict: 'idx_payee_classifications_unique',
                 ignoreDuplicates: false
               });
             
