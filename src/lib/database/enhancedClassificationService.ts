@@ -105,14 +105,15 @@ export const saveClassificationResultsWithValidation = async (
         await circuitBreaker(async () => {
           // Use efficient upsert to eliminate constraint violations and improve performance
           await exponentialBackoff(async () => {
-            // EMERGENCY FIX: Use .insert() with error handling instead of upsert for constraint issues
-            // This prevents the database constraint violations that are causing unresponsiveness
+            // ENHANCED CONSTRAINT HANDLING: Use .insert() with comprehensive error handling
             let { error } = await supabase
               .from('payee_classifications')
               .insert([record]);
             
-            // If duplicate, try update with proper where clause
+            // If duplicate constraint violation, try update with proper where clause
             if (error?.code === '23505') {
+              console.log(`[ENHANCED DB SERVICE] Duplicate constraint for "${record.payee_name}" - attempting update`);
+              
               const { error: updateError } = await supabase
                 .from('payee_classifications')
                 .update(record)
@@ -120,13 +121,32 @@ export const saveClassificationResultsWithValidation = async (
                 .eq('batch_id', record.batch_id || '')
                 .eq('row_index', record.row_index);
               
-              error = updateError;
+              if (updateError) {
+                console.error(`[ENHANCED DB SERVICE] Update failed for "${record.payee_name}":`, updateError);
+                error = updateError;
+              } else {
+                duplicateUpdates++;
+                console.log(`[ENHANCED DB SERVICE] ✅ Updated existing record for "${record.payee_name}"`);
+                error = null; // Clear error since update succeeded
+              }
             }
             
             if (error) {
-              throw new DatabaseError(`Upsert failed for "${record.payee_name}": ${error.message}`, error.code, true);
+              // Log detailed error information for debugging
+              console.error(`[ENHANCED DB SERVICE] Database operation failed for "${record.payee_name}":`, {
+                errorCode: error.code,
+                errorMessage: error.message,
+                recordData: {
+                  payee_name: record.payee_name,
+                  batch_id: record.batch_id,
+                  row_index: record.row_index
+                }
+              });
+              
+              throw new DatabaseError(`Database operation failed for "${record.payee_name}": ${error.message}`, error.code, true);
             } else {
               successfulInserts++;
+              console.log(`[ENHANCED DB SERVICE] ✅ Successfully saved "${record.payee_name}"`);
             }
           }, `Save classification for ${record.payee_name}`, { maxRetries: 2, baseDelay: 500 });
         }, `Circuit breaker for ${record.payee_name}`);

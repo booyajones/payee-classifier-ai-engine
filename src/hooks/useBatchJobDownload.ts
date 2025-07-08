@@ -44,7 +44,8 @@ export const useBatchJobDownload = ({
       startDownload(downloadId, filename, totalPayees);
       console.log(`[BATCH DOWNLOAD] Download progress tracking started`);
       
-      // Check if results are already processed for instant download
+      // ENHANCED RECOVERY: Check if results are already processed for instant download
+      console.log(`[BATCH DOWNLOAD] Checking for pre-processed results for job ${job.id}`);
       const hasPreProcessed = await AutomaticResultProcessor.hasPreProcessedResults(job.id);
       
       if (hasPreProcessed) {
@@ -103,6 +104,80 @@ export const useBatchJobDownload = ({
           });
           
           return;
+        } else {
+          console.log(`[BATCH DOWNLOAD] No pre-processed results found for job ${job.id}, checking if recovery is needed`);
+          
+          // ENHANCED RECOVERY: Check if this completed job has missing results
+          const { DownloadRecoveryService } = await import('@/lib/services/downloadRecoveryService');
+          const hasStoredResults = await DownloadRecoveryService.hasStoredResults(job.id);
+          
+          if (!hasStoredResults && job.status === 'completed') {
+            console.log(`[BATCH DOWNLOAD] ⚠️ Completed job ${job.id} has no stored results - attempting recovery`);
+            
+            updateDownload(downloadId, { 
+              stage: 'Recovering missing results...', 
+              progress: 10,
+              processed: 0,
+              total: totalPayees 
+            });
+            
+            const recoveryResult = await DownloadRecoveryService.recoverJobResults(job);
+            
+            if (recoveryResult.success) {
+              console.log(`[BATCH DOWNLOAD] ✅ Successfully recovered ${recoveryResult.processedCount} results for job ${job.id}`);
+              
+              updateDownload(downloadId, { 
+                stage: 'Recovery complete - checking for results...', 
+                progress: 30 
+              });
+              
+              // Try to get pre-processed results again after recovery
+              const recoveredResults = await AutomaticResultProcessor.getPreProcessedResults(job.id);
+              
+              if (recoveredResults && recoveredResults.length > 0) {
+                console.log(`[BATCH DOWNLOAD] Using recovered results for job ${job.id}`);
+                
+                updateDownload(downloadId, { 
+                  stage: 'Finalizing recovered results', 
+                  progress: 90,
+                  processed: recoveredResults.length,
+                  total: totalPayees 
+                });
+                
+                const finalClassifications: PayeeClassification[] = recoveredResults.map(r => ({
+                  id: r.id,
+                  payeeName: r.payee_name,
+                  result: r.classification as any,
+                  timestamp: new Date(r.created_at)
+                }));
+                
+                const summary: BatchProcessingResult = {
+                  results: finalClassifications,
+                  successCount: finalClassifications.length,
+                  failureCount: 0,
+                  originalFileData: payeeData.originalFileData
+                };
+                
+                completeDownload(downloadId);
+                onJobComplete(finalClassifications, summary, job.id);
+                
+                toast({
+                  title: "Recovery Successful",
+                  description: `🔄 Recovered and loaded ${finalClassifications.length} results for completed job!`,
+                });
+                
+                return;
+              }
+            } else {
+              console.error(`[BATCH DOWNLOAD] Recovery failed for job ${job.id}:`, recoveryResult.error);
+              
+              // Continue to fallback processing
+              updateDownload(downloadId, { 
+                stage: 'Recovery failed - attempting full processing...', 
+                progress: 5 
+              });
+            }
+          }
         }
       }
       

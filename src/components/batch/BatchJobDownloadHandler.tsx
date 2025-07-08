@@ -26,7 +26,32 @@ export const useBatchJobDownloadHandler = ({ payeeDataMap }: BatchJobDownloadHan
       
       const payeeData = payeeDataMap[job.id];
       if (!payeeData) {
-        throw new Error('Payee data not found for this job');
+        console.error(`[DOWNLOAD] No payee data found for job ${job.id} - attempting recovery`);
+        
+        // ENHANCED RECOVERY: Try to recover missing payee data and results
+        const { DownloadRecoveryService } = await import('@/lib/services/downloadRecoveryService');
+        
+        // Check if the job has stored results first
+        const hasStoredResults = await DownloadRecoveryService.hasStoredResults(job.id);
+        
+        if (!hasStoredResults) {
+          console.log(`[DOWNLOAD] Job ${job.id} has no stored results - attempting full recovery`);
+          const recoveryResult = await DownloadRecoveryService.recoverJobResults(job);
+          
+          if (!recoveryResult.success) {
+            throw new Error(`Recovery failed: ${recoveryResult.error}`);
+          }
+          
+          console.log(`[DOWNLOAD] ✅ Recovery successful for job ${job.id} - ${recoveryResult.processedCount} results processed`);
+          
+          toast({
+            title: "Recovery Complete",
+            description: `🔄 Successfully recovered ${recoveryResult.processedCount} results. Proceeding with download...`,
+          });
+        }
+        
+        // After recovery, we still need payee data for mapping, so this is still an error
+        throw new Error('Payee data not found for this job - unable to generate complete download');
       }
 
       // Get raw OpenAI results
