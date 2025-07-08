@@ -8,8 +8,11 @@ import AppFooter from "@/components/layout/AppFooter";
 import MainTabs from "@/components/navigation/MainTabs";
 import ApiKeySetupPage from "@/components/setup/ApiKeySetupPage";
 import KeyboardShortcutsHelp from "@/components/ui/keyboard-shortcuts-help";
+import { useEmergencyPageRecovery } from "@/hooks/useEmergencyPageRecovery";
 
 const Index = () => {
+  // NUCLEAR RECOVERY: Clear everything on page load if unresponsive
+  useEmergencyPageRecovery();
   console.log('Index component rendering');
   const {
     batchResults,
