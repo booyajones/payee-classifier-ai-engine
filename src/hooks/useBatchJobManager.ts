@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useBatchJobStore } from '@/stores/batchJobStore';
 import { useBatchJobActions } from '@/components/batch/useBatchJobActions';
 import { useBatchJobAutoPolling } from '@/hooks/batch/useBatchJobAutoPolling';
@@ -7,6 +7,8 @@ import { useBatchJobDownloadHandler } from '@/components/batch/BatchJobDownloadH
 import { useBatchJobActionsHandler } from '@/components/batch/BatchJobActionsHandler';
 import { BatchJobTimeoutManager } from '@/components/batch/BatchJobTimeoutManager';
 import { useLargeJobOptimization } from '@/hooks/batch/useLargeJobOptimization';
+import { debouncedStoreUpdater } from '@/lib/performance/debounceStore';
+import { emergencyStop } from '@/lib/performance/emergencyStop';
 
 export const useBatchJobManager = () => {
   const {
@@ -20,35 +22,91 @@ export const useBatchJobManager = () => {
   } = useBatchJobStore();
   
   const [autoPollingJobs, setAutoPollingJobs] = useState<Set<string>>(new Set());
+  const renderCountRef = useRef(0);
+  const lastJobsRef = useRef<string>('');
+  const storeUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // CIRCUIT BREAKER: Track render count and detect render loops
+  useEffect(() => {
+    renderCountRef.current += 1;
+    
+    if (renderCountRef.current > 20) {
+      console.error('[BATCH JOB MANAGER] Excessive renders detected, activating emergency stop');
+      emergencyStop.activate('Excessive renders in BatchJobManager');
+      return;
+    }
+    
+    // Reset render count every 2 seconds
+    const resetTimer = setTimeout(() => {
+      renderCountRef.current = 0;
+    }, 2000);
+    
+    return () => clearTimeout(resetTimer);
+  });
+
+  // PERFORMANCE: Debounced job update handler to prevent cascading renders
+  const debouncedUpdateJob = useCallback((job: any) => {
+    if (emergencyStop.check()) {
+      console.warn('[BATCH JOB MANAGER] Emergency stop active, blocking job update');
+      return;
+    }
+
+    // CIRCUIT BREAKER: Prevent updates for completed jobs
+    if (['completed', 'failed', 'cancelled', 'expired'].includes(job.status)) {
+      const existingJob = jobs.find(j => j.id === job.id);
+      if (existingJob && ['completed', 'failed', 'cancelled', 'expired'].includes(existingJob.status)) {
+        console.warn(`[BATCH JOB MANAGER] Blocking update for already ${existingJob.status} job`);
+        return;
+      }
+    }
+
+    debouncedStoreUpdater.scheduleUpdate(job, updateJob);
+  }, [jobs, updateJob]);
+
+  // PERFORMANCE: Memoize jobs to prevent unnecessary recalculations
+  const stableJobs = useMemo(() => {
+    const jobsString = JSON.stringify(jobs.map(j => ({ id: j.id, status: j.status, created_at: j.created_at })));
+    if (lastJobsRef.current === jobsString) {
+      return lastJobsRef.current === '' ? jobs : jobs; // Return the same reference if nothing changed
+    }
+    lastJobsRef.current = jobsString;
+    return jobs;
+  }, [jobs]);
 
   // Initialize large job optimization
   const largeJobOptimization = useLargeJobOptimization();
 
-  // Handle real-time updates
-  useBatchJobRealtimeHandler({ onJobUpdate: updateJob });
+  // DEBOUNCED: Handle real-time updates with debouncing
+  useBatchJobRealtimeHandler({ onJobUpdate: debouncedUpdateJob });
 
-  // Use the comprehensive batch job actions system
-  const {
-    refreshingJobs,
-    pollingStates,
-    handleRefreshJob,
-    handleDownloadResults,
-    handleCancelJob,
-    getStalledJobActions,
-    detectStalledJob
-  } = useBatchJobActions({
-    jobs,
-    payeeRowDataMap: payeeDataMap,
-    onJobUpdate: updateJob,
-    onJobComplete: () => {} // Handle job completion if needed
-  });
+  // PERFORMANCE: Memoize batch job actions to prevent recreation
+  const batchJobActions = useMemo(() => {
+    if (emergencyStop.check()) {
+      return {
+        refreshingJobs: new Set<string>(),
+        pollingStates: {},
+        handleRefreshJob: async () => {},
+        handleDownloadResults: async () => {},
+        handleCancelJob: () => {},
+        getStalledJobActions: () => null,
+        detectStalledJob: () => false
+      };
+    }
 
-  // Initialize auto-polling for active jobs
+    return useBatchJobActions({
+      jobs: stableJobs,
+      payeeRowDataMap: payeeDataMap,
+      onJobUpdate: debouncedUpdateJob,
+      onJobComplete: () => {} // Handle job completion if needed
+    });
+  }, [stableJobs, payeeDataMap, debouncedUpdateJob]);
+
+  // Initialize auto-polling for active jobs (only if not in emergency mode)
   useBatchJobAutoPolling({
-    jobs,
+    jobs: emergencyStop.check() ? [] : stableJobs,
     autoPollingJobs,
     setAutoPollingJobs,
-    handleRefreshJob
+    handleRefreshJob: batchJobActions.handleRefreshJob
   });
 
   // Download handler
@@ -59,29 +117,39 @@ export const useBatchJobManager = () => {
 
   // PERFORMANCE: Memoize job delete handler
   const handleJobDelete = useCallback((jobId: string) => {
+    if (emergencyStop.check()) return;
     baseHandleJobDelete(jobId, removeJob);
   }, [baseHandleJobDelete, removeJob]);
 
-  // PERFORMANCE: Memoize expensive stalled job actions calculation
+  // PERFORMANCE: Heavily memoize stalled job actions calculation
   const stalledJobActions = useMemo(() => {
-    return jobs.reduce((acc, job) => {
-      const stalledAction = getStalledJobActions(job);
-      if (stalledAction) {
-        acc[job.id] = stalledAction;
+    if (emergencyStop.check() || !batchJobActions.getStalledJobActions) {
+      return {};
+    }
+
+    return stableJobs.reduce((acc, job) => {
+      try {
+        const stalledAction = batchJobActions.getStalledJobActions(job);
+        if (stalledAction) {
+          acc[job.id] = stalledAction;
+        }
+      } catch (error) {
+        console.warn(`[BATCH JOB MANAGER] Error calculating stalled action for job ${job.id}:`, error);
       }
       return acc;
     }, {} as Record<string, any>);
-  }, [jobs, getStalledJobActions]);
+  }, [stableJobs, batchJobActions.getStalledJobActions]);
 
-  return {
-    jobs,
+  // PERFORMANCE: Memoize return object to prevent parent re-renders
+  return useMemo(() => ({
+    jobs: stableJobs,
     payeeDataMap,
-    refreshingJobs,
-    pollingStates,
+    refreshingJobs: batchJobActions.refreshingJobs,
+    pollingStates: batchJobActions.pollingStates,
     stalledJobActions,
-    handleRefreshJob,
-    handleDownloadResults,
-    handleCancelJob,
+    handleRefreshJob: batchJobActions.handleRefreshJob,
+    handleDownloadResults: batchJobActions.handleDownloadResults,
+    handleCancelJob: batchJobActions.handleCancelJob,
     handleDownload,
     handleCancel,
     handleJobDelete,
@@ -89,5 +157,14 @@ export const useBatchJobManager = () => {
     largeJobOptimization,
     // Timeout manager component
     TimeoutManager: BatchJobTimeoutManager
-  };
+  }), [
+    stableJobs,
+    payeeDataMap,
+    batchJobActions,
+    stalledJobActions,
+    handleDownload,
+    handleCancel,
+    handleJobDelete,
+    largeJobOptimization
+  ]);
 };

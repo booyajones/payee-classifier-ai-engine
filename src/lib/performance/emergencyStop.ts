@@ -18,6 +18,11 @@ class EmergencyStopService {
     this.active = true;
     this.activationTime = Date.now();
     
+    // Set global flag for store to check
+    if (typeof window !== 'undefined') {
+      (window as any).__EMERGENCY_STOP_ACTIVE = true;
+    }
+    
     productionLogger.error('[EMERGENCY STOP] Activated', { reason }, 'PERFORMANCE');
     
     // Auto-deactivate after delay
@@ -33,6 +38,11 @@ class EmergencyStopService {
     
     this.active = false;
     const duration = Date.now() - this.activationTime;
+    
+    // Clear global flag
+    if (typeof window !== 'undefined') {
+      (window as any).__EMERGENCY_STOP_ACTIVE = false;
+    }
     
     productionLogger.info('[EMERGENCY STOP] Deactivated', { 
       reason, 

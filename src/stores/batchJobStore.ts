@@ -64,6 +64,12 @@ export const useBatchJobStore = create<BatchJobState & BatchJobActions>()(
       jobs: [...state.jobs.filter(j => j.id !== job.id), job] 
     })),
     updateJob: (job) => set((state) => {
+      // EMERGENCY CIRCUIT BREAKER: Block all updates if emergency stop is active
+      if (typeof window !== 'undefined' && (window as any).__EMERGENCY_STOP_ACTIVE) {
+        console.warn(`[STORE] Emergency stop active, blocking job update for ${job.id.substring(0, 8)}`);
+        return state;
+      }
+
       // CIRCUIT BREAKER: Don't update completed jobs in store to prevent unnecessary re-renders
       if (['completed', 'failed', 'cancelled', 'expired'].includes(job.status)) {
         const existingJob = state.jobs.find(j => j.id === job.id);
@@ -73,11 +79,30 @@ export const useBatchJobStore = create<BatchJobState & BatchJobActions>()(
         }
       }
 
-      // CIRCUIT BREAKER: Don't update ancient jobs (over 48 hours)
+      // CIRCUIT BREAKER: Don't update ancient jobs (over 24 hours for aggressive cleanup)
       const jobAge = Date.now() - new Date(job.created_at * 1000).getTime();
-      if (jobAge > 48 * 60 * 60 * 1000) {
+      if (jobAge > 24 * 60 * 60 * 1000) {
         console.warn(`[STORE] Blocking update for ancient job ${job.id.substring(0, 8)} (age: ${Math.round(jobAge/3600000)}h)`);
         return state;
+      }
+
+      // PERFORMANCE: Only update if the job actually changed
+      const existingJob = state.jobs.find(j => j.id === job.id);
+      if (existingJob) {
+        const hasChanged = JSON.stringify({
+          status: existingJob.status,
+          request_counts: existingJob.request_counts,
+          output_file_id: existingJob.output_file_id
+        }) !== JSON.stringify({
+          status: job.status,
+          request_counts: job.request_counts,
+          output_file_id: job.output_file_id
+        });
+        
+        if (!hasChanged) {
+          console.debug(`[STORE] No changes detected for job ${job.id.substring(0, 8)}, skipping update`);
+          return state;
+        }
       }
 
       return {
