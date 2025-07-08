@@ -12,8 +12,8 @@ import KeyboardShortcutsHelp from "@/components/ui/keyboard-shortcuts-help";
 import { useEmergencyPageRecovery } from "@/hooks/useEmergencyPageRecovery";
 
 const Index = () => {
-  // Emergency recovery with conservative settings to prevent performance issues
-  useEmergencyPageRecovery();
+  // DISABLED: Emergency recovery that was causing loading issues
+  // useEmergencyPageRecovery();
   const {
     batchResults,
     batchSummary,
