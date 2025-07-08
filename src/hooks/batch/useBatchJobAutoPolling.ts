@@ -98,7 +98,7 @@ export const useBatchJobAutoPolling = ({
         });
       }
     }
-  }, []); // CRITICAL: Empty deps to prevent render loops
+  }, [jobs, autoPollingJobs, setAutoPollingJobs, cleanupPolling, startPolling]); // Fix: Add proper dependencies
 
   // Cleanup on unmount
   useEffect(() => {

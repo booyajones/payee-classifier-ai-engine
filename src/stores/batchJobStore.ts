@@ -64,9 +64,10 @@ export const useBatchJobStore = create<BatchJobState & BatchJobActions>()(
       jobs: [...state.jobs.filter(j => j.id !== job.id), job] 
     })),
     updateJob: (job) => set((state) => {
-      // EMERGENCY CIRCUIT BREAKER: Block all updates if emergency stop is active
-      if (typeof window !== 'undefined' && (window as any).__EMERGENCY_STOP_ACTIVE) {
-        console.warn(`[STORE] Emergency stop active, blocking job update for ${job.id.substring(0, 8)}`);
+      // EMERGENCY CIRCUIT BREAKER: Only block updates if emergency stop is actively interfering
+      if (typeof window !== 'undefined' && (window as any).__EMERGENCY_STOP_ACTIVE && 
+          ['in_progress', 'validating'].includes(job.status)) {
+        console.warn(`[STORE] Emergency stop active, blocking active job update for ${job.id.substring(0, 8)}`);
         return state;
       }
 

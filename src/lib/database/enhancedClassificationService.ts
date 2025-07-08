@@ -110,24 +110,24 @@ export const saveClassificationResultsWithValidation = async (
               .from('payee_classifications')
               .insert([record]);
             
-            // If duplicate constraint violation, try update with proper where clause
+            // If duplicate constraint violation, try upsert with proper conflict resolution
             if (error?.code === '23505') {
-              console.log(`[ENHANCED DB SERVICE] Duplicate constraint for "${record.payee_name}" - attempting update`);
+              console.log(`[ENHANCED DB SERVICE] Duplicate constraint for "${record.payee_name}" - attempting upsert`);
               
-              const { error: updateError } = await supabase
+              const { error: upsertError } = await supabase
                 .from('payee_classifications')
-                .update(record)
-                .eq('payee_name', record.payee_name)
-                .eq('batch_id', record.batch_id || '')
-                .eq('row_index', record.row_index);
+                .upsert(record, {
+                  onConflict: 'payee_name,batch_id,row_index',
+                  ignoreDuplicates: false
+                });
               
-              if (updateError) {
-                console.error(`[ENHANCED DB SERVICE] Update failed for "${record.payee_name}":`, updateError);
-                error = updateError;
+              if (upsertError) {
+                console.error(`[ENHANCED DB SERVICE] Upsert failed for "${record.payee_name}":`, upsertError);
+                error = upsertError;
               } else {
                 duplicateUpdates++;
-                console.log(`[ENHANCED DB SERVICE] ✅ Updated existing record for "${record.payee_name}"`);
-                error = null; // Clear error since update succeeded
+                console.log(`[ENHANCED DB SERVICE] ✅ Upserted existing record for "${record.payee_name}"`);
+                error = null; // Clear error since upsert succeeded
               }
             }
             
