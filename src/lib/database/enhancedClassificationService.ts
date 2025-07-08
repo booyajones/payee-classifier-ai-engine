@@ -105,14 +105,23 @@ export const saveClassificationResultsWithValidation = async (
         await circuitBreaker(async () => {
           // Use efficient upsert to eliminate constraint violations and improve performance
           await exponentialBackoff(async () => {
-            // CRITICAL FIX: Use the actual unique index name instead of column names
-            // The constraint uses COALESCE functions which can't be directly referenced in onConflict
-            const { error } = await supabase
+            // EMERGENCY FIX: Use .insert() with error handling instead of upsert for constraint issues
+            // This prevents the database constraint violations that are causing unresponsiveness
+            let { error } = await supabase
               .from('payee_classifications')
-              .upsert([record], {
-                onConflict: 'idx_payee_classifications_unique',
-                ignoreDuplicates: false
-              });
+              .insert([record]);
+            
+            // If duplicate, try update with proper where clause
+            if (error?.code === '23505') {
+              const { error: updateError } = await supabase
+                .from('payee_classifications')
+                .update(record)
+                .eq('payee_name', record.payee_name)
+                .eq('batch_id', record.batch_id || '')
+                .eq('row_index', record.row_index);
+              
+              error = updateError;
+            }
             
             if (error) {
               throw new DatabaseError(`Upsert failed for "${record.payee_name}": ${error.message}`, error.code, true);

@@ -35,13 +35,13 @@ export const useBatchJobAutoPolling = ({
   });
 
   useEffect(() => {
-    // CIRCUIT BREAKER: Only poll truly active jobs, exclude completed and ancient jobs
+    // EMERGENCY STABILIZATION: Only poll when absolutely necessary
+    const now = Date.now();
     const activeJobs = jobs.filter(job => {
-      // STOP ALL POLLING for completed, failed, cancelled, or expired jobs
+      // EMERGENCY: Stop ALL polling for completed jobs immediately
       if (!isActiveJobStatus(job.status)) {
-        // If it was being polled, clean it up immediately
         if (autoPollingJobs.has(job.id)) {
-          console.log(`[AUTO-POLLING] Stopping polling for ${job.status} job ${job.id.substring(0, 8)}`);
+          console.log(`[AUTO-POLLING] Emergency stop for ${job.status} job ${job.id.substring(0, 8)}`);
           cleanupPolling(job.id);
           setAutoPollingJobs(prev => {
             const newSet = new Set(prev);
@@ -52,10 +52,9 @@ export const useBatchJobAutoPolling = ({
         return false;
       }
       
-      // CIRCUIT BREAKER: Stop polling jobs older than 24 hours (reduced from 48h)
-      const jobAge = Date.now() - new Date(job.created_at * 1000).getTime();
-      if (jobAge > 24 * 60 * 60 * 1000) {
-        productionLogger.warn(`Auto-polling: Excluding ancient job ${job.id.substring(0, 8)} (age: ${Math.round(jobAge/3600000)}h)`, undefined, 'BATCH_POLLING');
+      // EMERGENCY: Dramatically reduced age limit to 12 hours
+      const jobAge = now - new Date(job.created_at * 1000).getTime();
+      if (jobAge > 12 * 60 * 60 * 1000) {
         if (autoPollingJobs.has(job.id)) {
           cleanupPolling(job.id);
           setAutoPollingJobs(prev => {
@@ -70,23 +69,26 @@ export const useBatchJobAutoPolling = ({
       return true;
     });
 
-    productionLogger.debug(`Auto-polling: checking ${activeJobs.length} active jobs (${jobs.length - activeJobs.length} excluded)`, undefined, 'BATCH_POLLING');
+    // EMERGENCY: Limit total polling jobs to prevent overload
+    const maxPollingJobs = 3;
+    const jobsToPoll = activeJobs.slice(0, maxPollingJobs);
+    
+    productionLogger.debug(`Emergency auto-polling: ${jobsToPoll.length}/${activeJobs.length} jobs (limited to ${maxPollingJobs})`, undefined, 'BATCH_POLLING');
 
-    // Start polling for new active jobs
-    for (const job of activeJobs) {
+    // Start polling only for priority jobs
+    for (const job of jobsToPoll) {
       if (!autoPollingJobs.has(job.id) && !isPollingRef.current.has(job.id)) {
         setAutoPollingJobs(prev => new Set(prev).add(job.id));
         startPolling(job.id);
       }
     }
 
-    // AGGRESSIVE CLEANUP: Stop polling for ALL non-active jobs
-    const activeJobIds = new Set(activeJobs.map(j => j.id));
-    const jobsToCleanup = Array.from(autoPollingJobs).filter(jobId => !activeJobIds.has(jobId));
+    // EMERGENCY CLEANUP: Stop all non-priority jobs
+    const priorityJobIds = new Set(jobsToPoll.map(j => j.id));
+    const jobsToCleanup = Array.from(autoPollingJobs).filter(jobId => !priorityJobIds.has(jobId));
     
     if (jobsToCleanup.length > 0) {
-      productionLogger.info(`Auto-polling: Cleaning up ${jobsToCleanup.length} inactive job(s)`, { jobsToCleanup: jobsToCleanup.map(id => id.substring(0, 8)) }, 'BATCH_POLLING');
-      
+      productionLogger.info(`Emergency cleanup: ${jobsToCleanup.length} jobs`, { jobsToCleanup: jobsToCleanup.map(id => id.substring(0, 8)) }, 'BATCH_POLLING');
       for (const jobId of jobsToCleanup) {
         cleanupPolling(jobId);
         setAutoPollingJobs(prev => {
@@ -96,7 +98,7 @@ export const useBatchJobAutoPolling = ({
         });
       }
     }
-  }, []); // CRITICAL: No dependencies to prevent render loops - job changes handled via refs
+  }, []); // CRITICAL: Empty deps to prevent render loops
 
   // Cleanup on unmount
   useEffect(() => {

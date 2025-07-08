@@ -45,18 +45,8 @@ const BatchJobContainer = ({
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
   const { toast } = useToast();
 
-  // PERFORMANCE: Memory management for large numbers of jobs
-  const { forceCleanup, getMemoryUsage } = useMemoryManager(
-    jobs,
-    (cleanedJobs) => {
-      if (cleanedJobs.length !== jobs.length) {
-        console.log(`[MEMORY MANAGER] Cleaned up ${jobs.length - cleanedJobs.length} old jobs`);
-        // Note: In a real implementation, we'd need to call a parent callback here
-        // For now, we'll log the cleanup but the parent manages the actual state
-      }
-    },
-    { maxCompletedJobs: 15, maxJobAgeHours: 48 } // More aggressive cleanup
-  );
+  // EMERGENCY: Memory management for large numbers of jobs
+  const { forceCleanup, getMemoryInfo } = useMemoryManager();
 
   const handleRefreshAll = async () => {
     setIsRefreshingAll(true);

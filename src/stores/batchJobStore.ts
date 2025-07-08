@@ -70,44 +70,52 @@ export const useBatchJobStore = create<BatchJobState & BatchJobActions>()(
         return state;
       }
 
-      // CIRCUIT BREAKER: Don't update completed jobs in store to prevent unnecessary re-renders
+      // EMERGENCY OPTIMIZATION: More aggressive filtering for completed jobs
       if (['completed', 'failed', 'cancelled', 'expired'].includes(job.status)) {
         const existingJob = state.jobs.find(j => j.id === job.id);
-        if (existingJob && ['completed', 'failed', 'cancelled', 'expired'].includes(existingJob.status)) {
-          console.warn(`[STORE] Blocking update for already ${existingJob.status} job ${job.id.substring(0, 8)}`);
-          return state; // No update needed for already completed jobs
+        if (existingJob && 
+            existingJob.status === job.status && 
+            existingJob.request_counts?.completed === job.request_counts?.completed &&
+            existingJob.output_file_id === job.output_file_id) {
+          return state; // No meaningful changes for completed jobs
         }
       }
 
-      // CIRCUIT BREAKER: Don't update ancient jobs (over 24 hours for aggressive cleanup)
+      // EMERGENCY: More aggressive age filtering (12 hours instead of 24)
       const jobAge = Date.now() - new Date(job.created_at * 1000).getTime();
-      if (jobAge > 24 * 60 * 60 * 1000) {
+      if (jobAge > 12 * 60 * 60 * 1000) {
         console.warn(`[STORE] Blocking update for ancient job ${job.id.substring(0, 8)} (age: ${Math.round(jobAge/3600000)}h)`);
         return state;
       }
 
-      // PERFORMANCE: Only update if the job actually changed
+      // EMERGENCY: Simplified change detection for critical fields only
       const existingJob = state.jobs.find(j => j.id === job.id);
       if (existingJob) {
-        const hasChanged = JSON.stringify({
-          status: existingJob.status,
-          request_counts: existingJob.request_counts,
-          output_file_id: existingJob.output_file_id
-        }) !== JSON.stringify({
-          status: job.status,
-          request_counts: job.request_counts,
-          output_file_id: job.output_file_id
-        });
+        const statusChanged = existingJob.status !== job.status;
+        const progressChanged = existingJob.request_counts?.completed !== job.request_counts?.completed;
+        const outputChanged = existingJob.output_file_id !== job.output_file_id;
         
-        if (!hasChanged) {
-          console.debug(`[STORE] No changes detected for job ${job.id.substring(0, 8)}, skipping update`);
-          return state;
+        if (!statusChanged && !progressChanged && !outputChanged) {
+          return state; // Skip update if no critical changes
         }
       }
 
-      return {
-        jobs: state.jobs.map(j => j.id === job.id ? job : j)
-      };
+      // EMERGENCY: Limit job store size to prevent memory bloat
+      let updatedJobs = state.jobs.map(j => j.id === job.id ? job : j);
+      
+      // If adding new job, ensure we don't exceed limit
+      if (!existingJob) {
+        updatedJobs = [...updatedJobs, job];
+        
+        // Keep only latest 50 jobs to prevent memory issues
+        if (updatedJobs.length > 50) {
+          updatedJobs = updatedJobs
+            .sort((a, b) => b.created_at - a.created_at)
+            .slice(0, 50);
+        }
+      }
+
+      return { jobs: updatedJobs };
     }),
     removeJob: (jobId) => set((state) => ({
       jobs: state.jobs.filter(j => j.id !== jobId),

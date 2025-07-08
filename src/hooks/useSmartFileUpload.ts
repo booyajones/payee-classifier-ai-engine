@@ -132,14 +132,16 @@ export const useSmartFileUpload = () => {
 
       debugLog('Starting memory-aware file processing');
 
-      let data: any[];
+      let data: any[] = [];
       try {
-        data = await parseFileWithWorker(file, (p) => {
+        const workerResult = await parseFileWithWorker(file, (p) => {
           updateProgress(UPLOAD_ID, 'Reading file contents...', 30 + (p / 100) * 30);
         });
+        data = Array.isArray(workerResult) ? workerResult : [];
       } catch (workerError) {
         debugLog('Worker parsing failed, falling back to main thread', workerError);
-        data = await parseUploadedFile(file);
+        const fallbackData = await parseUploadedFile(file);
+        data = Array.isArray(fallbackData) ? fallbackData : [];
       }
 
       debugLog('File parsing completed', {

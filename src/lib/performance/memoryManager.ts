@@ -1,169 +1,155 @@
-import { BatchJob } from '@/lib/openai/trueBatchAPI';
-import { productionLogger } from '@/lib/logging/productionLogger';
+/**
+ * EMERGENCY MEMORY MANAGER
+ * Implements aggressive memory management and cleanup strategies
+ */
 
-interface MemoryCleanupOptions {
-  maxCompletedJobs: number;
-  maxJobAgeHours: number;
-  cleanupIntervalMs: number;
-}
+class MemoryManager {
+  private cleanupCallbacks: Set<() => void> = new Set();
+  private isCleanupRunning = false;
+  private lastCleanup = 0;
 
-const DEFAULT_OPTIONS: MemoryCleanupOptions = {
-  maxCompletedJobs: 20, // Keep at most 20 completed jobs
-  maxJobAgeHours: 72,   // Clean up jobs older than 3 days
-  cleanupIntervalMs: 10 * 60 * 1000 // Clean up every 10 minutes
-};
-
-export class MemoryManager {
-  private cleanupTimer: NodeJS.Timeout | null = null;
-  private options: MemoryCleanupOptions;
-  private onJobsUpdated: (jobs: BatchJob[]) => void;
-
-  constructor(
-    onJobsUpdated: (jobs: BatchJob[]) => void,
-    options: Partial<MemoryCleanupOptions> = {}
-  ) {
-    this.options = { ...DEFAULT_OPTIONS, ...options };
-    this.onJobsUpdated = onJobsUpdated;
-    this.startCleanupTimer();
+  // Register cleanup callback
+  registerCleanup(callback: () => void): () => void {
+    this.cleanupCallbacks.add(callback);
+    return () => this.cleanupCallbacks.delete(callback);
   }
 
-  private startCleanupTimer() {
-    if (this.cleanupTimer) {
-      clearInterval(this.cleanupTimer);
+  // Force immediate cleanup
+  async forceCleanup(): Promise<void> {
+    if (this.isCleanupRunning) {
+      console.warn('[MEMORY MANAGER] Cleanup already running, skipping');
+      return;
     }
 
-    this.cleanupTimer = setInterval(() => {
-      // This will be called by the component when needed
-      // We don't have direct access to jobs here, so this is just a placeholder
-      productionLogger.debug('[MEMORY MANAGER] Cleanup timer triggered', undefined, 'MEMORY');
-    }, this.options.cleanupIntervalMs);
-  }
+    this.isCleanupRunning = true;
+    this.lastCleanup = Date.now();
 
-  cleanupJobs(jobs: BatchJob[]): BatchJob[] {
-    const now = Date.now();
-    const maxAgeMs = this.options.maxJobAgeHours * 60 * 60 * 1000;
+    try {
+      console.log('[MEMORY MANAGER] Starting emergency cleanup');
 
-    // AGGRESSIVE CLEANUP: Separate active and completed jobs
-    const activeJobs = jobs.filter(job => 
-      ['validating', 'in_progress', 'finalizing'].includes(job.status)
-    );
-    
-    const completedJobs = jobs.filter(job => 
-      ['completed', 'failed', 'cancelled', 'expired'].includes(job.status)
-    );
-
-    // Keep all active jobs
-    let cleanedJobs = [...activeJobs];
-
-    // EMERGENCY CLEANUP: If too many jobs, be more aggressive
-    const isEmergencyCleanup = jobs.length > 50;
-    const effectiveMaxAge = isEmergencyCleanup ? maxAgeMs / 2 : maxAgeMs; // Half the age limit in emergency
-    const effectiveMaxJobs = isEmergencyCleanup ? Math.floor(this.options.maxCompletedJobs / 2) : this.options.maxCompletedJobs;
-
-    // Clean up old completed jobs
-    const recentCompletedJobs = completedJobs.filter(job => {
-      const jobAge = now - new Date(job.created_at * 1000).getTime();
-      return jobAge <= effectiveMaxAge;
-    });
-
-    // Keep only the most recent completed jobs up to the limit
-    const sortedRecentCompleted = recentCompletedJobs
-      .sort((a, b) => b.created_at - a.created_at)
-      .slice(0, effectiveMaxJobs);
-
-    cleanedJobs.push(...sortedRecentCompleted);
-
-    const removedCount = jobs.length - cleanedJobs.length;
-    if (removedCount > 0) {
-      productionLogger.info(`[MEMORY MANAGER] ${isEmergencyCleanup ? 'EMERGENCY ' : ''}Cleaned up ${removedCount} old jobs`, {
-        totalJobs: jobs.length,
-        remainingJobs: cleanedJobs.length,
-        activeJobs: activeJobs.length,
-        completedJobs: sortedRecentCompleted.length,
-        emergencyMode: isEmergencyCleanup
-      }, 'MEMORY');
-    }
-
-    return cleanedJobs;
-  }
-
-  performGarbageCollection() {
-    // Force garbage collection if available (development only)
-    if (typeof window !== 'undefined' && (window as any).gc) {
-      try {
-        (window as any).gc();
-        productionLogger.debug('[MEMORY MANAGER] Manual garbage collection triggered', undefined, 'MEMORY');
-      } catch (error) {
-        productionLogger.warn('[MEMORY MANAGER] Manual garbage collection failed', error, 'MEMORY');
+      // Execute all registered cleanup callbacks
+      for (const callback of this.cleanupCallbacks) {
+        try {
+          callback();
+        } catch (error) {
+          console.error('[MEMORY MANAGER] Cleanup callback failed:', error);
+        }
       }
+
+      // Clear browser caches
+      this.clearBrowserCaches();
+
+      // Force garbage collection if available
+      this.forceGarbageCollection();
+
+      console.log('[MEMORY MANAGER] Emergency cleanup completed');
+    } finally {
+      this.isCleanupRunning = false;
     }
   }
 
-  getMemoryUsage(): { used: number; total: number; percentage: number } | null {
+  // Check if cleanup is needed
+  shouldCleanup(): boolean {
+    const timeSinceLastCleanup = Date.now() - this.lastCleanup;
+    return timeSinceLastCleanup > 5 * 60 * 1000; // 5 minutes
+  }
+
+  // Get memory usage info
+  getMemoryInfo(): { usage?: number; limit?: number; percentage?: number } {
+    if (typeof window === 'undefined') return {};
+
     try {
       if ('memory' in performance) {
         const memory = (performance as any).memory;
-        return {
-          used: Math.round(memory.usedJSHeapSize / 1024 / 1024), // MB
-          total: Math.round(memory.totalJSHeapSize / 1024 / 1024), // MB
-          percentage: Math.round((memory.usedJSHeapSize / memory.totalJSHeapSize) * 100)
-        };
+        const usage = memory.usedJSHeapSize;
+        const limit = memory.jsHeapSizeLimit;
+        const percentage = Math.round((usage / limit) * 100);
+
+        return { usage, limit, percentage };
       }
     } catch (error) {
-      productionLogger.warn('[MEMORY MANAGER] Memory usage unavailable', error, 'MEMORY');
+      console.warn('[MEMORY MANAGER] Memory info unavailable:', error);
     }
-    return null;
+
+    return {};
   }
 
-  destroy() {
-    if (this.cleanupTimer) {
-      clearInterval(this.cleanupTimer);
-      this.cleanupTimer = null;
+  // Clear browser caches
+  private clearBrowserCaches(): void {
+    if (typeof window === 'undefined') return;
+
+    try {
+      // Clear localStorage items related to our app
+      Object.keys(localStorage).forEach(key => {
+        if (key.includes('batch') || 
+            key.includes('job') || 
+            key.includes('polling') || 
+            key.includes('cache') ||
+            key.includes('payee')) {
+          localStorage.removeItem(key);
+        }
+      });
+
+      // Clear sessionStorage
+      Object.keys(sessionStorage).forEach(key => {
+        if (key.includes('batch') || 
+            key.includes('job') || 
+            key.includes('polling') || 
+            key.includes('cache')) {
+          sessionStorage.removeItem(key);
+        }
+      });
+
+      console.log('[MEMORY MANAGER] Browser caches cleared');
+    } catch (error) {
+      console.warn('[MEMORY MANAGER] Cache cleanup failed:', error);
     }
+  }
+
+  // Force garbage collection if available
+  private forceGarbageCollection(): void {
+    try {
+      if (typeof window !== 'undefined' && 'gc' in window) {
+        (window as any).gc();
+        console.log('[MEMORY MANAGER] Forced garbage collection');
+      }
+    } catch (error) {
+      console.warn('[MEMORY MANAGER] GC not available:', error);
+    }
+  }
+
+  // Monitor memory usage
+  startMonitoring(thresholdPercentage: number = 80): () => void {
+    const checkMemory = () => {
+      const { percentage } = this.getMemoryInfo();
+      
+      if (percentage && percentage > thresholdPercentage) {
+        console.warn(`[MEMORY MANAGER] High memory usage: ${percentage}%`);
+        
+        if (percentage > 90) {
+          console.error('[MEMORY MANAGER] Critical memory usage, forcing cleanup');
+          this.forceCleanup();
+        }
+      }
+    };
+
+    const interval = setInterval(checkMemory, 10000); // Check every 10 seconds
+    
+    return () => {
+      clearInterval(interval);
+    };
   }
 }
 
-// React hook for memory management
-export const useMemoryManager = (
-  jobs: BatchJob[],
-  onJobsUpdated: (jobs: BatchJob[]) => void,
-  options: Partial<MemoryCleanupOptions> = {}
-) => {
-  const managerRef = React.useRef<MemoryManager | null>(null);
+// Global memory manager instance
+export const memoryManager = new MemoryManager();
 
-  React.useEffect(() => {
-    if (!managerRef.current) {
-      managerRef.current = new MemoryManager(onJobsUpdated, options);
-    }
-
-    // Perform cleanup on job changes
-    const cleanedJobs = managerRef.current.cleanupJobs(jobs);
-    if (cleanedJobs.length !== jobs.length) {
-      onJobsUpdated(cleanedJobs);
-    }
-
-    return () => {
-      if (managerRef.current) {
-        managerRef.current.destroy();
-        managerRef.current = null;
-      }
-    };
-  }, [jobs, onJobsUpdated, options]);
-
-  const forceCleanup = React.useCallback(() => {
-    if (managerRef.current) {
-      const cleanedJobs = managerRef.current.cleanupJobs(jobs);
-      onJobsUpdated(cleanedJobs);
-      managerRef.current.performGarbageCollection();
-    }
-  }, [jobs, onJobsUpdated]);
-
-  const getMemoryUsage = React.useCallback(() => {
-    return managerRef.current?.getMemoryUsage() || null;
-  }, []);
-
-  return { forceCleanup, getMemoryUsage };
+// Hook for easy integration
+export const useMemoryManager = () => {
+  return {
+    forceCleanup: () => memoryManager.forceCleanup(),
+    getMemoryInfo: () => memoryManager.getMemoryInfo(),
+    registerCleanup: (callback: () => void) => memoryManager.registerCleanup(callback),
+    startMonitoring: (threshold?: number) => memoryManager.startMonitoring(threshold)
+  };
 };
-
-// Import React for the hook
-import React from 'react';

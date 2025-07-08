@@ -29,42 +29,51 @@ export const useBatchJobManager = () => {
   const lastJobsRef = useRef<string>('');
   const storeUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // CIRCUIT BREAKER: Track render count and detect render loops
+  // EMERGENCY STABILIZATION: Dramatically reduced render tracking and emergency limits
   useEffect(() => {
     renderCountRef.current += 1;
     
-    if (renderCountRef.current > 20) {
+    // EMERGENCY: Reduced threshold to catch loops faster
+    if (renderCountRef.current > 8) {
       console.error('[BATCH JOB MANAGER] Excessive renders detected, activating emergency stop');
       emergencyStop.activate('Excessive renders in BatchJobManager');
       return;
     }
     
-    // Reset render count every 2 seconds
+    // EMERGENCY: Faster reset for more responsive detection
     const resetTimer = setTimeout(() => {
       renderCountRef.current = 0;
-    }, 2000);
+    }, 1000);
     
     return () => clearTimeout(resetTimer);
-  }, []); // FIXED: Empty dependency array to prevent this useEffect itself from causing renders
+  }, []); // CRITICAL: Empty dependency to prevent render loops
 
-  // PERFORMANCE: Debounced job update handler to prevent cascading renders
+  // EMERGENCY STABILIZATION: Heavily optimized job update handler
   const debouncedUpdateJob = useCallback((job: any) => {
     if (emergencyStop.check()) {
       console.warn('[BATCH JOB MANAGER] Emergency stop active, blocking job update');
       return;
     }
 
-    // CIRCUIT BREAKER: Prevent updates for completed jobs that haven't changed
+    // EMERGENCY: More aggressive filtering for completed jobs
     if (['completed', 'failed', 'cancelled', 'expired'].includes(job.status)) {
       const existingJob = jobs.find(j => j.id === job.id);
-      if (existingJob && existingJob.status === job.status) {
-        // Job status hasn't changed, skip update to prevent render loops
+      if (existingJob && existingJob.status === job.status && 
+          existingJob.request_counts?.completed === job.request_counts?.completed) {
+        // No meaningful changes, skip entirely
         return;
       }
     }
 
+    // EMERGENCY: Block updates for ancient jobs (over 12 hours)
+    const jobAge = Date.now() - new Date(job.created_at * 1000).getTime();
+    if (jobAge > 12 * 60 * 60 * 1000) {
+      console.warn(`[BATCH JOB MANAGER] Blocking update for ancient job ${job.id.substring(0, 8)}`);
+      return;
+    }
+
     debouncedStoreUpdater.scheduleUpdate(job, updateJob);
-  }, [updateJob]); // FIXED: Removed jobs dependency to prevent recreation
+  }, [updateJob]); // CRITICAL: Minimal dependencies
 
   // PERFORMANCE: Memoize jobs to prevent unnecessary recalculations
   const stableJobs = useMemo(() => {
