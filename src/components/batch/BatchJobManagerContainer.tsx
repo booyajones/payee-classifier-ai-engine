@@ -9,6 +9,7 @@ const BatchJobManagerContainer = () => {
     payeeDataMap,
     refreshingJobs,
     pollingStates,
+    autoPollingJobs,
     stalledJobActions,
     handleRefreshJob,
     handleForceRefresh,
@@ -33,6 +34,7 @@ const BatchJobManagerContainer = () => {
           payeeRowDataMap={payeeDataMap}
           refreshingJobs={refreshingJobs}
           pollingStates={pollingStates}
+          autoPollingJobs={autoPollingJobs}
           stalledJobActions={stalledJobActions}
           largeJobOptimization={largeJobOptimization}
           onRefresh={handleRefreshJob}

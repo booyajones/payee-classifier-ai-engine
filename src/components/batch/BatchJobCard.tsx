@@ -17,6 +17,7 @@ interface BatchJobCardProps {
   payeeRowData?: PayeeRowData;
   isRefreshing?: boolean;
   isPolling?: boolean;
+  isAutoPolling?: boolean; // Separate auto-polling state
   pollingState?: any;
   stalledJobActions?: any;
   onRefresh: () => void;
@@ -32,6 +33,7 @@ const BatchJobCard = ({
   payeeRowData,
   isRefreshing = false,
   isPolling = false,
+  isAutoPolling = false,
   pollingState,
   stalledJobActions,
   onRefresh,
@@ -66,6 +68,7 @@ const BatchJobCard = ({
             isRefreshing={isRefreshing}
             isDownloading={false}
             isPolling={isPolling}
+            isAutoPolling={isAutoPolling}
             onRefresh={onRefresh}
             onCancel={onCancel}
             onDelete={onDelete}

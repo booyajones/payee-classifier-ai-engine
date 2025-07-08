@@ -9,6 +9,7 @@ interface BatchJobListProps {
   payeeRowDataMap: Record<string, PayeeRowData>;
   refreshingJobs: Set<string>;
   pollingStates: Record<string, { isPolling: boolean }>;
+  autoPollingJobs: Set<string>; // Track auto-polling jobs
   stalledJobActions?: Record<string, any>;
   onRefresh: (jobId: string) => Promise<void>;
   onForceRefresh?: (jobId: string) => Promise<void>; // FORCE REFRESH: Debug capability

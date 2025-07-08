@@ -9,6 +9,7 @@ interface VirtualizedBatchJobListProps {
   payeeRowDataMap: Record<string, PayeeRowData>;
   refreshingJobs: Set<string>;
   pollingStates: Record<string, any>;
+  autoPollingJobs: Set<string>; // Track auto-polling jobs
   stalledJobActions?: Record<string, any>;
   onRefresh: (jobId: string, silent?: boolean) => Promise<void>;
   onForceRefresh?: (jobId: string) => Promise<void>; // FORCE REFRESH: Debug capability
@@ -23,6 +24,7 @@ const VirtualizedBatchJobList = ({
   payeeRowDataMap,
   refreshingJobs,
   pollingStates,
+  autoPollingJobs,
   stalledJobActions = {},
   onRefresh,
   onForceRefresh,
@@ -56,6 +58,7 @@ const VirtualizedBatchJobList = ({
       const payeeRowData = payeeRowDataMap[job.id];
       const isRefreshing = refreshingJobs.has(job.id);
       const pollingState = pollingStates[job.id];
+      const isAutoPolling = autoPollingJobs.has(job.id);
       const stalledJobAction = stalledJobActions[job.id];
 
       return (
@@ -65,6 +68,7 @@ const VirtualizedBatchJobList = ({
             payeeRowData={payeeRowData}
             isRefreshing={isRefreshing}
             isPolling={Boolean(pollingState)}
+            isAutoPolling={isAutoPolling}
             pollingState={pollingState}
             stalledJobActions={stalledJobAction}
             onRefresh={() => onRefresh(job.id)}
@@ -77,7 +81,7 @@ const VirtualizedBatchJobList = ({
         </div>
       );
     });
-  }, [sortedJobs, payeeRowDataMap, refreshingJobs, pollingStates, stalledJobActions, onRefresh, onForceRefresh, onForceSync, onDownload, onCancel, onJobDelete]);
+  }, [sortedJobs, payeeRowDataMap, refreshingJobs, pollingStates, autoPollingJobs, stalledJobActions, onRefresh, onForceRefresh, onForceSync, onDownload, onCancel, onJobDelete]);
 
   if (sortedJobs.length === 0) {
     return (
@@ -100,6 +104,7 @@ const VirtualizedBatchJobList = ({
           const payeeRowData = payeeRowDataMap[job.id];
           const isRefreshing = refreshingJobs.has(job.id);
           const pollingState = pollingStates[job.id];
+          const isAutoPolling = autoPollingJobs.has(job.id);
           const stalledJobAction = stalledJobActions[job.id];
 
           return (
@@ -109,6 +114,7 @@ const VirtualizedBatchJobList = ({
               payeeRowData={payeeRowData}
               isRefreshing={isRefreshing}
               isPolling={Boolean(pollingState)}
+              isAutoPolling={isAutoPolling}
               pollingState={pollingState}
               stalledJobActions={stalledJobAction}
               onRefresh={() => onRefresh(job.id)}

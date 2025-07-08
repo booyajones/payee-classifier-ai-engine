@@ -10,6 +10,7 @@ interface BatchJobActionsProps {
   isRefreshing: boolean;
   isDownloading: boolean;
   isPolling: boolean;
+  isAutoPolling?: boolean; // Separate state for auto-polling
   onRefresh: () => void;
   onCancel: () => void;
   onDelete: () => void;
@@ -20,6 +21,7 @@ const BatchJobActions = ({
   isCompleted,
   isRefreshing,
   isPolling,
+  isAutoPolling = false,
   onRefresh,
   onCancel,
   onDelete
@@ -77,10 +79,11 @@ const BatchJobActions = ({
         variant="outline"
         size="sm"
         onClick={safeRefresh}
-        disabled={isRefreshing || isPolling}
+        disabled={isRefreshing}
+        className={isAutoPolling ? 'border-blue-300 bg-blue-50/30' : ''}
       >
-        <RefreshCw className={`h-3 w-3 mr-1 ${(isRefreshing || isPolling) ? 'animate-spin' : ''}`} />
-        Refresh
+        <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : isAutoPolling ? 'text-blue-600' : ''}`} />
+        {isAutoPolling ? 'Auto' : 'Refresh'}
       </Button>
 
       {['validating', 'in_progress', 'finalizing'].includes(job.status) && (

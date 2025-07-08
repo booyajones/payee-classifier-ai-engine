@@ -16,6 +16,7 @@ interface BatchJobContainerProps {
   payeeRowDataMap: Record<string, PayeeRowData>;
   refreshingJobs: Set<string>;
   pollingStates: Record<string, any>;
+  autoPollingJobs: Set<string>; // Track auto-polling jobs
   stalledJobActions?: Record<string, any>;
   largeJobOptimization?: any;
   onRefresh: (jobId: string, silent?: boolean) => Promise<void>;
@@ -33,6 +34,7 @@ const BatchJobContainer = ({
   payeeRowDataMap,
   refreshingJobs,
   pollingStates,
+  autoPollingJobs,
   stalledJobActions = {},
   largeJobOptimization,
   onRefresh,
@@ -151,6 +153,7 @@ const BatchJobContainer = ({
           payeeRowDataMap={payeeRowDataMap}
           refreshingJobs={refreshingJobs}
           pollingStates={pollingStates}
+          autoPollingJobs={autoPollingJobs}
           stalledJobActions={stalledJobActions}
           onRefresh={onRefresh}
           onForceRefresh={onForceRefresh}

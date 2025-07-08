@@ -168,6 +168,7 @@ export const useBatchJobManager = () => {
     payeeDataMap,
     refreshingJobs: batchJobActions.refreshingJobs,
     pollingStates: batchJobActions.pollingStates,
+    autoPollingJobs, // Add auto-polling jobs state
     stalledJobActions,
     handleRefreshJob: batchJobActions.handleRefreshJob,
     handleForceRefresh: batchJobActions.handleForceRefresh, // FORCE REFRESH: Debug capability
@@ -191,6 +192,7 @@ export const useBatchJobManager = () => {
     stableJobs,
     payeeDataMap,
     batchJobActions,
+    autoPollingJobs, // Add to dependencies
     stalledJobActions,
     handleDownload,
     handleCancel,
