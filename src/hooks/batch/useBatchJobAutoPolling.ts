@@ -37,7 +37,20 @@ export const useBatchJobAutoPolling = ({
   useEffect(() => {
     // CIRCUIT BREAKER: Only poll truly active jobs, exclude completed and ancient jobs
     const activeJobs = jobs.filter(job => {
-      if (!isActiveJobStatus(job.status)) return false;
+      // STOP ALL POLLING for completed, failed, cancelled, or expired jobs
+      if (!isActiveJobStatus(job.status)) {
+        // If it was being polled, clean it up immediately
+        if (autoPollingJobs.has(job.id)) {
+          console.log(`[AUTO-POLLING] Stopping polling for ${job.status} job ${job.id.substring(0, 8)}`);
+          cleanupPolling(job.id);
+          setAutoPollingJobs(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(job.id);
+            return newSet;
+          });
+        }
+        return false;
+      }
       
       // CIRCUIT BREAKER: Stop polling jobs older than 48 hours
       const jobAge = Date.now() - new Date(job.created_at * 1000).getTime();

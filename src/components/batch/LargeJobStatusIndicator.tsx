@@ -115,6 +115,11 @@ const LargeJobStatusIndicator = ({
   };
 
   const getTimeIndicator = () => {
+    // FIXED: Don't show "running" for completed jobs
+    if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled' || job.status === 'expired') {
+      return null;
+    }
+    
     if (isVeryLongRunning) {
       return (
         <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">

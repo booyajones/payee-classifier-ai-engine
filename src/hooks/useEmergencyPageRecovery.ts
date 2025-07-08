@@ -3,12 +3,13 @@ import { useBatchJobStore } from '@/stores/batchJobStore';
 import { emergencyStop } from '@/lib/performance/emergencyStop';
 
 export const useEmergencyPageRecovery = () => {
-  const { clearAllJobs } = useBatchJobStore();
+  const { clearAllJobs, jobs } = useBatchJobStore();
 
   useEffect(() => {
-    // NUCLEAR OPTION: Immediate recovery on page load
+    // NUCLEAR OPTION: Immediate recovery on page load if unresponsive
     const performEmergencyRecovery = () => {
       console.log('[EMERGENCY RECOVERY] Page unresponsive - activating nuclear recovery');
+      console.log(`[EMERGENCY RECOVERY] Found ${jobs.length} jobs in store`);
       
       // Stop everything immediately
       emergencyStop.activate('Nuclear page recovery');
