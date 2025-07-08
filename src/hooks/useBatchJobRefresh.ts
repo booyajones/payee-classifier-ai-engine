@@ -1,15 +1,20 @@
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { BatchJob, checkBatchJobStatus } from "@/lib/openai/trueBatchAPI";
 import { handleError, showRetryableErrorToast } from "@/lib/errorHandler";
 import { useApiRetry } from "@/hooks/useRetry";
 import { BatchJobUpdater } from "@/lib/database/batchJobUpdater";
 import { BatchJobLoader } from "@/lib/database/batchJobLoader";
+import { withRefreshTimeout } from "@/lib/openai/utils";
 
 export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
   const [refreshingJobs, setRefreshingJobs] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+  
+  // Circuit breaker to prevent multiple simultaneous requests
+  const activeRequests = useRef<Map<string, { cancel: () => void }>>(new Map());
+  const lastRequestTime = useRef<Map<string, number>>(new Map());
 
   const {
     execute: refreshJobWithRetry,
@@ -88,18 +93,48 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
     }
   };
 
-  const handleRefreshJob = async (jobId: string, silent: boolean = false) => {
+  const handleRefreshJob = useCallback(async (jobId: string, silent: boolean = false) => {
+    // Circuit breaker: prevent rapid repeated requests
+    const now = Date.now();
+    const lastRequest = lastRequestTime.current.get(jobId);
+    if (lastRequest && now - lastRequest < 2000) {
+      console.log(`[JOB REFRESH] Rate limited refresh request for ${jobId.substring(0, 8)} - too soon`);
+      return;
+    }
+
+    // Cancel any existing request for this job
+    const existingRequest = activeRequests.current.get(jobId);
+    if (existingRequest) {
+      console.log(`[JOB REFRESH] Cancelling existing request for ${jobId.substring(0, 8)}`);
+      existingRequest.cancel();
+      activeRequests.current.delete(jobId);
+    }
+
     setRefreshingJobs(prev => new Set(prev).add(jobId));
+    lastRequestTime.current.set(jobId, now);
+    
+    // Create cancellable request with timeout
+    const { promise: refreshPromise, cancel } = withRefreshTimeout(
+      checkBatchJobStatus(jobId),
+      15000 // 15 second timeout for refresh operations
+    );
+    
+    // Store the cancel function
+    activeRequests.current.set(jobId, { cancel });
+
     try {
-      console.log(`[JOB REFRESH] Refreshing job ${jobId} with stall detection`);
-      const updatedJob = await refreshJobWithRetry(jobId);
-      console.log(`[JOB REFRESH] Job ${jobId} status: ${updatedJob.status}, progress: ${updatedJob.request_counts.completed}/${updatedJob.request_counts.total}`);
+      console.log(`[JOB REFRESH] Refreshing job ${jobId.substring(0, 8)} with 15s timeout`);
+      const updatedJob = await refreshPromise;
+      console.log(`[JOB REFRESH] Job ${jobId.substring(0, 8)} status: ${updatedJob.status}, progress: ${updatedJob.request_counts.completed}/${updatedJob.request_counts.total}`);
+      
+      // Clean up the active request
+      activeRequests.current.delete(jobId);
       
       // Check for truly stalled jobs (no forced cancellation)
       if (detectStalledJob(updatedJob)) {
         const createdTime = new Date(updatedJob.created_at * 1000);
         const timeSinceCreated = Date.now() - createdTime.getTime();
-        console.warn(`[JOB REFRESH] STALLED JOB DETECTED: ${jobId}`);
+        console.warn(`[JOB REFRESH] STALLED JOB DETECTED: ${jobId.substring(0, 8)}`);
         const hasStartedProcessing = updatedJob.request_counts.completed > 0;
         
         toast({
@@ -116,7 +151,7 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
       try {
         await BatchJobUpdater.updateBatchJobStatus(updatedJob);
       } catch (updateError) {
-        console.warn(`[JOB REFRESH] Database update failed for ${jobId}:`, updateError);
+        console.warn(`[JOB REFRESH] Database update failed for ${jobId.substring(0, 8)}:`, updateError);
         // Don't fail the whole refresh if database update fails
       }
       
@@ -130,12 +165,31 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
         });
       }
     } catch (error) {
-      const appError = handleError(error, 'Job Status Refresh');
-      console.error(`[JOB REFRESH] Error refreshing job ${jobId}:`, error);
+      // Clean up the active request
+      activeRequests.current.delete(jobId);
       
-      // Check for specific API issues that might indicate stalled jobs
+      const appError = handleError(error, 'Job Status Refresh');
+      console.error(`[JOB REFRESH] Error refreshing job ${jobId.substring(0, 8)}:`, error);
+      
+      // Handle specific error types with better user feedback
       if (error instanceof Error) {
-        if (error.message.includes('404') || error.message.includes('not found')) {
+        if (error.message.includes('cancelled') || error.message.includes('aborted')) {
+          console.log(`[JOB REFRESH] Request cancelled for job ${jobId.substring(0, 8)}`);
+          toast({
+            title: "Refresh Cancelled",
+            description: `Refresh operation was cancelled for job ${jobId.substring(0, 8)}...`,
+            variant: "default",
+            duration: 4000,
+          });
+          return; // Don't throw for cancelled requests
+        } else if (error.message.includes('timed out')) {
+          toast({
+            title: "⏱️ API Timeout",
+            description: `OpenAI API is responding slowly. Job ${jobId.substring(0, 8)}... refresh timed out after 15 seconds.`,
+            variant: "destructive",
+            duration: 8000,
+          });
+        } else if (error.message.includes('404') || error.message.includes('not found')) {
           toast({
             title: "Job Not Found",
             description: `Job ${jobId.substring(0, 8)}... may have been removed from OpenAI. Consider it completed or failed.`,
@@ -149,23 +203,43 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
             variant: "destructive",
             duration: 8000,
           });
+        } else if (error.message.includes('429') || error.message.includes('rate limit')) {
+          toast({
+            title: "Rate Limited",
+            description: `OpenAI API rate limit reached. Please wait a moment before refreshing job ${jobId.substring(0, 8)}...`,
+            variant: "destructive",
+            duration: 8000,
+          });
+        } else {
+          // Generic API error
+          toast({
+            title: "Refresh Failed",
+            description: `Unable to refresh job ${jobId.substring(0, 8)}... - OpenAI API may be experiencing issues.`,
+            variant: "destructive",
+            duration: 6000,
+          });
         }
       }
       
-      showRetryableErrorToast(
-        appError, 
-        () => handleRefreshJob(jobId, silent),
-        'Job Refresh'
-      );
+      // Only show retry option for non-timeout/non-cancelled errors
+      if (!error.message.includes('cancelled') && !error.message.includes('timed out')) {
+        showRetryableErrorToast(
+          appError, 
+          () => handleRefreshJob(jobId, silent),
+          'Job Refresh'
+        );
+      }
+      
       throw error;
     } finally {
+      // Always clean up refresh state
       setRefreshingJobs(prev => {
         const newSet = new Set(prev);
         newSet.delete(jobId);
         return newSet;
       });
     }
-  };
+  }, [onJobUpdate, toast, detectStalledJob]);
 
   return {
     refreshingJobs,
