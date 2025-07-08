@@ -26,6 +26,10 @@ export const useBatchJobRefreshErrorHandler = () => {
           duration: 4000,
         });
         return; // Don't throw for cancelled requests
+      } else if (error.message.includes('database') || error.message.includes('constraint')) {
+        // Database errors during processing don't mean the job failed - just log and continue
+        console.warn(`[JOB REFRESH] Database error during processing for job ${jobId.substring(0, 8)} - this is normal during file generation:`, error.message);
+        return; // Don't show error toast for database processing errors
       } else if (error.message.includes('timed out')) {
         toast({
           title: "⏱️ API Timeout",

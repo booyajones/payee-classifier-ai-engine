@@ -38,7 +38,7 @@ export const calculatePollingDelay = (job: BatchJob): number => {
   
   // More responsive polling for very fresh jobs
   const hasProgress = job.request_counts.completed > 0;
-  return hasProgress ? 30 * 1000 : 45 * 1000; // 30-45 seconds for new jobs
+  return hasProgress ? 15 * 1000 : 20 * 1000; // 15-20 seconds for new jobs with progress
 };
 
 export const getInitialPollingDelay = (job: BatchJob): number => {
@@ -46,11 +46,11 @@ export const getInitialPollingDelay = (job: BatchJob): number => {
   
   // Very responsive initial polling for fresh jobs
   if (jobAge < 2 * 60 * 1000) { // Under 2 minutes
-    return job.status === 'in_progress' ? 1000 : 2000; // 1-2 seconds
+    return job.status === 'in_progress' ? 3000 : 5000; // 3-5 seconds (reduced from 1-2)
   }
   
   if (jobAge < 10 * 60 * 1000) { // Under 10 minutes
-    return job.status === 'in_progress' ? 3000 : 5000; // 3-5 seconds
+    return job.status === 'in_progress' ? 8000 : 10000; // 8-10 seconds
   }
   
   // Longer initial delay for older jobs

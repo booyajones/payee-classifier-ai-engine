@@ -95,17 +95,28 @@ export const useBatchJobRefreshCore = (onJobUpdate: (job: BatchJob) => void) => 
         await BatchJobUpdater.updateBatchJobStatus(updatedJob);
       } catch (updateError) {
         console.warn(`[JOB REFRESH] Database update failed for ${jobId.substring(0, 8)}:`, updateError);
-        // Don't fail the whole refresh if database update fails
+        // Don't fail the whole refresh if database update fails - continue with UI update
+        // Database errors during file generation don't mean the job failed
       }
       
       onJobUpdate(updatedJob);
       
-      // Only show success toast for user-initiated refreshes, not automatic polling
+      // Show appropriate success toast - differentiate between progress and completion
       if (!silent) {
-        toast({
-          title: "Job Status Updated",
-          description: `Job refreshed: ${updatedJob.status} (${updatedJob.request_counts.completed}/${updatedJob.request_counts.total})`,
-        });
+        if (updatedJob.status === 'completed') {
+          toast({
+            title: "✅ Job Completed",
+            description: `Batch job (...${jobId.substring(-8)}) is now completed`,
+            variant: "default",
+            duration: 8000,
+          });
+        } else {
+          toast({
+            title: "Job Status Updated",
+            description: `Job refreshed: ${updatedJob.status} (${updatedJob.request_counts.completed}/${updatedJob.request_counts.total})`,
+            duration: 4000,
+          });
+        }
       }
     } catch (error) {
       // Clean up the active request
