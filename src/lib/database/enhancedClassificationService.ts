@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { PayeeClassification } from '@/lib/types';
+import { exponentialBackoff, createCircuitBreaker, DatabaseError } from './resilientDatabase';
 
 interface SICValidationStats {
   totalSaved: number;
@@ -89,56 +90,78 @@ export const saveClassificationResultsWithValidation = async (
 
   console.log(`[ENHANCED DB SERVICE] Validation complete: ${stats.businessCount} businesses, ${stats.individualCount} individuals, ${stats.sicCodeCount} with SIC codes`);
 
-  // CRITICAL FIX: Use proper upsert logic to handle duplicate detection data updates
+  // RESILIENT DATABASE: Use circuit breaker and exponential backoff
+  const circuitBreaker = createCircuitBreaker(3, 30000); // 3 failures, 30s recovery
   let successfulInserts = 0;
   let duplicateUpdates = 0;
   
-  for (const record of validatedResults) {
-    try {
-      // First try to insert the record
-      const { error: insertError } = await supabase
-        .from('payee_classifications')
-        .insert([record]);
-      
-      if (insertError && insertError.code === '23505') {
-        // Unique constraint violation - update existing record with duplicate detection data
-        const { error: updateError } = await supabase
-          .from('payee_classifications')
-          .update({
-            // Update duplicate detection fields specifically
-            is_potential_duplicate: record.is_potential_duplicate,
-            duplicate_of_payee_id: record.duplicate_of_payee_id,
-            duplicate_confidence_score: record.duplicate_confidence_score,
-            duplicate_detection_method: record.duplicate_detection_method,
-            duplicate_group_id: record.duplicate_group_id,
-            ai_duplicate_reasoning: record.ai_duplicate_reasoning,
-            // Also update other fields that might have changed
-            classification: record.classification,
-            confidence: record.confidence,
-            reasoning: record.reasoning,
-            sic_code: record.sic_code,
-            sic_description: record.sic_description
-          })
-          .eq('payee_name', record.payee_name)
-          .eq('batch_id', record.batch_id)
-          .eq('row_index', record.row_index);
+  // Process records in smaller batches to reduce database load
+  const BATCH_SIZE = 10;
+  for (let i = 0; i < validatedResults.length; i += BATCH_SIZE) {
+    const batchRecords = validatedResults.slice(i, i + BATCH_SIZE);
+    
+    for (const record of batchRecords) {
+      try {
+        await circuitBreaker(async () => {
+          // Wrap database operations in exponential backoff
+          await exponentialBackoff(async () => {
+            // First try to insert the record
+            const { error: insertError } = await supabase
+              .from('payee_classifications')
+              .insert([record]);
+            
+            if (insertError && insertError.code === '23505') {
+              // Unique constraint violation - update existing record with duplicate detection data
+              const { error: updateError } = await supabase
+                .from('payee_classifications')
+                .update({
+                  // Update duplicate detection fields specifically
+                  is_potential_duplicate: record.is_potential_duplicate,
+                  duplicate_of_payee_id: record.duplicate_of_payee_id,
+                  duplicate_confidence_score: record.duplicate_confidence_score,
+                  duplicate_detection_method: record.duplicate_detection_method,
+                  duplicate_group_id: record.duplicate_group_id,
+                  ai_duplicate_reasoning: record.ai_duplicate_reasoning,
+                  // Also update other fields that might have changed
+                  classification: record.classification,
+                  confidence: record.confidence,
+                  reasoning: record.reasoning,
+                  sic_code: record.sic_code,
+                  sic_description: record.sic_description
+                })
+                .eq('payee_name', record.payee_name)
+                .eq('batch_id', record.batch_id)
+                .eq('row_index', record.row_index);
+              
+              if (updateError) {
+                throw new DatabaseError(`Update failed for "${record.payee_name}": ${updateError.message}`, updateError.code, true);
+              } else {
+                duplicateUpdates++;
+                console.log(`[RESILIENT DB] Updated duplicate detection data for: "${record.payee_name}"`);
+              }
+            } else if (insertError) {
+              throw new DatabaseError(`Insert failed for "${record.payee_name}": ${insertError.message}`, insertError.code, true);
+            } else {
+              successfulInserts++;
+            }
+          }, `Save classification for ${record.payee_name}`, { maxRetries: 2, baseDelay: 500 });
+        }, `Circuit breaker for ${record.payee_name}`);
         
-        if (updateError) {
-          console.error(`[ENHANCED DB SERVICE] Update failed for "${record.payee_name}":`, updateError.message);
-          stats.sicValidationErrors.push(`Update failed for "${record.payee_name}": ${updateError.message}`);
+      } catch (error) {
+        if (error instanceof DatabaseError && error.code === 'CIRCUIT_OPEN') {
+          console.error(`[RESILIENT DB] Circuit breaker is open - stopping batch processing`);
+          stats.sicValidationErrors.push(`Circuit breaker activated - remaining records not processed`);
+          break; // Stop processing this batch
         } else {
-          duplicateUpdates++;
-          console.log(`[ENHANCED DB SERVICE] Updated duplicate detection data for: "${record.payee_name}"`);
+          console.error(`[RESILIENT DB] Final failure for "${record.payee_name}":`, error);
+          stats.sicValidationErrors.push(`Final failure for "${record.payee_name}": ${error instanceof Error ? error.message : String(error)}`);
         }
-      } else if (insertError) {
-        console.error(`[ENHANCED DB SERVICE] Insert failed for "${record.payee_name}":`, insertError.message);
-        stats.sicValidationErrors.push(`Insert failed for "${record.payee_name}": ${insertError.message}`);
-      } else {
-        successfulInserts++;
       }
-    } catch (unexpectedError) {
-      console.error(`[ENHANCED DB SERVICE] Unexpected error for "${record.payee_name}":`, unexpectedError);
-      stats.sicValidationErrors.push(`Unexpected error for "${record.payee_name}": ${unexpectedError}`);
+    }
+    
+    // Add small delay between batches to prevent overwhelming the database
+    if (i + BATCH_SIZE < validatedResults.length) {
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
   }
 
