@@ -88,7 +88,7 @@ export const useBatchJobAutoPolling = ({
         });
       }
     }
-  }, [jobs, autoPollingJobs, setAutoPollingJobs, startPolling, cleanupPolling, isPollingRef]);
+  }, [jobs.length, autoPollingJobs.size, startPolling, cleanupPolling]); // Only re-run when counts change
 
   // Cleanup on unmount
   useEffect(() => {

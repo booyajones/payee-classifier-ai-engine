@@ -58,5 +58,5 @@ export const useEmergencyPageRecovery = () => {
     }
 
     // No automatic backup timer - only run when needed
-  }, [jobs.length]); // Only re-run when jobs length changes significantly
+  }, []); // Only run once on mount to avoid render loops
 };
