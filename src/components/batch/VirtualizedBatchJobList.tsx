@@ -3,7 +3,6 @@ import { FixedSizeList as List } from 'react-window';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import BatchJobCard from './BatchJobCard';
-import DirectCSVExport from './DirectCSVExport';
 
 interface VirtualizedBatchJobListProps {
   jobs: BatchJob[];
@@ -99,38 +98,22 @@ const VirtualizedBatchJobList = ({
           const isRefreshing = refreshingJobs.has(job.id);
           const pollingState = pollingStates[job.id];
           const stalledJobAction = stalledJobActions[job.id];
-          
-          // Check if job is effectively complete
-          const isEffectivelyComplete = job.status === 'completed' || 
-            (job.request_counts.total > 0 && 
-             job.request_counts.completed === job.request_counts.total && 
-             job.status === 'finalizing');
 
           return (
-            <div key={`${job.id}-${job.status}-${job.request_counts.completed}`} className="space-y-2">
-              <BatchJobCard
-                job={job}
-                payeeRowData={payeeRowData}
-                isRefreshing={isRefreshing}
-                isPolling={Boolean(pollingState)}
-                pollingState={pollingState}
-                stalledJobActions={stalledJobAction}
-                onRefresh={() => onRefresh(job.id)}
-                onForceSync={onForceSync ? () => onForceSync(job.id) : undefined}
-                onDownload={() => onDownload(job)}
-                onCancel={() => onCancel(job.id)}
-                onDelete={() => onJobDelete(job.id)}
-              />
-              
-              {/* Download interface for completed jobs */}
-              {isEffectivelyComplete && payeeRowData && (
-                <DirectCSVExport 
-                  job={job}
-                  payeeData={payeeRowData}
-                  onDownloadResults={() => onDownload(job)}
-                />
-              )}
-            </div>
+            <BatchJobCard
+              key={`${job.id}-${job.status}-${job.request_counts.completed}`}
+              job={job}
+              payeeRowData={payeeRowData}
+              isRefreshing={isRefreshing}
+              isPolling={Boolean(pollingState)}
+              pollingState={pollingState}
+              stalledJobActions={stalledJobAction}
+              onRefresh={() => onRefresh(job.id)}
+              onForceSync={onForceSync ? () => onForceSync(job.id) : undefined}
+              onDownload={() => onDownload(job)}
+              onCancel={() => onCancel(job.id)}
+              onDelete={() => onJobDelete(job.id)}
+            />
           );
         })}
       </div>
