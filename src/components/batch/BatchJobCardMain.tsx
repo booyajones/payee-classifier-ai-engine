@@ -75,7 +75,6 @@ const BatchJobCardMain = React.memo(({
         job={job}
         payeeRowData={payeeRowData}
         isCompleted={actuallyCompleted}
-        onDownload={onDownload}
       />
     </Card>
   );

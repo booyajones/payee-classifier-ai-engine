@@ -1,7 +1,7 @@
 
 import React, { useMemo, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Upload, Play, TestTube, Users, Eye, Activity, BarChart3 } from "lucide-react";
+import { FileText, Upload, Play, TestTube, Users, Eye, Activity, BarChart3, Download } from "lucide-react";
 import SingleClassificationForm from "@/components/SingleClassificationForm";
 import HealthCheckPanel from "@/components/testing/HealthCheckPanel";
 import ImplementationSummary from "@/components/testing/ImplementationSummary";
@@ -15,6 +15,7 @@ import CodeQualityDashboard from "@/components/quality/CodeQualityDashboard";
 import SmartFileUpload from "@/components/SmartFileUpload";
 import KeywordExclusionManager from "@/components/KeywordExclusionManager";
 import BatchJobManagerContainer from "@/components/batch/BatchJobManagerContainer";
+import UnifiedDownloadCenter from "@/components/download/UnifiedDownloadCenter";
 
 
 import OptimizedVirtualizedTable from "@/components/table/OptimizedVirtualizedTable";
@@ -36,7 +37,7 @@ interface MainTabsProps {
 const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: MainTabsProps) => {
   console.log('MainTabs rendering, props:', { allResultsLength: allResults.length });
   const { activeTab, setActiveTab } = useAppStore();
-  const { addJob, setPayeeData } = useBatchJobStore();
+  const { addJob, setPayeeData, jobs, payeeDataMap } = useBatchJobStore();
   const { toast } = useToast();
   const { saveBatchJob } = useBatchJobPersistence();
   const { showSuccess, showError, showInfo } = useEnhancedNotifications();
@@ -168,6 +169,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
         single: 'Single Classification',
         upload: 'File Upload',
         jobs: 'Batch Jobs',
+        downloads: 'Download Center',
         keywords: 'Keyword Management',
         health: 'System Health',
         quality: 'Code Quality'
@@ -190,7 +192,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
       />
       
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-6" role="tablist">
+        <TabsList className="grid w-full grid-cols-7" role="tablist">
           <TabsTrigger 
             value="single" 
             className="flex items-center gap-2"
@@ -216,9 +218,17 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
             Jobs
           </TabsTrigger>
           <TabsTrigger 
+            value="downloads" 
+            className="flex items-center gap-2"
+            aria-label="Download Center (Alt+4)"
+          >
+            <Download className="h-4 w-4" />
+            Downloads
+          </TabsTrigger>
+          <TabsTrigger 
             value="keywords" 
             className="flex items-center gap-2"
-            aria-label="Keyword Management (Alt+4)"
+            aria-label="Keyword Management (Alt+5)"
           >
             <FileText className="h-4 w-4" />
             Keywords
@@ -226,7 +236,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
           <TabsTrigger 
             value="health" 
             className="flex items-center gap-2"
-            aria-label="System Health (Alt+5)"
+            aria-label="System Health (Alt+6)"
           >
             <Activity className="h-4 w-4" />
             Health
@@ -234,7 +244,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
           <TabsTrigger 
             value="quality" 
             className="flex items-center gap-2"
-            aria-label="Code Quality (Alt+6)"
+            aria-label="Code Quality (Alt+7)"
           >
             <BarChart3 className="h-4 w-4" />
             Quality
@@ -268,6 +278,19 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
 
             <TabsContent value="jobs" className="mt-6" role="tabpanel">
               <BatchJobManagerContainer />
+            </TabsContent>
+
+            <TabsContent value="downloads" className="mt-6" role="tabpanel">
+              <UnifiedDownloadCenter 
+                jobs={jobs}
+                payeeRowDataMap={payeeDataMap}
+                onDownload={async (job) => {
+                  // Use the existing download handler logic
+                  const { useBatchJobDownloadHandler } = await import('@/components/batch/BatchJobDownloadHandler');
+                  const { handleDownload } = useBatchJobDownloadHandler({ payeeDataMap });
+                  await handleDownload(job);
+                }}
+              />
             </TabsContent>
 
             <TabsContent value="keywords" className="mt-6" role="tabpanel">
