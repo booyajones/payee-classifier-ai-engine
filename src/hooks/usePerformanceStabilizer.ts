@@ -15,8 +15,8 @@ export const usePerformanceStabilizer = () => {
   useEffect(() => {
     renderCountRef.current += 1;
     
-    // EMERGENCY: Very low threshold for render loop detection
-    if (renderCountRef.current > 5) {
+    // RESPONSIVENESS FIX: Higher threshold to prevent false positives during normal auto-polling
+    if (renderCountRef.current > 15) {
       console.error('[PERFORMANCE STABILIZER] Critical render loop detected');
       emergencyStop.activate('Critical render loop in performance stabilizer');
       return;

@@ -66,11 +66,11 @@ export const useBatchJobStore = create<BatchJobState & BatchJobActions>()(
     updateJob: (job) => set((state) => {
       console.log(`[STORE] Updating job ${job.id.substring(0, 8)} with status: ${job.status}`);
       
-      // Only block updates during true emergencies (rendering issues), not normal operation
+      // RESPONSIVENESS FIX: Allow data updates to flow through more freely
       const isEmergencyActive = typeof window !== 'undefined' && (window as any).__EMERGENCY_STOP_ACTIVE;
       if (isEmergencyActive) {
-        console.log(`[STORE] Emergency stop active but allowing data update for ${job.id.substring(0, 8)}`);
-        // Allow data updates but log them during emergency stop
+        console.log(`[STORE] Emergency stop active - allowing data update for ${job.id.substring(0, 8)}`);
+        // Continue with update - only block extreme rendering loops, not data flow
       }
 
       // Smart filtering for completed jobs - only skip if truly no changes
@@ -93,15 +93,20 @@ export const useBatchJobStore = create<BatchJobState & BatchJobActions>()(
         return state;
       }
 
-      // More permissive change detection - allow updates for active jobs
+      // RESPONSIVENESS FIX: More permissive updates for active jobs
       const existingJob = state.jobs.find(j => j.id === job.id);
-      if (existingJob && ['completed', 'failed', 'cancelled', 'expired'].includes(job.status)) {
+      const isActiveJob = ['validating', 'in_progress', 'finalizing'].includes(job.status);
+      
+      // Always allow updates for active jobs to ensure responsive UI
+      if (isActiveJob) {
+        console.log(`[STORE] Allowing update for active job ${job.id.substring(0, 8)}: ${job.status}`);
+      } else if (existingJob && ['completed', 'failed', 'cancelled', 'expired'].includes(job.status)) {
         const statusChanged = existingJob.status !== job.status;
         const progressChanged = existingJob.request_counts?.completed !== job.request_counts?.completed;
         const outputChanged = existingJob.output_file_id !== job.output_file_id;
         
         if (!statusChanged && !progressChanged && !outputChanged) {
-          console.log(`[STORE] Skipping non-critical update for ${job.id.substring(0, 8)}`);
+          console.log(`[STORE] Skipping non-critical update for completed job ${job.id.substring(0, 8)}`);
           return state; // Skip update if no critical changes for completed jobs
         }
       }

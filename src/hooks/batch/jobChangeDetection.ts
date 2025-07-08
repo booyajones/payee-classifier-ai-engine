@@ -33,8 +33,8 @@ export const useJobChangeDetection = () => {
     const jobAge = now - createdTime.getTime();
     const isOldJob = jobAge > 2 * 60 * 60 * 1000; // Over 2 hours old
     
-    // Adaptive polling intervals based on job age and progress
-    const baseInterval = isOldJob ? 60000 : 30000; // 1 minute for old jobs, 30s for new
+    // RESPONSIVENESS FIX: Much shorter intervals for better UI updates
+    const baseInterval = isOldJob ? 20000 : 10000; // 20s for old jobs, 10s for new (was 60s/30s)
     const shouldForceUpdate = job.status === 'in_progress' && timeSinceLastUpdate > baseInterval;
     
     const hasChanged = hasStatusChange || hasProgressChange || shouldForceUpdate;

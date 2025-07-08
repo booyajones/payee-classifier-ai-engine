@@ -33,8 +33,8 @@ export const useBatchJobManager = () => {
   useEffect(() => {
     renderCountRef.current += 1;
     
-    // More conservative threshold to prevent false positives
-    if (renderCountRef.current > 12) {
+    // RESPONSIVENESS FIX: Increased threshold to prevent false positives during normal operation
+    if (renderCountRef.current > 25) {
       console.error('[BATCH JOB MANAGER] Excessive renders detected, activating emergency stop');
       emergencyStop.activate('Excessive renders in BatchJobManager');
       return;

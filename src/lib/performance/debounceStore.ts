@@ -13,8 +13,8 @@ class DebouncedStoreUpdater {
     timer: null
   };
 
-  private readonly DEBOUNCE_DELAY = 250; // 250ms debounce
-  private readonly MIN_UPDATE_INTERVAL = 100; // Minimum 100ms between updates
+  private readonly DEBOUNCE_DELAY = 50; // RESPONSIVENESS FIX: Reduced from 250ms to 50ms
+  private readonly MIN_UPDATE_INTERVAL = 25; // RESPONSIVENESS FIX: Reduced from 100ms to 25ms
 
   scheduleUpdate(job: BatchJob, updateFn: (job: BatchJob) => void): void {
     // Add to pending updates

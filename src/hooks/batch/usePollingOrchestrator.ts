@@ -89,10 +89,10 @@ export const usePollingOrchestrator = ({
         const isStillActive = updatedJob && isActiveJobStatus(updatedJob.status);
         
         if (isStillActive) {
-          // Use optimized polling for large jobs, fallback to standard calculation
+          // RESPONSIVENESS FIX: Use the faster interval, not the slower one
           const optimizedDelay = getPollingInterval(updatedJob);
           const standardDelay = calculatePollingDelay(updatedJob);
-          const delay = Math.max(optimizedDelay, standardDelay); // Use the more conservative interval
+          const delay = Math.min(optimizedDelay, standardDelay); // Use the more responsive interval
           
           updatePollingInterval(jobId, delay);
           pollTimeouts.current[jobId] = setTimeout(poll, delay);
