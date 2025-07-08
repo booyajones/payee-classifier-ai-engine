@@ -20,6 +20,7 @@ interface BatchJobCardProps {
   pollingState?: any;
   stalledJobActions?: any;
   onRefresh: () => void;
+  onForceSync?: () => Promise<BatchJob>; // EMERGENCY FIX
   onDownload: () => void;
   onCancel: () => void;
   onDelete: () => void;
@@ -33,6 +34,7 @@ const BatchJobCard = ({
   pollingState,
   stalledJobActions,
   onRefresh,
+  onForceSync,
   onDownload,
   onCancel,
   onDelete

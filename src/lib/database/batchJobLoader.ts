@@ -132,4 +132,57 @@ export class BatchJobLoader {
     console.log(`[BATCH JOB LOADER] Successfully loaded ${jobs.length} batch jobs with enhanced processing`);
     return { jobs, payeeRowDataMap };
   }
+
+  /**
+   * Load a single batch job by ID
+   */
+  static async loadBatchJobById(jobId: string): Promise<BatchJob | null> {
+    console.log(`[BATCH JOB LOADER] Loading single job: ${jobId.substring(0, 8)}`);
+
+    const { data, error } = await supabase
+      .from('batch_jobs')
+      .select('*')
+      .eq('id', jobId)
+      .single();
+
+    if (error) {
+      console.error(`[BATCH JOB LOADER] Error loading job ${jobId.substring(0, 8)}:`, error);
+      return null;
+    }
+
+    if (!data) {
+      console.log(`[BATCH JOB LOADER] Job ${jobId.substring(0, 8)} not found`);
+      return null;
+    }
+
+    try {
+      const batchJob: BatchJob = {
+        id: data.id,
+        errors: data.errors || null,
+        input_file_id: 'db-stored',
+        completion_window: '24h',
+        status: data.status as any,
+        output_file_id: data.output_file_id || null,
+        created_at: data.created_at_timestamp,
+        in_progress_at: data.in_progress_at_timestamp || null,
+        expired_at: data.expired_at_timestamp || null,
+        finalizing_at: data.finalizing_at_timestamp || null,
+        completed_at: data.completed_at_timestamp || null,
+        failed_at: data.failed_at_timestamp || null,
+        cancelled_at: data.cancelled_at_timestamp || null,
+        request_counts: {
+          total: data.request_counts_total,
+          completed: data.request_counts_completed,
+          failed: data.request_counts_failed
+        },
+        metadata: data.metadata as any || null
+      };
+
+      console.log(`[BATCH JOB LOADER] Successfully loaded job ${jobId.substring(0, 8)} with status: ${batchJob.status}`);
+      return batchJob;
+    } catch (error) {
+      console.error(`[BATCH JOB LOADER] Error processing job ${jobId.substring(0, 8)}:`, error);
+      return null;
+    }
+  }
 }

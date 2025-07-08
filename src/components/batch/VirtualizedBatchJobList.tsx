@@ -12,6 +12,7 @@ interface VirtualizedBatchJobListProps {
   pollingStates: Record<string, any>;
   stalledJobActions?: Record<string, any>;
   onRefresh: (jobId: string, silent?: boolean) => Promise<void>;
+  onForceSync?: (jobId: string) => Promise<BatchJob>; // EMERGENCY FIX
   onDownload: (job: BatchJob) => Promise<void>;
   onCancel: (jobId: string) => void;
   onJobDelete: (jobId: string) => void;
@@ -24,6 +25,7 @@ const VirtualizedBatchJobList = ({
   pollingStates,
   stalledJobActions = {},
   onRefresh,
+  onForceSync,
   onDownload,
   onCancel,
   onJobDelete
@@ -65,6 +67,7 @@ const VirtualizedBatchJobList = ({
             pollingState={pollingState}
             stalledJobActions={stalledJobAction}
             onRefresh={() => onRefresh(job.id)}
+            onForceSync={onForceSync ? () => onForceSync(job.id) : undefined}
             onDownload={() => onDownload(job)}
             onCancel={() => onCancel(job.id)}
             onDelete={() => onJobDelete(job.id)}
@@ -72,7 +75,7 @@ const VirtualizedBatchJobList = ({
         </div>
       );
     });
-  }, [sortedJobs, payeeRowDataMap, refreshingJobs, pollingStates, stalledJobActions, onRefresh, onDownload, onCancel, onJobDelete]);
+  }, [sortedJobs, payeeRowDataMap, refreshingJobs, pollingStates, stalledJobActions, onRefresh, onForceSync, onDownload, onCancel, onJobDelete]);
 
   if (sortedJobs.length === 0) {
     return (
@@ -113,6 +116,7 @@ const VirtualizedBatchJobList = ({
                 pollingState={pollingState}
                 stalledJobActions={stalledJobAction}
                 onRefresh={() => onRefresh(job.id)}
+                onForceSync={onForceSync ? () => onForceSync(job.id) : undefined}
                 onDownload={() => onDownload(job)}
                 onCancel={() => onCancel(job.id)}
                 onDelete={() => onJobDelete(job.id)}

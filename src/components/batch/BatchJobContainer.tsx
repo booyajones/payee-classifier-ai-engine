@@ -19,6 +19,7 @@ interface BatchJobContainerProps {
   stalledJobActions?: Record<string, any>;
   largeJobOptimization?: any;
   onRefresh: (jobId: string, silent?: boolean) => Promise<void>;
+  onForceSync?: (jobId: string) => Promise<BatchJob>; // EMERGENCY FIX
   onDownload: (job: BatchJob) => Promise<void>;
   onCancel: (jobId: string) => void;
   onJobDelete: (jobId: string) => void;
@@ -32,6 +33,7 @@ const BatchJobContainer = ({
   stalledJobActions = {},
   largeJobOptimization,
   onRefresh,
+  onForceSync,
   onDownload,
   onCancel,
   onJobDelete
@@ -137,6 +139,7 @@ const BatchJobContainer = ({
           pollingStates={pollingStates}
           stalledJobActions={stalledJobActions}
           onRefresh={onRefresh}
+          onForceSync={onForceSync}
           onDownload={onDownload}
           onCancel={onCancel}
           onJobDelete={onJobDelete}

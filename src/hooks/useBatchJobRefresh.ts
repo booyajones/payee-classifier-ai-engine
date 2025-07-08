@@ -5,6 +5,7 @@ import { BatchJob, checkBatchJobStatus } from "@/lib/openai/trueBatchAPI";
 import { handleError, showRetryableErrorToast } from "@/lib/errorHandler";
 import { useApiRetry } from "@/hooks/useRetry";
 import { BatchJobUpdater } from "@/lib/database/batchJobUpdater";
+import { BatchJobLoader } from "@/lib/database/batchJobLoader";
 
 export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
   const [refreshingJobs, setRefreshingJobs] = useState<Set<string>>(new Set());
@@ -54,6 +55,37 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
     console.log(`[STALL DETECTION] Job ${job.id}: progress=${job.request_counts.completed}/${job.request_counts.total}, time=${Math.round(timeSinceCreated/60000)}min, started=${hasStartedProcessing}, stalled=${isStalled}`);
     
     return isStalled;
+  };
+
+  // EMERGENCY FIX: Direct database sync that bypasses circuit breaker
+  const handleForceStatusSync = async (jobId: string) => {
+    console.log(`[FORCE SYNC] Emergency status sync for job ${jobId.substring(0, 8)}`);
+    
+    try {
+      const dbJob = await BatchJobLoader.loadBatchJobById(jobId);
+      if (dbJob) {
+        console.log(`[FORCE SYNC] Found job ${jobId.substring(0, 8)} with status: ${dbJob.status}`);
+        onJobUpdate(dbJob);
+        
+        toast({
+          title: "Status Synchronized",
+          description: `Job ${jobId.substring(0, 8)}... status synced from database: ${dbJob.status}`,
+          variant: "default",
+        });
+        
+        return dbJob;
+      } else {
+        throw new Error('Job not found in database');
+      }
+    } catch (error) {
+      console.error(`[FORCE SYNC] Error syncing job ${jobId.substring(0, 8)}:`, error);
+      toast({
+        title: "Sync Failed",
+        description: `Could not sync status for job ${jobId.substring(0, 8)}...`,
+        variant: "destructive",
+      });
+      throw error;
+    }
   };
 
   const handleRefreshJob = async (jobId: string, silent: boolean = false) => {
@@ -138,6 +170,7 @@ export const useBatchJobRefresh = (onJobUpdate: (job: BatchJob) => void) => {
   return {
     refreshingJobs,
     handleRefreshJob,
+    handleForceStatusSync,
     isRefreshRetrying,
     detectStalledJob
   };

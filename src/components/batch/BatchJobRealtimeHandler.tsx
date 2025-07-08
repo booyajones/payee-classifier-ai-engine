@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { useToast } from '@/hooks/use-toast';
 import { useBatchJobRealtime } from '@/hooks/useBatchJobRealtime';
@@ -9,13 +9,32 @@ interface BatchJobRealtimeHandlerProps {
 
 export const useBatchJobRealtimeHandler = ({ onJobUpdate }: BatchJobRealtimeHandlerProps) => {
   const { toast } = useToast();
+  const completionNotifiedRef = useRef<Set<string>>(new Set());
 
   const handleRealtimeJobUpdate = useCallback((updatedJob: BatchJob) => {
     console.log('[REALTIME] Received job update:', updatedJob.id.substring(0, 8), 'status:', updatedJob.status);
     
-    // CIRCUIT BREAKER: Completely block updates for completed jobs
+    // EMERGENCY FIX: Allow ONE completion update per job, then block subsequent updates
     if (['completed', 'failed', 'cancelled', 'expired'].includes(updatedJob.status)) {
-      console.warn(`[REALTIME] Blocking updates for ${updatedJob.status} job ${updatedJob.id.substring(0, 8)} - completed jobs should not receive updates`);
+      if (completionNotifiedRef.current.has(updatedJob.id)) {
+        console.warn(`[REALTIME] Completion already notified for ${updatedJob.status} job ${updatedJob.id.substring(0, 8)} - blocking duplicate`);
+        return;
+      }
+      
+      // Mark this job as completion-notified and allow this ONE update through
+      completionNotifiedRef.current.add(updatedJob.id);
+      console.log(`[REALTIME] EMERGENCY FIX: Allowing completion update for job ${updatedJob.id.substring(0, 8)} (${updatedJob.status})`);
+      
+      onJobUpdate(updatedJob);
+      
+      // Show toast notification for completion
+      if (updatedJob.id.startsWith('batch_') && updatedJob.id.length > 20) {
+        toast({
+          title: "Job Status Updated",
+          description: `Batch job (...${updatedJob.id.slice(-8)}) is now ${updatedJob.status}`,
+          variant: updatedJob.status === 'completed' ? 'default' : 'destructive'
+        });
+      }
       return;
     }
     
@@ -50,18 +69,6 @@ export const useBatchJobRealtimeHandler = ({ onJobUpdate }: BatchJobRealtimeHand
     }
     
     onJobUpdate(updatedJob);
-    
-    // Show toast notification for significant status changes
-    // Only show toasts for valid OpenAI batch job IDs (length > 20 and starts with "batch_")
-    if (['completed', 'failed', 'expired', 'cancelled'].includes(updatedJob.status) && 
-        updatedJob.id.startsWith('batch_') && 
-        updatedJob.id.length > 20) {
-      toast({
-        title: "Job Status Updated",
-        description: `Batch job (...${updatedJob.id.slice(-8)}) is now ${updatedJob.status}`,
-        variant: updatedJob.status === 'completed' ? 'default' : 'destructive'
-      });
-    }
   }, [onJobUpdate, toast]);
 
   // Enable real-time updates

@@ -10,6 +10,7 @@ const BatchJobManagerContainer = () => {
     pollingStates,
     stalledJobActions,
     handleRefreshJob,
+    handleForceStatusSync,
     handleDownloadResults,
     handleCancelJob,
     handleJobDelete,
@@ -30,6 +31,7 @@ const BatchJobManagerContainer = () => {
         stalledJobActions={stalledJobActions}
         largeJobOptimization={largeJobOptimization}
         onRefresh={handleRefreshJob}
+        onForceSync={handleForceStatusSync}
         onDownload={handleDownloadResults}
         onCancel={handleCancelJob}
         onJobDelete={handleJobDelete}

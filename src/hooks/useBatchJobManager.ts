@@ -9,6 +9,7 @@ import { BatchJobTimeoutManager } from '@/components/batch/BatchJobTimeoutManage
 import { useLargeJobOptimization } from '@/hooks/batch/useLargeJobOptimization';
 import { debouncedStoreUpdater } from '@/lib/performance/debounceStore';
 import { emergencyStop } from '@/lib/performance/emergencyStop';
+import { useJobStatusSync } from '@/hooks/useJobStatusSync';
 
 export const useBatchJobManager = () => {
   const {
@@ -75,6 +76,9 @@ export const useBatchJobManager = () => {
 
   // Initialize large job optimization
   const largeJobOptimization = useLargeJobOptimization();
+
+  // EMERGENCY FIX: Add status sync for recovery from completion update blocks
+  const { syncJobStatus, syncAllJobStatuses } = useJobStatusSync({ onJobUpdate: debouncedUpdateJob });
 
   // DEBOUNCED: Handle real-time updates with debouncing
   useBatchJobRealtimeHandler({ onJobUpdate: debouncedUpdateJob });
@@ -150,6 +154,7 @@ export const useBatchJobManager = () => {
     pollingStates: batchJobActions.pollingStates,
     stalledJobActions,
     handleRefreshJob: batchJobActions.handleRefreshJob,
+    handleForceStatusSync: batchJobActions.handleForceStatusSync, // EMERGENCY FIX
     handleDownloadResults: batchJobActions.handleDownloadResults,
     handleCancelJob: batchJobActions.handleCancelJob,
     handleDownload,
@@ -157,6 +162,9 @@ export const useBatchJobManager = () => {
     handleJobDelete,
     // Large job optimization
     largeJobOptimization,
+    // EMERGENCY FIX: Status sync functions for manual recovery
+    syncJobStatus,
+    syncAllJobStatuses,
     // Timeout manager component
     TimeoutManager: BatchJobTimeoutManager
   }), [
@@ -167,6 +175,8 @@ export const useBatchJobManager = () => {
     handleDownload,
     handleCancel,
     handleJobDelete,
-    largeJobOptimization
+    largeJobOptimization,
+    syncJobStatus,
+    syncAllJobStatuses
   ]);
 };
