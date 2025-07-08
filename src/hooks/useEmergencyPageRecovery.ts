@@ -11,21 +11,32 @@ export const useEmergencyPageRecovery = () => {
       console.log('[EMERGENCY RECOVERY] Page unresponsive - activating nuclear recovery');
       console.log(`[EMERGENCY RECOVERY] Found ${jobs.length} jobs in store`);
       
-      // Stop everything immediately
+      // Step 1: Stop everything immediately
       emergencyStop.activate('Nuclear page recovery');
       
-      // Clear all jobs immediately
+      // Step 2: Clear all jobs immediately
       clearAllJobs();
       
-      // Clear all timers and intervals aggressively
+      // Step 3: NUCLEAR TIMER CLEANUP - clear ALL possible timers
       try {
-        const highestId = 99999;
-        for (let i = 1; i <= highestId; i++) {
+        // Clear all timeout IDs (more aggressive range)
+        for (let i = 1; i <= 999999; i++) {
           clearTimeout(i);
           clearInterval(i);
         }
+        console.log('[EMERGENCY RECOVERY] Cleared all timers up to 999999');
       } catch (e) {
-        // Ignore errors
+        console.warn('[EMERGENCY RECOVERY] Timer cleanup error:', e);
+      }
+      
+      // Step 4: Clear requestAnimationFrame IDs
+      try {
+        for (let i = 1; i <= 9999; i++) {
+          cancelAnimationFrame(i);
+        }
+        console.log('[EMERGENCY RECOVERY] Cleared all animation frames');
+      } catch (e) {
+        console.warn('[EMERGENCY RECOVERY] Animation frame cleanup error:', e);
       }
       
       // Clear any React Query cache

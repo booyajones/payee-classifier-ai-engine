@@ -138,6 +138,7 @@ const EnhancedBatchJobProgress = ({ job, onManualRefresh, isRefreshing = false }
     }
   };
 
+  // FIXED: Don't show progress for completed jobs AT ALL
   const showProgress = total > 0 && job.status === 'in_progress';
 
   if (!showProgress) return null;
@@ -243,7 +244,7 @@ const EnhancedBatchJobProgress = ({ job, onManualRefresh, isRefreshing = false }
                 {rate && (
                   <span>Processing rate: {rate.toFixed(1)} items/hour</span>
                 )}
-                {ageInHours > 1 && (
+                {ageInHours > 1 && job.status === 'in_progress' && (
                   <span>Runtime: {Math.round(ageInHours)}h {Math.round((ageInHours % 1) * 60)}m</span>
                 )}
               </div>

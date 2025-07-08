@@ -83,6 +83,7 @@ const BatchJobProgress = ({ job, onManualRefresh, isRefreshing = false }: BatchJ
     };
   };
 
+  // FIXED: Only show progress for truly active jobs
   const showProgress = total > 0 && job.status === 'in_progress';
 
   if (!showProgress) return null;
