@@ -63,13 +63,13 @@ export const usePerformanceStabilizer = () => {
     }
   }, []);
 
-  // PERFORMANCE MONITORING LOOP
+  // PERFORMANCE MONITORING LOOP - REDUCED FREQUENCY
   useEffect(() => {
     const monitorPerformance = () => {
       const now = Date.now();
       
-      // Check every 2 seconds
-      if (now - lastPerformanceCheck.current > 2000) {
+      // Check every 5 seconds (reduced from 2s)
+      if (now - lastPerformanceCheck.current > 5000) {
         lastPerformanceCheck.current = now;
         checkMemoryUsage();
         
@@ -78,8 +78,15 @@ export const usePerformanceStabilizer = () => {
       }
     };
 
-    const intervalId = setInterval(monitorPerformance, 1000);
-    return () => clearInterval(intervalId);
+    // Start monitoring only after 5 seconds to let app stabilize
+    const startTimer = setTimeout(() => {
+      const intervalId = setInterval(monitorPerformance, 5000); // Reduced from 1s to 5s
+      
+      // Store interval for cleanup
+      return () => clearInterval(intervalId);
+    }, 5000);
+
+    return () => clearTimeout(startTimer);
   }, [checkMemoryUsage]);
 
   // EMERGENCY CLEANUP

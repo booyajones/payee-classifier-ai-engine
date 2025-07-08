@@ -1,7 +1,7 @@
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 
 export const calculatePollingDelay = (job: BatchJob): number => {
-  // CIRCUIT BREAKER: Never poll completed jobs
+  // PHASE 3: Circuit breaker - Never poll completed jobs
   if (['completed', 'failed', 'cancelled', 'expired'].includes(job.status)) {
     return Infinity; // Stop all polling for completed jobs
   }
@@ -10,35 +10,35 @@ export const calculatePollingDelay = (job: BatchJob): number => {
   const createdTime = new Date(job.created_at * 1000);
   const jobAge = now - createdTime.getTime();
   
-  // EMERGENCY: Dramatically reduced polling to prevent system overload
-  if (jobAge > 12 * 60 * 60 * 1000) { // Over 12 hours (reduced from 24)
-    console.warn(`[POLLING] Job ${job.id.substring(0, 8)} is over 12 hours old - stopping polling`);
+  // PHASE 3: Extremely conservative polling to reduce system load
+  if (jobAge > 8 * 60 * 60 * 1000) { // Over 8 hours (further reduced)
+    console.warn(`[POLLING] Job ${job.id.substring(0, 8)} is over 8 hours old - stopping polling`);
     return Infinity; // Stop polling completely for old jobs
   }
   
-  if (jobAge > 6 * 60 * 60 * 1000) { // Over 6 hours
-    return 30 * 60 * 1000; // 30 minutes for very old jobs (increased from 15)
+  if (jobAge > 4 * 60 * 60 * 1000) { // Over 4 hours
+    return 60 * 60 * 1000; // 1 hour for very old jobs (much longer)
   }
   
-  if (jobAge > 3 * 60 * 60 * 1000) { // Over 3 hours
-    return 20 * 60 * 1000; // 20 minutes for old jobs (increased from 10)
+  if (jobAge > 2 * 60 * 60 * 1000) { // Over 2 hours
+    return 30 * 60 * 1000; // 30 minutes for old jobs
   }
   
   if (jobAge > 1 * 60 * 60 * 1000) { // Over 1 hour
-    return 10 * 60 * 1000; // 10 minutes (increased from 5)
+    return 15 * 60 * 1000; // 15 minutes
   }
   
   if (jobAge > 30 * 60 * 1000) { // Over 30 minutes
-    return 5 * 60 * 1000; // 5 minutes (increased from 3)
+    return 10 * 60 * 1000; // 10 minutes
   }
   
   if (jobAge > 15 * 60 * 1000) { // Over 15 minutes
-    return 3 * 60 * 1000; // 3 minutes for medium-aged jobs
+    return 5 * 60 * 1000; // 5 minutes for medium-aged jobs
   }
   
-  // EMERGENCY: Much more conservative polling for fresh jobs
+  // PHASE 3: Very conservative polling for fresh jobs
   const hasProgress = job.request_counts.completed > 0;
-  return hasProgress ? 2 * 60 * 1000 : 3 * 60 * 1000; // 2-3 minutes for new jobs (increased from 1-2 minutes)
+  return hasProgress ? 3 * 60 * 1000 : 5 * 60 * 1000; // 3-5 minutes for new jobs (much longer)
 };
 
 export const getInitialPollingDelay = (job: BatchJob): number => {

@@ -29,24 +29,24 @@ export const useBatchJobManager = () => {
   const lastJobsRef = useRef<string>('');
   const storeUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // EMERGENCY STABILIZATION: Dramatically reduced render tracking and emergency limits
+  // PHASE 2: Stabilized render tracking with proper cleanup
   useEffect(() => {
     renderCountRef.current += 1;
     
-    // EMERGENCY: Reduced threshold to catch loops faster
-    if (renderCountRef.current > 8) {
+    // More conservative threshold to prevent false positives
+    if (renderCountRef.current > 12) {
       console.error('[BATCH JOB MANAGER] Excessive renders detected, activating emergency stop');
       emergencyStop.activate('Excessive renders in BatchJobManager');
       return;
     }
     
-    // EMERGENCY: Faster reset for more responsive detection
+    // Stable reset timer
     const resetTimer = setTimeout(() => {
-      renderCountRef.current = 0;
-    }, 1000);
+      renderCountRef.current = Math.max(0, renderCountRef.current - 1);
+    }, 2000);
     
     return () => clearTimeout(resetTimer);
-  }, []); // CRITICAL: Empty dependency to prevent render loops
+  }, [jobs.length]); // FIXED: Only track when jobs count changes
 
   // EMERGENCY STABILIZATION: Heavily optimized job update handler
   const debouncedUpdateJob = useCallback((job: any) => {

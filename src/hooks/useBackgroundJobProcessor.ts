@@ -5,9 +5,14 @@ import { logger } from '@/lib/logging/logger';
 /**
  * Hook to automatically process existing completed jobs in the background
  */
-export const useBackgroundJobProcessor = () => {
+export const useBackgroundJobProcessor = (enabled: boolean = false) => {
   useEffect(() => {
-    // Run background processing once on app load
+    if (!enabled) {
+      logger.info('Background job processor disabled for stability');
+      return;
+    }
+
+    // Run background processing once on app load - much longer delay for stability
     const processExistingJobs = async () => {
       try {
         logger.info('Starting background processing of existing completed jobs');
@@ -18,9 +23,9 @@ export const useBackgroundJobProcessor = () => {
       }
     };
 
-    // Delay to let the app fully load first
-    const timer = setTimeout(processExistingJobs, 2000);
+    // Much longer delay to let the app fully stabilize (30 seconds)
+    const timer = setTimeout(processExistingJobs, 30000);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [enabled]);
 };

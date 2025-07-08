@@ -1,23 +1,27 @@
 
-import React, { useEffect, Suspense, lazy } from 'react';
-import ErrorBoundary from "@/components/ErrorBoundary";
+import React, { useEffect, Suspense, lazy, useState } from 'react';
+import { EnhancedErrorBoundary } from "@/components/ui/enhanced-error-boundary";
 import { UnifiedProgressProvider } from "@/contexts/UnifiedProgressContext";
 import { useIndexState } from "@/hooks/useIndexState";
-import { useBackgroundJobProcessor } from "@/hooks/useBackgroundJobProcessor";
 import { usePerformanceStabilizer } from "@/hooks/usePerformanceStabilizer";
 import { useTimerManager } from "@/hooks/useTimerManager";
+import { useAppRecovery } from "@/hooks/useAppRecovery";
 import AppHeader from "@/components/layout/AppHeader";
 import AppFooter from "@/components/layout/AppFooter";
 import ApiKeySetupPage from "@/components/setup/ApiKeySetupPage";
 import KeyboardShortcutsHelp from "@/components/ui/keyboard-shortcuts-help";
+import { emergencyStop } from "@/lib/performance/emergencyStop";
 
-// PERFORMANCE: Lazy load heavy components
+// PERFORMANCE: Lazy load heavy components with loading states
 const MainTabs = lazy(() => import("@/components/navigation/MainTabs"));
 
 const Index = () => {
+  const [appReady, setAppReady] = useState(false);
+  
   // EMERGENCY STABILIZATION HOOKS
   const { emergencyCleanup, isStable } = usePerformanceStabilizer();
   const { clearAll: clearAllTimers } = useTimerManager();
+  const { manualRecovery } = useAppRecovery();
   
   const {
     batchResults,
@@ -28,26 +32,53 @@ const Index = () => {
     handleKeySet
   } = useIndexState();
   
-  // EMERGENCY: Conditionally use background processor only when stable
-  // Note: Using it unconditionally but the hook itself should handle stability
-  useBackgroundJobProcessor();
-  
-  // EMERGENCY CLEANUP on unmount
+  // PHASE 1: Controlled app initialization
   useEffect(() => {
-    return () => {
+    const initializeApp = async () => {
+      try {
+        // Ensure emergency stop is clear
+        emergencyStop.deactivate('App initialization');
+        
+        // Small delay to let React settle
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Mark app as ready only when stable
+        if (isStable) {
+          setAppReady(true);
+          console.log('[INDEX] App ready and stable');
+        }
+      } catch (error) {
+        console.error('[INDEX] App initialization failed:', error);
+        setAppReady(true); // Still mark ready to prevent infinite loading
+      }
+    };
+
+    initializeApp();
+  }, [isStable]);
+  
+  // EMERGENCY CLEANUP on unmount and route changes
+  useEffect(() => {
+    const handleUnload = () => {
       clearAllTimers();
       emergencyCleanup();
     };
+
+    window.addEventListener('beforeunload', handleUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+      handleUnload();
+    };
   }, [clearAllTimers, emergencyCleanup]);
   
-  console.log('Index state:', { hasApiKey, batchResultsLength: batchResults.length, isStable });
+  console.log('Index state:', { hasApiKey, batchResultsLength: batchResults.length, isStable, appReady });
 
   if (!hasApiKey) {
     return (
       <UnifiedProgressProvider>
-        <ErrorBoundary>
+        <EnhancedErrorBoundary>
           <ApiKeySetupPage onKeySet={handleKeySet} />
-        </ErrorBoundary>
+        </EnhancedErrorBoundary>
       </UnifiedProgressProvider>
     );
   }
@@ -58,7 +89,7 @@ const Index = () => {
 
   return (
     <UnifiedProgressProvider>
-      <ErrorBoundary>
+      <EnhancedErrorBoundary>
         <div className="min-h-screen bg-background">
           <AppHeader 
             title="Payee Classification System"
@@ -66,16 +97,28 @@ const Index = () => {
           />
 
           <main className="container px-4 pb-8">
-            <ErrorBoundary>
-              <Suspense fallback={<div className="flex justify-center items-center h-64">Loading...</div>}>
-                <MainTabs
-                  allResults={batchResults}
-                  onBatchClassify={handleBatchClassify}
-                  onComplete={handleBatchComplete}
-                  onJobDelete={handleJobDelete}
-                />
-              </Suspense>
-            </ErrorBoundary>
+            <EnhancedErrorBoundary>
+              {appReady ? (
+                <Suspense fallback={
+                  <div className="flex flex-col justify-center items-center h-64 space-y-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <p className="text-muted-foreground">Loading application...</p>
+                  </div>
+                }>
+                  <MainTabs
+                    allResults={batchResults}
+                    onBatchClassify={handleBatchClassify}
+                    onComplete={handleBatchComplete}
+                    onJobDelete={handleJobDelete}
+                  />
+                </Suspense>
+              ) : (
+                <div className="flex flex-col justify-center items-center h-64 space-y-4">
+                  <div className="animate-pulse rounded-full h-8 w-8 bg-primary/20"></div>
+                  <p className="text-muted-foreground">Initializing system...</p>
+                </div>
+              )}
+            </EnhancedErrorBoundary>
           </main>
 
           <AppFooter />
@@ -83,7 +126,7 @@ const Index = () => {
           {/* Keyboard Shortcuts Help */}
           <KeyboardShortcutsHelp />
         </div>
-      </ErrorBoundary>
+      </EnhancedErrorBoundary>
     </UnifiedProgressProvider>
   );
 };

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useBatchJobManager } from '@/hooks/useBatchJobManager';
 import BatchJobContainer from './BatchJobContainer';
+import { ProgressiveLoader } from '@/components/ui/progressive-loader';
 
 const BatchJobManagerContainer = () => {
   const {
@@ -25,21 +26,23 @@ const BatchJobManagerContainer = () => {
       {/* Timeout manager runs in background */}
       <TimeoutManager jobs={jobs} onJobCancel={handleCancelJob} />
       
-      <BatchJobContainer
-        jobs={jobs}
-        payeeRowDataMap={payeeDataMap}
-        refreshingJobs={refreshingJobs}
-        pollingStates={pollingStates}
-        stalledJobActions={stalledJobActions}
-        largeJobOptimization={largeJobOptimization}
-        onRefresh={handleRefreshJob}
-        onForceSync={handleForceStatusSync}
-        onDownload={handleDownloadResults}
-        onCancel={handleCancelJob}
-        onJobDelete={handleJobDelete}
-        onCleanup={performCleanup}
-        onForceCleanup={forceCleanup}
-      />
+      <ProgressiveLoader delay={300}>
+        <BatchJobContainer
+          jobs={jobs}
+          payeeRowDataMap={payeeDataMap}
+          refreshingJobs={refreshingJobs}
+          pollingStates={pollingStates}
+          stalledJobActions={stalledJobActions}
+          largeJobOptimization={largeJobOptimization}
+          onRefresh={handleRefreshJob}
+          onForceSync={handleForceStatusSync}
+          onDownload={handleDownloadResults}
+          onCancel={handleCancelJob}
+          onJobDelete={handleJobDelete}
+          onCleanup={performCleanup}
+          onForceCleanup={forceCleanup}
+        />
+      </ProgressiveLoader>
     </>
   );
 };

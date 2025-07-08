@@ -69,8 +69,8 @@ export const useBatchJobAutoPolling = ({
       return true;
     });
 
-    // EMERGENCY: Limit total polling jobs to prevent overload
-    const maxPollingJobs = 3;
+    // PHASE 3: Drastically limit total polling jobs to prevent overload
+    const maxPollingJobs = 2; // Reduced from 3 to 2
     const jobsToPoll = activeJobs.slice(0, maxPollingJobs);
     
     productionLogger.debug(`Emergency auto-polling: ${jobsToPoll.length}/${activeJobs.length} jobs (limited to ${maxPollingJobs})`, undefined, 'BATCH_POLLING');
