@@ -1,7 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useBatchJobStore } from '@/stores/batchJobStore';
 import { useBatchJobActions } from '@/components/batch/useBatchJobActions';
-import { useBatchJobRealtimeHandler } from '@/components/batch/BatchJobRealtimeHandler';
 import { useBatchJobDownloadHandler } from '@/components/batch/BatchJobDownloadHandler';
 import { useBatchJobActionsHandler } from '@/components/batch/BatchJobActionsHandler';
 import { BatchJobTimeoutManager } from '@/components/batch/BatchJobTimeoutManager';
@@ -9,7 +8,7 @@ import { useLargeJobOptimization } from '@/hooks/batch/useLargeJobOptimization';
 import { debouncedStoreUpdater } from '@/lib/performance/debounceStore';
 import { useJobStatusSync } from '@/hooks/useJobStatusSync';
 import { useUnifiedCleanup } from '@/hooks/useUnifiedCleanup';
-import { useUnifiedPollingOrchestrator } from '@/hooks/useUnifiedPollingOrchestrator';
+import { useUnifiedAutoRefresh } from '@/hooks/useUnifiedAutoRefresh';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useStablePerformanceMonitor } from '@/hooks/useStablePerformanceMonitor';
 
@@ -107,16 +106,11 @@ export const useBatchJobManager = () => {
   const { performCleanup, forceCleanup } = useUnifiedCleanup({ maxJobs: 50 });
   const { syncJobStatus, syncAllJobStatuses } = useJobStatusSync({ onJobUpdate: debouncedUpdateJob });
 
-  // Replace multiple polling systems with unified orchestrator
-  const { pollingStates, manualRefresh, isHealthy: pollingHealthy } = useUnifiedPollingOrchestrator(
-    stableJobs.filter(job => networkHealthy && performanceStable), // Only poll when healthy
+  // Use unified auto-refresh system (combines polling + realtime)
+  const { refreshStates, manualRefresh, isHealthy: autoRefreshHealthy } = useUnifiedAutoRefresh(
+    stableJobs,
     debouncedUpdateJob
   );
-
-  // Real-time handler with network awareness
-  useBatchJobRealtimeHandler({ 
-    onJobUpdate: networkHealthy ? debouncedUpdateJob : () => {} 
-  });
 
   // Simplified batch job actions without redundant polling
   const batchJobActions = useBatchJobActions({
@@ -137,12 +131,12 @@ export const useBatchJobManager = () => {
   }, [baseHandleJobDelete, removeJob, networkHealthy]);
 
   const handleRefreshJob = useCallback(async (jobId: string) => {
-    if (!networkHealthy || !performanceStable) {
+    if (!networkHealthy || !performanceStable || !autoRefreshHealthy) {
       console.warn('[BATCH JOB MANAGER] Skipping refresh - system not healthy');
       return;
     }
     await manualRefresh(jobId);
-  }, [manualRefresh, networkHealthy, performanceStable]);
+  }, [manualRefresh, networkHealthy, performanceStable, autoRefreshHealthy]);
 
   // Simplified stalled job detection
   const stalledJobActions = useMemo(() => {
@@ -168,8 +162,8 @@ export const useBatchJobManager = () => {
     jobs: stableJobs,
     payeeDataMap,
     refreshingJobs: new Set<string>(), // Simplified - use unified polling state
-    pollingStates,
-    autoPollingJobs: new Set<string>(), // Managed by unified orchestrator
+    pollingStates: refreshStates,
+    autoPollingJobs: new Set(Object.keys(refreshStates).filter(jobId => refreshStates[jobId]?.isPolling)),
     stalledJobActions,
     handleRefreshJob,
     handleForceRefresh: batchJobActions.handleForceRefresh,
@@ -187,12 +181,12 @@ export const useBatchJobManager = () => {
     // Health monitoring
     networkHealthy,
     performanceStable,
-    pollingHealthy,
+    autoRefreshHealthy,
     TimeoutManager: BatchJobTimeoutManager
   }), [
     stableJobs,
     payeeDataMap,
-    pollingStates,
+    refreshStates,
     stalledJobActions,
     handleRefreshJob,
     batchJobActions,
@@ -206,6 +200,6 @@ export const useBatchJobManager = () => {
     syncAllJobStatuses,
     networkHealthy,
     performanceStable,
-    pollingHealthy
+    autoRefreshHealthy
   ]);
 };

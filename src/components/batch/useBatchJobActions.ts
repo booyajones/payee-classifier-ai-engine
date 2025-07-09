@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { PayeeRowData } from "@/lib/rowMapping";
-import { useBatchJobPolling } from "@/hooks/useBatchJobPolling";
+// Removed useBatchJobPolling - now handled by unified auto-refresh
 import { useBatchJobRefresh } from "@/hooks/useBatchJobRefresh";
 import { useBatchJobDownload } from "@/hooks/useBatchJobDownload";
 import { useBatchJobCancellation } from "@/hooks/useBatchJobCancellation";
@@ -35,9 +35,8 @@ export const useBatchJobActions = ({
   // PERFORMANCE: Memoize jobs array to prevent unnecessary re-renders
   const memoizedJobs = useMemo(() => jobs, [JSON.stringify(jobs.map(j => ({ id: j.id, status: j.status, created_at: j.created_at })))]);
 
-  // Initialize hooks with safe callbacks
+  // Initialize hooks with safe callbacks  
   const { refreshingJobs, handleRefreshJob: baseHandleRefreshJob, handleForceRefresh, handleForceStatusSync, detectStalledJob } = useBatchJobRefresh(wrappedOnJobUpdate);
-  const { pollingStates, refreshSpecificJob } = useBatchJobPolling(memoizedJobs, wrappedOnJobUpdate);
   const { handleCancelJob } = useBatchJobCancellation(wrappedOnJobUpdate);
   
   const { handleDownloadResults: baseHandleDownloadResults } = useBatchJobDownload({
@@ -45,17 +44,22 @@ export const useBatchJobActions = ({
     onJobComplete: wrappedOnJobComplete
   });
 
+  // Create a dummy refreshSpecificJob function since it's now handled by unified auto-refresh
+  const dummyRefreshSpecificJob = async (jobId: string, refreshFn: () => Promise<void>) => {
+    await refreshFn();
+  };
+
   // PERFORMANCE: Memoize action handlers to prevent recreation
   const actionHandlers = useMemo(() => createActionHandlers(
     memoizedJobs,
     payeeRowDataMap,
     toast,
-    refreshSpecificJob,
+    dummyRefreshSpecificJob,
     baseHandleRefreshJob,
     detectStalledJob,
     baseHandleDownloadResults,
     handleCancelJob
-  ), [memoizedJobs, payeeRowDataMap, toast, refreshSpecificJob, baseHandleRefreshJob, detectStalledJob, baseHandleDownloadResults, handleCancelJob]);
+  ), [memoizedJobs, payeeRowDataMap, toast, baseHandleRefreshJob, detectStalledJob, baseHandleDownloadResults, handleCancelJob]);
 
   // PERFORMANCE: Memoize stall detection utilities
   const stallDetection = useMemo(() => createStallDetection(detectStalledJob, payeeRowDataMap), [detectStalledJob, payeeRowDataMap]);
@@ -64,7 +68,6 @@ export const useBatchJobActions = ({
   return useMemo(() => ({
     // State
     refreshingJobs,
-    pollingStates,
     
     // Enhanced actions with comprehensive error handling
     handleRefreshJob: actionHandlers.handleRefreshJob,
@@ -76,5 +79,5 @@ export const useBatchJobActions = ({
     // New stall detection utilities
     getStalledJobActions: stallDetection.getStalledJobActions,
     detectStalledJob
-  }), [refreshingJobs, pollingStates, actionHandlers, stallDetection, detectStalledJob]);
+  }), [refreshingJobs, actionHandlers, handleForceRefresh, handleForceStatusSync, stallDetection, detectStalledJob]);
 };

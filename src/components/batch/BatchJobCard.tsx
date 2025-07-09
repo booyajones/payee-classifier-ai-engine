@@ -11,6 +11,7 @@ import BatchJobActions from './BatchJobActions';
 import BatchJobStatusIndicator from './BatchJobStatusIndicator';
 import LargeJobStatusIndicator from './LargeJobStatusIndicator';
 import LargeJobManagementPanel from './LargeJobManagementPanel';
+import { BatchJobAutoRefreshIndicator } from './BatchJobAutoRefreshIndicator';
 
 interface BatchJobCardProps {
   job: BatchJob;
@@ -74,6 +75,18 @@ const BatchJobCard = ({
             onDelete={onDelete}
           />
         </div>
+
+        {/* Auto-refresh indicator for active jobs */}
+        {isActive && (
+          <div className="flex justify-between items-center mb-3">
+            <BatchJobAutoRefreshIndicator
+              isPolling={isRefreshing || isPolling}
+              isHealthy={true} // TODO: Connect to actual health status
+              lastPoll={pollingState?.lastPoll}
+              pollCount={pollingState?.pollCount}
+            />
+          </div>
+        )}
 
         {isLargeJob || isLongRunning ? (
           <LargeJobStatusIndicator
