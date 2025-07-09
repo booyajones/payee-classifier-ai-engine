@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { PerformanceCircuitBreaker } from '@/components/performance/PerformanceCircuitBreaker';
 import { useMemoryManager } from '@/lib/performance/memoryManager';
+import { useJobRecovery } from '@/hooks/useJobRecovery';
 
 
 interface BatchJobContainerProps {
@@ -51,6 +52,9 @@ const BatchJobContainer = React.memo(({
 
   // EMERGENCY: Memory management for large numbers of jobs
   const { forceCleanup, getMemoryInfo } = useMemoryManager();
+  
+  // Job recovery for stuck states
+  const { resyncJobs } = useJobRecovery();
 
   const handleRefreshAll = React.useCallback(async () => {
     setIsRefreshingAll(true);
@@ -108,6 +112,15 @@ const BatchJobContainer = React.memo(({
           </div>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={resyncJobs}
+            title="Reset stuck jobs and refresh data"
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Recovery
+          </Button>
           {onForceCleanup && (
             <Button
               variant="outline"

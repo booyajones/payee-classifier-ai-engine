@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { BatchJob } from '@/lib/openai/trueBatchAPI';
+import { BatchJob, checkBatchJobStatus } from '@/lib/openai/trueBatchAPI';
 import { connectionManager } from '@/lib/network/connectionManager';
 
 interface PollingState {
@@ -38,6 +38,12 @@ export const useUnifiedPollingOrchestrator = (
   };
 
   const shouldPollJob = useCallback((job: BatchJob): boolean => {
+    // Validate job exists and has valid ID
+    if (!job || !job.id || job.id.length < 10) {
+      console.warn('[POLLING ORCHESTRATOR] Invalid job or job ID:', job?.id);
+      return false;
+    }
+
     // Don't poll if network is unhealthy
     if (!connectionManager.isHealthy()) {
       return false;
@@ -55,11 +61,9 @@ export const useUnifiedPollingOrchestrator = (
       return true;
     }
 
-    // Occasionally verify completed jobs (less frequently)
+    // Stop polling completed jobs completely - no verification needed
     if (['completed', 'failed', 'cancelled', 'expired'].includes(job.status)) {
-      const lastPoll = state?.lastPoll || 0;
-      const timeSinceLastPoll = Date.now() - lastPoll;
-      return timeSinceLastPoll > config.completedJobInterval;
+      return false;
     }
 
     return false;
@@ -67,6 +71,12 @@ export const useUnifiedPollingOrchestrator = (
 
   const pollSingleJob = useCallback(async (job: BatchJob) => {
     const jobId = job.id;
+    
+    // Validate job before polling
+    if (!jobId || jobId.length < 10) {
+      console.warn('[POLLING ORCHESTRATOR] Invalid job ID, skipping poll:', jobId);
+      return;
+    }
     
     try {
       setPollingStates(prev => ({
@@ -79,17 +89,14 @@ export const useUnifiedPollingOrchestrator = (
         }
       }));
 
-      // Use connection manager for reliable requests
+      // Use proper checkBatchJobStatus instead of non-existent API endpoint
       const updatedJob = await connectionManager.executeWithRetry(
-        async () => {
-          const response = await fetch(`/api/batch-jobs/${jobId}/status`);
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          return response.json();
-        },
+        () => checkBatchJobStatus(jobId),
         `poll-job-${jobId.slice(-8)}`
       );
 
       if (updatedJob) {
+        console.log(`[POLLING ORCHESTRATOR] Job ${jobId.slice(-8)} status: ${updatedJob.status}, progress: ${updatedJob.request_counts.completed}/${updatedJob.request_counts.total}`);
         onJobUpdate(updatedJob);
       }
 
@@ -155,12 +162,27 @@ export const useUnifiedPollingOrchestrator = (
       clearTimeout(globalPollingRef.current);
     }
 
-    // Schedule polls for all eligible jobs
+    // Schedule polls for all eligible jobs with validation
     const schedulePoll = () => {
-      jobs.forEach(job => {
+      // Filter out invalid jobs before scheduling
+      const validJobs = jobs.filter(job => job && job.id && job.id.length > 10);
+      
+      validJobs.forEach(job => {
         if (shouldPollJob(job)) {
           scheduleJobPoll(job);
         }
+      });
+
+      // Clean up polling states for jobs that no longer exist
+      const validJobIds = new Set(validJobs.map(j => j.id));
+      setPollingStates(prev => {
+        const filteredStates: Record<string, PollingState> = {};
+        Object.entries(prev).forEach(([jobId, state]) => {
+          if (validJobIds.has(jobId)) {
+            filteredStates[jobId] = state;
+          }
+        });
+        return filteredStates;
       });
 
       // Schedule next orchestration check
@@ -185,7 +207,10 @@ export const useUnifiedPollingOrchestrator = (
 
   const manualRefresh = useCallback(async (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
-    if (!job) return;
+    if (!job) {
+      console.warn(`[POLLING ORCHESTRATOR] Cannot refresh job ${jobId} - not found in jobs list`);
+      return;
+    }
 
     // Clear scheduled poll and do immediate poll
     if (pollTimersRef.current[jobId]) {
