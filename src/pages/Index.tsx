@@ -2,8 +2,9 @@
 import React, { useEffect, Suspense, lazy, useState } from 'react';
 import { EnhancedErrorBoundary } from "@/components/ui/enhanced-error-boundary";
 import { UnifiedProgressProvider } from "@/contexts/UnifiedProgressContext";
-import { useIndexState } from "@/hooks/useIndexState";
+import { useOptimizedIndexState } from "@/hooks/useOptimizedIndexState";
 import { usePerformanceStabilizer } from "@/hooks/usePerformanceStabilizer";
+import { useOptimizedMemoryMonitor } from "@/hooks/useOptimizedMemoryMonitor";
 import { useTimerManager } from "@/hooks/useTimerManager";
 import { useAppRecovery } from "@/hooks/useAppRecovery";
 import AppHeader from "@/components/layout/AppHeader";
@@ -22,6 +23,7 @@ const Index = () => {
   const { emergencyCleanup, isStable } = usePerformanceStabilizer();
   const { clearAll: clearAllTimers } = useTimerManager();
   const { manualRecovery } = useAppRecovery();
+  const { optimizeMemory } = useOptimizedMemoryMonitor({ threshold: 75 });
   
   const {
     batchResults,
@@ -30,7 +32,7 @@ const Index = () => {
     handleBatchComplete,
     handleJobDelete,
     handleKeySet
-  } = useIndexState();
+  } = useOptimizedIndexState();
   
   // PHASE 1: Controlled app initialization
   useEffect(() => {
@@ -61,6 +63,7 @@ const Index = () => {
     const handleUnload = () => {
       clearAllTimers();
       emergencyCleanup();
+      optimizeMemory();
     };
 
     window.addEventListener('beforeunload', handleUnload);

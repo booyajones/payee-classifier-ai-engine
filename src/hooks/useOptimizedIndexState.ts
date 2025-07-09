@@ -1,23 +1,25 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { isOpenAIInitialized } from "@/lib/openai/client";
 import { logMemoryUsage } from "@/lib/openai/apiUtils";
 import { useToast } from "@/components/ui/use-toast";
 
-export const useIndexState = () => {
+/**
+ * Optimized index state hook with consolidated effects
+ * Replaces useIndexState with better performance
+ */
+export const useOptimizedIndexState = () => {
   const [batchResults, setBatchResults] = useState<PayeeClassification[]>([]);
   const [batchSummary, setBatchSummary] = useState<BatchProcessingResult | null>(null);
   const [hasApiKey, setHasApiKey] = useState(false);
   const { toast } = useToast();
 
-  console.log('[INDEX DEBUG] Component rendering');
-
+  // Single initialization effect
   useEffect(() => {
-    const initializeComponent = async () => {
+    const initializeComponent = () => {
       try {
         setHasApiKey(isOpenAIInitialized());
-        logMemoryUsage('Index component mount');
+        logMemoryUsage('Index component initialized');
       } catch (error) {
         console.error('[INDEX ERROR] Initialization failed:', error);
         toast({
@@ -29,19 +31,10 @@ export const useIndexState = () => {
     };
 
     initializeComponent();
-  }, []);
+  }, [toast]);
 
-  // Memory logging on initialization only
-  useEffect(() => {
-    try {
-      logMemoryUsage('Index state initialized');
-    } catch (error) {
-      console.error('[INDEX ERROR] Memory logging failed:', error);
-    }
-  }, []);
-
-  // Handle batch completion
-  const handleBatchComplete = async (
+  // Memoized handlers to prevent unnecessary re-renders
+  const handleBatchComplete = useCallback(async (
     results: PayeeClassification[],
     summary: BatchProcessingResult
   ) => {
@@ -65,10 +58,9 @@ export const useIndexState = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
 
-  // Handle job deletion - clear summary and results
-  const handleJobDelete = () => {
+  const handleJobDelete = useCallback(() => {
     try {
       console.log('[INDEX] Clearing batch summary and results due to job deletion');
       setBatchResults([]);
@@ -81,22 +73,23 @@ export const useIndexState = () => {
     } catch (error) {
       console.error('[INDEX ERROR] Failed to clear batch data:', error);
     }
-  };
+  }, [toast]);
 
-  const handleKeySet = () => {
+  const handleKeySet = useCallback(() => {
     try {
       setHasApiKey(true);
     } catch (error) {
       console.error('[INDEX ERROR] Key setting failed:', error);
     }
-  };
+  }, []);
 
-  return {
+  // Memoized return object
+  return useMemo(() => ({
     batchResults,
     batchSummary,
     hasApiKey,
     handleBatchComplete,
     handleJobDelete,
     handleKeySet
-  };
+  }), [batchResults, batchSummary, hasApiKey, handleBatchComplete, handleJobDelete, handleKeySet]);
 };

@@ -15,7 +15,7 @@ import {
   Settings
 } from 'lucide-react';
 import { useErrorHandler } from '@/lib/errors/standardErrorHandler';
-import { MemoryMonitor } from '@/hooks/useMemoryOptimization';
+import { MemoryMonitor } from '@/components/ui/memory-monitor';
 import PerformanceMonitor from '@/components/performance/PerformanceMonitor';
 import { requestCache } from '@/lib/caching/requestCache';
 

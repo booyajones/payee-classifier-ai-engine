@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
-import { useMemoryOptimization } from './useMemoryOptimization';
+import { useOptimizedMemoryMonitor } from './useOptimizedMemoryMonitor';
 
 interface TableColumn<T> {
   key: keyof T | string;
@@ -50,7 +50,8 @@ export function useOptimizedTable<T extends Record<string, any>>(
     total: data.length
   });
 
-  const { memoizeWithLimit, processInChunks } = useMemoryOptimization();
+  // Simple memoization without external dependencies
+  const memoCache = useRef(new Map<string, any>());
   const previousDataRef = useRef<T[]>([]);
   const sortedDataRef = useRef<T[]>([]);
 
@@ -114,7 +115,12 @@ export function useOptimizedTable<T extends Record<string, any>>(
     // Use cache key based on data length, search query, and sort config
     const cacheKey = `table-${data.length}-${searchQuery}-${JSON.stringify(sortConfig)}`;
     
-    return memoizeWithLimit(cacheKey, () => {
+    // Simple memoization
+    if (memoCache.current.has(cacheKey)) {
+      return memoCache.current.get(cacheKey);
+    }
+    
+    const result = (() => {
       // Only reprocess if data actually changed
       if (previousDataRef.current === data && sortedDataRef.current.length > 0) {
         const filtered = searchFunction(sortedDataRef.current, searchQuery);
@@ -128,8 +134,15 @@ export function useOptimizedTable<T extends Record<string, any>>(
       
       const filtered = searchFunction(sorted, searchQuery);
       return filtered;
-    });
-  }, [data, searchQuery, sortConfig, sortFunction, searchFunction, memoizeWithLimit]);
+    })();
+    
+    // Cache with size limit
+    if (memoCache.current.size > 50) {
+      memoCache.current.clear();
+    }
+    memoCache.current.set(cacheKey, result);
+    return result;
+  }, [data, searchQuery, sortConfig, sortFunction, searchFunction]);
 
   // Paginated data
   const paginatedData = useMemo(() => {
@@ -191,13 +204,24 @@ export function useOptimizedTable<T extends Record<string, any>>(
     }));
   }, [processedData.length]);
 
-  // Bulk operations for large datasets
+  // Simple bulk processing without external dependencies
   const bulkProcess = useCallback(async <R>(
     processor: (items: T[]) => Promise<R[]>,
     chunkSize = 100
   ): Promise<R[]> => {
-    return processInChunks(processedData, processor, chunkSize);
-  }, [processedData, processInChunks]);
+    const results: R[] = [];
+    for (let i = 0; i < processedData.length; i += chunkSize) {
+      const chunk = processedData.slice(i, i + chunkSize);
+      const chunkResults = await processor(chunk);
+      results.push(...chunkResults);
+      
+      // Allow UI to breathe
+      if (i + chunkSize < processedData.length) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    }
+    return results;
+  }, [processedData]);
 
   // Export functionality
   const exportData = useCallback((format: 'csv' | 'json' = 'csv') => {

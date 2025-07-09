@@ -8,8 +8,7 @@ import { BatchJobTimeoutManager } from '@/components/batch/BatchJobTimeoutManage
 import { useLargeJobOptimization } from '@/hooks/batch/useLargeJobOptimization';
 import { debouncedStoreUpdater } from '@/lib/performance/debounceStore';
 import { useJobStatusSync } from '@/hooks/useJobStatusSync';
-import { useAutomaticJobCleanup } from '@/hooks/useAutomaticJobCleanup';
-import { usePerformanceCleanup } from '@/hooks/batch/usePerformanceCleanup';
+import { useUnifiedCleanup } from '@/hooks/useUnifiedCleanup';
 import { useUnifiedPollingOrchestrator } from '@/hooks/useUnifiedPollingOrchestrator';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useStablePerformanceMonitor } from '@/hooks/useStablePerformanceMonitor';
@@ -91,8 +90,7 @@ export const useBatchJobManager = () => {
 
   // Initialize optimizations and cleanup
   const largeJobOptimization = useLargeJobOptimization();
-  const { performCleanup } = useAutomaticJobCleanup({ jobs: stableJobs });
-  const { forceCleanup } = usePerformanceCleanup();
+  const { performCleanup, forceCleanup } = useUnifiedCleanup({ maxJobs: 50 });
   const { syncJobStatus, syncAllJobStatuses } = useJobStatusSync({ onJobUpdate: debouncedUpdateJob });
 
   // Replace multiple polling systems with unified orchestrator
