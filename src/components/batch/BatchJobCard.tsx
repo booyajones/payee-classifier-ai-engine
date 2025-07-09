@@ -81,10 +81,13 @@ const BatchJobCard = ({
           <div className="flex justify-between items-center mb-3">
             <BatchJobAutoRefreshIndicator
               isPolling={isRefreshing || isPolling}
-              isHealthy={true} // TODO: Connect to actual health status
+              isHealthy={true} // TODO: Connect to actual health status from useUnifiedAutoRefresh
               lastPoll={pollingState?.lastPoll}
               pollCount={pollingState?.pollCount}
             />
+            <div className="text-xs text-muted-foreground">
+              Auto-refresh every 15s
+            </div>
           </div>
         )}
 

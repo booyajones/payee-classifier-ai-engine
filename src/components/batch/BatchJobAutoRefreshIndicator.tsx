@@ -25,16 +25,17 @@ export const BatchJobAutoRefreshIndicator: React.FC<AutoRefreshIndicatorProps> =
   };
 
   const getStatusText = () => {
-    if (!isHealthy) return 'Offline';
-    if (isPolling) return 'Refreshing...';
+    if (!isHealthy) return 'Connection issue';
+    if (isPolling) return 'Checking progress...';
     
     if (lastPoll) {
       const timeSince = Math.round((Date.now() - lastPoll) / 1000);
+      if (timeSince < 30) return `Just updated`;
       if (timeSince < 60) return `Updated ${timeSince}s ago`;
       return `Updated ${Math.round(timeSince / 60)}m ago`;
     }
     
-    return 'Auto-refresh active';
+    return 'Auto-refresh enabled';
   };
 
   const getVariant = () => {

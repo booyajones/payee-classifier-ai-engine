@@ -99,13 +99,19 @@ export const useUnifiedAutoRefresh = (
       : 0;
     
     const hasStatusChange = !lastUpdate || lastUpdate.status !== updatedJob.status;
-    const hasProgressChange = !lastUpdate || Math.abs(lastUpdate.progress - currentProgress) > 2; // 2% threshold
-    const isTimeBased = !lastUpdate || (now - lastUpdate.timestamp) > 30000; // 30 seconds
+    
+    // Dynamic thresholds based on job status - active jobs get more sensitive updates
+    const isActiveJob = ['validating', 'in_progress', 'finalizing'].includes(updatedJob.status);
+    const progressThreshold = isActiveJob ? 0.1 : 2; // 0.1% for active, 2% for others
+    const timeThreshold = isActiveJob ? 5000 : 30000; // 5s for active, 30s for others
+    
+    const hasProgressChange = !lastUpdate || Math.abs(lastUpdate.progress - currentProgress) > progressThreshold;
+    const isTimeBased = !lastUpdate || (now - lastUpdate.timestamp) > timeThreshold;
     
     const shouldUpdate = hasStatusChange || hasProgressChange || isTimeBased;
     
     if (shouldUpdate) {
-      console.log(`[AUTO-REFRESH] ${source.toUpperCase()} update for job ${jobId.slice(-8)}: status=${updatedJob.status}, progress=${currentProgress.toFixed(1)}%`);
+      console.log(`[AUTO-REFRESH] ${source.toUpperCase()} update for job ${jobId.slice(-8)}: status=${updatedJob.status}, progress=${currentProgress.toFixed(2)}% (threshold: ${isActiveJob ? '0.1%' : '2%'})`);
       
       // Update tracking
       lastUpdateRef.current[jobId] = {
@@ -127,7 +133,7 @@ export const useUnifiedAutoRefresh = (
         });
       }
     } else {
-      console.log(`[AUTO-REFRESH] ${source.toUpperCase()} update skipped for job ${jobId.slice(-8)} (no meaningful change)`);
+      console.log(`[AUTO-REFRESH] ${source.toUpperCase()} update skipped for job ${jobId.slice(-8)} (progress: ${currentProgress.toFixed(2)}%, last: ${lastUpdate?.progress?.toFixed(2) || 0}%, diff: ${Math.abs((lastUpdate?.progress || 0) - currentProgress).toFixed(2)}%)`);
     }
   }, [onJobUpdate, toast]);
 

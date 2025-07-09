@@ -18,7 +18,7 @@ const BatchJobProgress = ({ job, onManualRefresh, isRefreshing = false }: BatchJ
   
   const getProgressPercentage = () => {
     if (total === 0) return 0;
-    return Math.round((completed / total) * 100);
+    return Number(((completed / total) * 100).toFixed(1)); // Show 1 decimal place for better precision
   };
 
   const getJobAge = () => {
@@ -110,6 +110,7 @@ const BatchJobProgress = ({ job, onManualRefresh, isRefreshing = false }: BatchJ
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">{progress}%</span>
+          {isRefreshing && <span className="text-xs text-muted-foreground">Updating...</span>}
           {progressStage.showTimeoutWarning && onManualRefresh && (
             <Button
               variant="outline"
