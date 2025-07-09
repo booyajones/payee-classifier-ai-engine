@@ -5,8 +5,8 @@ import { LargeDataStorage } from '@/lib/storage/largeDataStorage';
 import { supabase } from '@/integrations/supabase/client';
 
 export class EnhancedBatchJobOperations {
-  private static readonly MAX_RECORDS_THRESHOLD = 5000;
-  private static readonly MAX_JSON_SIZE_BYTES = 500000; // 500KB
+  private static readonly MAX_RECORDS_THRESHOLD = 1000; // Much lower threshold
+  private static readonly MAX_JSON_SIZE_BYTES = 50000; // 50KB - much smaller limit
 
   /**
    * Intelligently saves batch job data, handling large datasets efficiently
@@ -39,10 +39,24 @@ export class EnhancedBatchJobOperations {
    */
   private static shouldOptimizeData(payeeRowData: PayeeRowData): boolean {
     const recordCount = payeeRowData.uniquePayeeNames.length;
-    const estimatedSize = JSON.stringify(payeeRowData).length;
     
-    return recordCount > this.MAX_RECORDS_THRESHOLD || 
-           estimatedSize > this.MAX_JSON_SIZE_BYTES;
+    // Always optimize for datasets > 1000 records or if we have large arrays
+    if (recordCount > this.MAX_RECORDS_THRESHOLD) {
+      return true;
+    }
+    
+    // Check size of individual data components to avoid timeout
+    try {
+      const originalDataSize = JSON.stringify(payeeRowData.originalFileData || []).length;
+      const rowMappingsSize = JSON.stringify(payeeRowData.rowMappings || []).length;
+      
+      return originalDataSize > this.MAX_JSON_SIZE_BYTES || 
+             rowMappingsSize > this.MAX_JSON_SIZE_BYTES;
+    } catch (error) {
+      // If we can't serialize, definitely needs optimization
+      console.warn('[SIZE CHECK] Failed to check data size, defaulting to optimization:', error);
+      return true;
+    }
   }
 
   /**
@@ -54,13 +68,13 @@ export class EnhancedBatchJobOperations {
   ): Promise<void> {
     console.log(`[LARGE JOB] Optimizing save for ${payeeRowData.uniquePayeeNames.length} records`);
     
-    // Step 1: Sample the data for immediate processing
-    const sampledData = DataSampler.smartSample(payeeRowData, 2000);
+    // Step 1: Sample the data for database save (keep very small)
+    const sampledData = DataSampler.smartSample(payeeRowData, 500); // Much smaller sample for DB
     
     // Step 2: Store original data in storage
     const storageUrl = await LargeDataStorage.storeOriginalData(batchJob.id, payeeRowData);
     
-    // Step 3: Save minimal job record with sampled data
+    // Step 3: Save minimal job record with tiny sampled data
     await this.saveMinimalJobRecord(batchJob, sampledData, storageUrl);
     
     console.log(`[LARGE JOB] Saved optimized job with ${sampledData.uniquePayeeNames.length} sampled records`);
@@ -221,11 +235,11 @@ export class EnhancedBatchJobOperations {
         return [{ placeholder: `No ${fieldName}` }];
       }
 
-      // Test serialization
+      // Test serialization with much smaller limits
       const testSerialized = JSON.stringify(data);
-      if (testSerialized.length > 1000000) { // 1MB limit
-        console.warn(`[SERIALIZE] ${fieldName}: data too large (${testSerialized.length} bytes), truncating`);
-        return data.slice(0, 100); // Take first 100 items
+      if (testSerialized.length > 10000) { // 10KB limit - very conservative
+        console.warn(`[SERIALIZE] ${fieldName}: data too large (${testSerialized.length} bytes), truncating heavily`);
+        return data.slice(0, 10); // Take only first 10 items
       }
 
       console.log(`[SERIALIZE] ${fieldName}: successfully serialized ${data.length} items`);

@@ -14,26 +14,42 @@ export class LargeDataStorage {
     try {
       console.log(`[LARGE DATA STORAGE] Storing original data for job ${jobId}`);
       
-      // Create the data to store
+      // Validate data before storage
+      if (!payeeRowData.originalFileData || !Array.isArray(payeeRowData.originalFileData)) {
+        throw new Error('Invalid originalFileData: must be an array');
+      }
+      
+      if (!payeeRowData.rowMappings || !Array.isArray(payeeRowData.rowMappings)) {
+        throw new Error('Invalid rowMappings: must be an array');
+      }
+      
+      // Create the data to store with safety checks
       const dataToStore = {
         originalFileData: payeeRowData.originalFileData,
         rowMappings: payeeRowData.rowMappings,
+        uniquePayeeNames: payeeRowData.uniquePayeeNames || [],
         metadata: {
-          totalRecords: payeeRowData.originalFileData.length,
-          uniquePayees: payeeRowData.uniquePayeeNames.length,
+          totalRecords: payeeRowData.originalFileData?.length || 0,
+          uniquePayees: payeeRowData.uniquePayeeNames?.length || 0,
           storedAt: new Date().toISOString(),
-          jobId
+          jobId,
+          version: '1.0'
         }
       };
       
-      // Convert to JSON
+      // Convert to JSON with size check
       const jsonData = JSON.stringify(dataToStore);
+      const fileSizeMB = (jsonData.length / (1024 * 1024)).toFixed(2);
+      console.log(`[LARGE DATA STORAGE] Data size: ${fileSizeMB}MB`);
+      
       const fileName = `job-${jobId}-original-data.json`;
       
-      // Upload to storage
+      // Upload to storage as Blob for better handling
+      const blob = new Blob([jsonData], { type: 'application/json' });
+      
       const { data, error } = await supabase.storage
         .from(this.BUCKET_NAME)
-        .upload(fileName, jsonData, {
+        .upload(fileName, blob, {
           contentType: 'application/json',
           upsert: true
         });
