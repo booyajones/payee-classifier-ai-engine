@@ -33,6 +33,11 @@ const Index = () => {
     handleJobDelete,
     handleKeySet
   } = useOptimizedIndexState();
+
+  // MUST be defined before any conditional logic to maintain hook order
+  const handleBatchClassify = React.useCallback((results: any[]) => {
+    // Handle batch classification results
+  }, []);
   
   // PHASE 1: Controlled app initialization
   useEffect(() => {
@@ -85,10 +90,6 @@ const Index = () => {
       </UnifiedProgressProvider>
     );
   }
-
-  const handleBatchClassify = React.useCallback((results: any[]) => {
-    // Handle batch classification results
-  }, []);
 
   return (
     <UnifiedProgressProvider>
