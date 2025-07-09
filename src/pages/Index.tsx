@@ -86,9 +86,9 @@ const Index = () => {
     );
   }
 
-  const handleBatchClassify = (results: any[]) => {
+  const handleBatchClassify = React.useCallback((results: any[]) => {
     // Handle batch classification results
-  };
+  }, []);
 
   return (
     <UnifiedProgressProvider>

@@ -1,10 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Zap, RotateCcw } from 'lucide-react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
-import BatchJobList from './BatchJobList';
+import OptimizedBatchJobList from './OptimizedBatchJobList';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { PerformanceCircuitBreaker } from '@/components/performance/PerformanceCircuitBreaker';
@@ -29,7 +29,7 @@ interface BatchJobContainerProps {
   onForceCleanup?: () => void; // Force performance cleanup function
 }
 
-const BatchJobContainer = ({
+const BatchJobContainer = React.memo(({
   jobs,
   payeeRowDataMap,
   refreshingJobs,
@@ -52,7 +52,7 @@ const BatchJobContainer = ({
   // EMERGENCY: Memory management for large numbers of jobs
   const { forceCleanup, getMemoryInfo } = useMemoryManager();
 
-  const handleRefreshAll = async () => {
+  const handleRefreshAll = React.useCallback(async () => {
     setIsRefreshingAll(true);
     try {
       // Refreshing all jobs manually
@@ -63,13 +63,13 @@ const BatchJobContainer = ({
     } finally {
       setIsRefreshingAll(false);
     }
-  };
+  }, [jobs, onRefresh]);
 
-  const activeJobs = jobs.filter(job => 
+  const activeJobs = useMemo(() => jobs.filter(job => 
     ['validating', 'in_progress', 'finalizing'].includes(job.status)
-  );
+  ), [jobs]);
 
-  const stalledJobs = jobs.filter(job => stalledJobActions[job.id]?.isStalled);
+  const stalledJobs = useMemo(() => jobs.filter(job => stalledJobActions[job.id]?.isStalled), [jobs, stalledJobActions]);
 
   if (jobs.length === 0) {
     return (
@@ -148,7 +148,7 @@ const BatchJobContainer = ({
       )}
 
       <PerformanceCircuitBreaker>
-        <BatchJobList
+        <OptimizedBatchJobList
           jobs={jobs}
           payeeRowDataMap={payeeRowDataMap}
           refreshingJobs={refreshingJobs}
@@ -165,6 +165,6 @@ const BatchJobContainer = ({
       </PerformanceCircuitBreaker>
     </div>
   );
-};
+});
 
 export default BatchJobContainer;

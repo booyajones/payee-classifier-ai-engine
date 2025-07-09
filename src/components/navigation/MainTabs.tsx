@@ -35,7 +35,7 @@ interface MainTabsProps {
   onJobDelete: () => void;
 }
 
-const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: MainTabsProps) => {
+const MainTabs = React.memo(({ allResults, onBatchClassify, onComplete, onJobDelete }: MainTabsProps) => {
   console.log('MainTabs rendering, props:', { allResultsLength: allResults.length });
   const { activeTab, setActiveTab } = useAppStore();
   const { addJob, setPayeeData, jobs, payeeDataMap } = useBatchJobStore();
@@ -65,8 +65,8 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
     sortedResults
   } = useTableSorting(allResults, getOriginalColumns);
 
-  // Handler for tab changes with loading state
-  const handleTabChange = async (tab: string) => {
+  // Handler for tab changes with loading state - memoized to prevent re-creation
+  const handleTabChange = React.useCallback(async (tab: string) => {
     console.log('Tab changed:', tab);
     setIsTabLoading(true);
     
@@ -84,20 +84,20 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
         { actionLabel: "Learn More" }
       );
     }
-  };
+  }, [setActiveTab, showInfo]);
 
-  // Handler for single classification results
-  const handleSingleClassify = (result: PayeeClassification) => {
+  // Handler for single classification results - memoized
+  const handleSingleClassify = React.useCallback((result: PayeeClassification) => {
     console.log('Single classification result:', result.payeeName);
-  };
+  }, []);
 
-  // Handler for viewing result details
-  const handleViewDetails = (result: PayeeClassification) => {
+  // Handler for viewing result details - memoized
+  const handleViewDetails = React.useCallback((result: PayeeClassification) => {
     console.log('View details for payee:', result.payeeName);
-  };
+  }, []);
 
-  // Handler for batch job creation
-  const handleBatchJobCreated = async (batchJob: any, payeeRowData: any) => {
+  // Handler for batch job creation - memoized to prevent re-creation
+  const handleBatchJobCreated = React.useCallback(async (batchJob: any, payeeRowData: any) => {
     console.log('Creating new batch job with payee data:', payeeRowData.uniquePayeeNames.length);
     
     try {
@@ -140,7 +140,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
         }
       );
     }
-  };
+  }, [addJob, setPayeeData, saveBatchJob, showSuccess, showError, setActiveTab]);
 
   // Generate columns from results data - memoized to prevent rerenders
   const generateColumns = useMemo(() => {
@@ -163,8 +163,8 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
 
   console.log('MainTabs about to render tabs with activeTab:', activeTab);
 
-  // Generate breadcrumb items based on active tab
-  const breadcrumbItems = [
+  // Generate breadcrumb items based on active tab - memoized
+  const breadcrumbItems = useMemo(() => [
     { 
       label: {
         single: 'Single Classification',
@@ -177,7 +177,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
       }[activeTab] || 'Dashboard',
       active: true
     }
-  ];
+  ], [activeTab]);
   
   return (
     <div className="w-full space-y-4">
@@ -323,6 +323,6 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
     </div>
 
   );
-};
+});
 
 export default MainTabs;
