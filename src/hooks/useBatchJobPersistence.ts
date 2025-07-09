@@ -4,6 +4,7 @@ import { useBatchJobStore } from '@/stores/batchJobStore';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import { resetAllApplicationState } from '@/lib/utils/systemReset';
+import { EnhancedBatchJobOperations } from '@/lib/database/enhancedBatchJobOperations';
 
 export const useBatchJobPersistence = () => {
   const { setJobs, setPayeeDataMap, setLoaded, clearAllJobs } = useBatchJobStore();
@@ -83,7 +84,7 @@ export const useBatchJobPersistence = () => {
     loadBatchJobs();
   }, [setJobs, setPayeeDataMap, setLoaded, clearAllJobs]);
 
-  // Enhanced save batch job with validation
+  // Enhanced save batch job with intelligent routing
   const saveBatchJob = async (batchJob: BatchJob, payeeData?: PayeeRowData) => {
     try {
       console.log(`[PERSISTENCE] Starting save for batch job ${batchJob.id}`);
@@ -93,44 +94,12 @@ export const useBatchJobPersistence = () => {
         throw new Error('Invalid batch job: missing required fields');
       }
 
-      // Ensure required data is present
-      const jobData = {
-        id: batchJob.id,
-        status: batchJob.status,
-        created_at_timestamp: batchJob.created_at,
-        completed_at_timestamp: batchJob.completed_at || null,
-        failed_at_timestamp: batchJob.failed_at || null,
-        expired_at_timestamp: batchJob.expired_at || null,
-        finalizing_at_timestamp: batchJob.finalizing_at || null,
-        in_progress_at_timestamp: batchJob.in_progress_at || null,
-        cancelled_at_timestamp: batchJob.cancelled_at || null,
-        output_file_id: batchJob.output_file_id || null,
-        errors: batchJob.errors || null,
-        request_counts_total: batchJob.request_counts.total,
-        request_counts_completed: batchJob.request_counts.completed,
-        request_counts_failed: batchJob.request_counts.failed,
-        metadata: batchJob.metadata || null,
-        unique_payee_names: payeeData?.uniquePayeeNames || [],
-        original_file_data: payeeData?.originalFileData && payeeData.originalFileData.length > 0 
-          ? JSON.parse(JSON.stringify(payeeData.originalFileData))
-          : [{ placeholder: "No data" }],
-        row_mappings: payeeData?.rowMappings && payeeData.rowMappings.length > 0
-          ? JSON.parse(JSON.stringify(payeeData.rowMappings))
-          : [{ placeholder: "No mappings" }],
-        selected_payee_column: null,
-        file_name: null,
-        file_headers: null
-      };
-
-      // Atomic database operation
-      const { error } = await supabase
-        .from('batch_jobs')
-        .upsert(jobData as any);
-
-      if (error) {
-        console.error(`[PERSISTENCE] Database error saving job ${batchJob.id}:`, error);
-        throw error;
+      if (!payeeData) {
+        throw new Error('PayeeRowData is required for batch job save');
       }
+
+      // Use enhanced batch job operations for intelligent saving
+      await EnhancedBatchJobOperations.saveBatchJobIntelligently(batchJob, payeeData);
 
       // Post-save verification
       const { data: verifyData, error: verifyError } = await supabase
@@ -148,7 +117,9 @@ export const useBatchJobPersistence = () => {
       return true;
     } catch (error) {
       console.error(`[PERSISTENCE] Error saving batch job ${batchJob.id}:`, error);
-      throw error;
+      // Provide more specific error message
+      const errorMessage = error instanceof Error ? error.message : 'Unknown database error';
+      throw new Error(`Failed to save batch job: ${errorMessage}`);
     }
   };
 

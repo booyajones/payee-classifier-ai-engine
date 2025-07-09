@@ -75,39 +75,65 @@ export class EnhancedBatchJobOperations {
   ): Promise<void> {
     console.log(`[STANDARD SAVE] Saving job with ${payeeRowData.uniquePayeeNames.length} records`);
     
-    const batchJobRecord = {
-      id: batchJob.id,
-      status: batchJob.status,
-      created_at_timestamp: batchJob.created_at,
-      app_created_at: new Date().toISOString(),
-      app_updated_at: new Date().toISOString(),
-      unique_payee_names: payeeRowData.uniquePayeeNames,
-      selected_payee_column: null, // PayeeRowData doesn't have this property
-      file_name: null, // PayeeRowData doesn't have this property
-      file_size_bytes: null, // PayeeRowData doesn't have this property
-      file_headers: null, // PayeeRowData doesn't have this property
-      original_file_data: payeeRowData.originalFileData.length > 0 
-        ? JSON.parse(JSON.stringify(payeeRowData.originalFileData))
-        : [{ placeholder: "No data" }],
-      row_mappings: payeeRowData.rowMappings.length > 0 
-        ? JSON.parse(JSON.stringify(payeeRowData.rowMappings))
-        : [{ placeholder: "No mappings" }],
-      request_counts_total: payeeRowData.uniquePayeeNames.length,
-      request_counts_completed: 0,
-      request_counts_failed: 0,
-      errors: null,
-      metadata: {
-        processing_type: 'standard',
-        record_count: payeeRowData.uniquePayeeNames.length,
-        timestamp: Date.now()
+    try {
+      // Validate essential data
+      if (!batchJob.id || !batchJob.status) {
+        throw new Error('Missing required batch job fields');
       }
-    };
 
-    const { error } = await supabase
-      .from('batch_jobs')
-      .upsert(batchJobRecord);
+      if (!payeeRowData.uniquePayeeNames || !Array.isArray(payeeRowData.uniquePayeeNames)) {
+        throw new Error('Invalid payee data: uniquePayeeNames must be an array');
+      }
 
-    if (error) {
+      // Safe data serialization with validation
+      const originalFileDataSafe = this.safeSerializeData(
+        payeeRowData.originalFileData, 
+        'originalFileData'
+      );
+
+      const rowMappingsSafe = this.safeSerializeData(
+        payeeRowData.rowMappings, 
+        'rowMappings'
+      );
+
+      const batchJobRecord = {
+        id: batchJob.id,
+        status: batchJob.status,
+        created_at_timestamp: batchJob.created_at,
+        app_created_at: new Date().toISOString(),
+        app_updated_at: new Date().toISOString(),
+        unique_payee_names: payeeRowData.uniquePayeeNames,
+        selected_payee_column: null,
+        file_name: null,
+        file_size_bytes: null,
+        file_headers: null,
+        original_file_data: originalFileDataSafe,
+        row_mappings: rowMappingsSafe,
+        request_counts_total: payeeRowData.uniquePayeeNames.length,
+        request_counts_completed: 0,
+        request_counts_failed: 0,
+        errors: null,
+        metadata: {
+          processing_type: 'standard',
+          record_count: payeeRowData.uniquePayeeNames.length,
+          timestamp: Date.now()
+        }
+      };
+
+      console.log(`[STANDARD SAVE] Attempting database save for job ${batchJob.id}`);
+      
+      const { error } = await supabase
+        .from('batch_jobs')
+        .upsert(batchJobRecord);
+
+      if (error) {
+        console.error(`[STANDARD SAVE] Database error for job ${batchJob.id}:`, error);
+        throw new Error(`Database save failed: ${error.message}`);
+      }
+
+      console.log(`[STANDARD SAVE] Successfully saved job ${batchJob.id} to database`);
+    } catch (error) {
+      console.error(`[STANDARD SAVE] Failed to save job ${batchJob.id}:`, error);
       throw error;
     }
   }
@@ -120,43 +146,93 @@ export class EnhancedBatchJobOperations {
     sampledData: PayeeRowData,
     storageUrl: string
   ): Promise<void> {
-    const minimalRecord = {
-      id: batchJob.id,
-      status: batchJob.status,
-      created_at_timestamp: batchJob.created_at,
-      app_created_at: new Date().toISOString(),
-      app_updated_at: new Date().toISOString(),
-      unique_payee_names: sampledData.uniquePayeeNames,
-      selected_payee_column: null, // PayeeRowData doesn't have this property
-      file_name: null, // PayeeRowData doesn't have this property
-      file_size_bytes: null, // PayeeRowData doesn't have this property
-      file_headers: null, // PayeeRowData doesn't have this property
-      original_file_data: sampledData.originalFileData.length > 0 
-        ? JSON.parse(JSON.stringify(sampledData.originalFileData))
-        : [{ placeholder: "No data" }],
-      row_mappings: sampledData.rowMappings.length > 0 
-        ? JSON.parse(JSON.stringify(sampledData.rowMappings))
-        : [{ placeholder: "No mappings" }],
-      request_counts_total: sampledData.uniquePayeeNames.length,
-      request_counts_completed: 0,
-      request_counts_failed: 0,
-      errors: null,
-      metadata: {
-        processing_type: 'optimized_large',
-        original_record_count: sampledData.originalRecordCount || sampledData.uniquePayeeNames.length,
-        sampled_record_count: sampledData.uniquePayeeNames.length,
-        storage_url: storageUrl,
-        is_sampled: true,
-        timestamp: Date.now()
+    try {
+      // Safe data serialization with validation
+      const originalFileDataSafe = this.safeSerializeData(
+        sampledData.originalFileData, 
+        'originalFileData'
+      );
+
+      const rowMappingsSafe = this.safeSerializeData(
+        sampledData.rowMappings, 
+        'rowMappings'
+      );
+
+      const minimalRecord = {
+        id: batchJob.id,
+        status: batchJob.status,
+        created_at_timestamp: batchJob.created_at,
+        app_created_at: new Date().toISOString(),
+        app_updated_at: new Date().toISOString(),
+        unique_payee_names: sampledData.uniquePayeeNames,
+        selected_payee_column: null,
+        file_name: null,
+        file_size_bytes: null,
+        file_headers: null,
+        original_file_data: originalFileDataSafe,
+        row_mappings: rowMappingsSafe,
+        request_counts_total: sampledData.uniquePayeeNames.length,
+        request_counts_completed: 0,
+        request_counts_failed: 0,
+        errors: null,
+        metadata: {
+          processing_type: 'optimized_large',
+          original_record_count: (sampledData as any).originalRecordCount || sampledData.uniquePayeeNames.length,
+          sampled_record_count: sampledData.uniquePayeeNames.length,
+          storage_url: storageUrl,
+          is_sampled: true,
+          timestamp: Date.now()
+        }
+      };
+
+      const { error } = await supabase
+        .from('batch_jobs')
+        .upsert(minimalRecord);
+
+      if (error) {
+        console.error(`[MINIMAL SAVE] Database error for job ${batchJob.id}:`, error);
+        throw new Error(`Minimal record save failed: ${error.message}`);
       }
-    };
 
-    const { error } = await supabase
-      .from('batch_jobs')
-      .upsert(minimalRecord);
-
-    if (error) {
+      console.log(`[MINIMAL SAVE] Successfully saved minimal record for job ${batchJob.id}`);
+    } catch (error) {
+      console.error(`[MINIMAL SAVE] Failed to save minimal record for job ${batchJob.id}:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Safely serializes data for database storage
+   */
+  private static safeSerializeData(data: any, fieldName: string): any {
+    try {
+      if (!data) {
+        console.log(`[SERIALIZE] ${fieldName}: data is null/undefined, using default`);
+        return [{ placeholder: `No ${fieldName}` }];
+      }
+
+      if (!Array.isArray(data)) {
+        console.log(`[SERIALIZE] ${fieldName}: data is not an array, converting`);
+        return [{ value: data, note: `Converted from ${typeof data}` }];
+      }
+
+      if (data.length === 0) {
+        console.log(`[SERIALIZE] ${fieldName}: array is empty, using default`);
+        return [{ placeholder: `No ${fieldName}` }];
+      }
+
+      // Test serialization
+      const testSerialized = JSON.stringify(data);
+      if (testSerialized.length > 1000000) { // 1MB limit
+        console.warn(`[SERIALIZE] ${fieldName}: data too large (${testSerialized.length} bytes), truncating`);
+        return data.slice(0, 100); // Take first 100 items
+      }
+
+      console.log(`[SERIALIZE] ${fieldName}: successfully serialized ${data.length} items`);
+      return data;
+    } catch (error) {
+      console.error(`[SERIALIZE] Error serializing ${fieldName}:`, error);
+      return [{ error: `Failed to serialize ${fieldName}`, timestamp: Date.now() }];
     }
   }
 }
