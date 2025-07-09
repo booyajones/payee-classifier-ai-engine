@@ -51,8 +51,22 @@ const SmartFileUpload = ({ onBatchJobCreated, onProcessingComplete }: SmartFileU
       
       updateProgress(UPLOAD_ID, 'Creating batch job...', 70);
       
-      // Create the batch job via callback
-      onBatchJobCreated(null, payeeRowData);
+      // Import createBatchJob and generateContextualBatchJobName
+      const { createBatchJob } = await import('@/lib/openai/trueBatchAPI');
+      const { generateContextualBatchJobName } = await import('@/lib/services/batchJobNameGenerator');
+      
+      // Generate job name and create actual batch job
+      const jobName = generateContextualBatchJobName(payeeRowData.uniquePayeeNames.length, 'file');
+      const batchJob = await createBatchJob(
+        payeeRowData.uniquePayeeNames,
+        `File upload batch: ${payeeRowData.uniquePayeeNames.length} payees`,
+        jobName
+      );
+      
+      console.log('Batch job created successfully:', batchJob.id);
+      
+      // Create the batch job via callback with actual batch job
+      onBatchJobCreated(batchJob, payeeRowData);
       
       updateProgress(UPLOAD_ID, 'Batch job created successfully!', 100);
       completeProgress(UPLOAD_ID, 'Ready for processing!');
