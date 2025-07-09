@@ -40,16 +40,30 @@ export const useBatchJobManager = () => {
 
     const existingJob = jobs.find(j => j.id === job.id);
     
-    // Check if job just completed and trigger result processing
+    // Check if job just completed and trigger ENHANCED result processing and file generation
     if (job.status === 'completed' && existingJob?.status !== 'completed' && job.output_file_id) {
-      console.log(`[BATCH JOB MANAGER] Job ${job.id} just completed, triggering automatic result processing...`);
+      console.log(`[BATCH JOB MANAGER] Job ${job.id} just completed, triggering enhanced automatic processing...`);
       
-      // Import and trigger automatic result processing
+      // Import and trigger automatic result processing AND file generation
       try {
         const { AutomaticResultProcessor } = await import('@/lib/services/automaticResultProcessor');
+        const { EnhancedFileGenerationService } = await import('@/lib/services/enhancedFileGenerationService');
+        
+        // Process results first, then generate files
         AutomaticResultProcessor.processCompletedBatch(job).then(success => {
           if (success) {
             console.log(`[BATCH JOB MANAGER] Successfully processed results for job ${job.id}`);
+            
+            // Then generate files for instant downloads
+            EnhancedFileGenerationService.processCompletedJob(job).then(fileResult => {
+              if (fileResult.success) {
+                console.log(`[BATCH JOB MANAGER] Files generated for job ${job.id} - instant downloads ready`);
+              } else {
+                console.warn(`[BATCH JOB MANAGER] File generation failed for job ${job.id}:`, fileResult.error);
+              }
+            }).catch(fileError => {
+              console.error(`[BATCH JOB MANAGER] File generation error for job ${job.id}:`, fileError);
+            });
           } else {
             console.warn(`[BATCH JOB MANAGER] Failed to process results for job ${job.id}`);
           }

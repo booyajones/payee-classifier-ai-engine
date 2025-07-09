@@ -1,19 +1,20 @@
 import React from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
-import DirectDatabaseDownload from './DirectDatabaseDownload';
+import DownloadStatusDisplay from './DownloadStatusDisplay';
 
 interface BatchJobFinalizingDownloadProps {
   job: BatchJob;
-  activeDownload: {
+  activeDownload?: {
     isActive: boolean;
   } | undefined;
-  onDownload: () => void;
+  onDownload?: () => void;
+  onRefresh?: () => void;
 }
 
 const BatchJobFinalizingDownload = ({ 
   job, 
   activeDownload, 
-  onDownload 
+  onRefresh 
 }: BatchJobFinalizingDownloadProps) => {
   const { total, completed } = job.request_counts;
   
@@ -21,18 +22,16 @@ const BatchJobFinalizingDownload = ({
   const isEffectivelyComplete = job.status === 'completed' || 
     (total > 0 && completed === total && job.status === 'finalizing');
 
-  // Show download button for completed jobs with results
+  // Show download status for completed jobs
   if (!isEffectivelyComplete || activeDownload?.isActive) {
     return null;
   }
 
   return (
-    <div className="flex justify-end">
-      <DirectDatabaseDownload 
-        jobId={job.id}
-        className="text-sm px-3 py-1"
-      />
-    </div>
+    <DownloadStatusDisplay 
+      jobId={job.id}
+      onRefresh={onRefresh}
+    />
   );
 };
 

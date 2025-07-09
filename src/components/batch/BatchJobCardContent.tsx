@@ -7,7 +7,8 @@ import BatchJobProgress from './BatchJobProgress';
 import EnhancedBatchJobProgress from './EnhancedBatchJobProgress';
 import BatchJobRequestCounts from './BatchJobRequestCounts';
 import BatchJobStuckWarning from './BatchJobStuckWarning';
-// Removed individual download components - downloads now centralized
+import DownloadStatusDisplay from './DownloadStatusDisplay';
+// Enhanced download status display integrated
 
 interface BatchJobCardContentProps {
   job: BatchJob;
@@ -48,16 +49,23 @@ const BatchJobCardContent = ({
       <BatchJobRequestCounts job={job} />
       <BatchJobStuckWarning job={job} />
       
-      {/* Download functionality moved to unified Download Center */}
+      {/* Enhanced download status display for completed jobs */}
       {isCompleted && (
-        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-          <div className="flex items-center gap-2 text-green-700">
-            <CheckCircle className="h-4 w-4" />
-            <span className="text-sm font-medium">✅ Job completed successfully</span>
+        <div className="space-y-2">
+          <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center gap-2 text-green-700">
+              <CheckCircle className="h-4 w-4" />
+              <span className="text-sm font-medium">✅ Job completed successfully</span>
+            </div>
+            <p className="text-xs text-green-600 mt-1">
+              {job.request_counts.completed} payees processed • Download ready below
+            </p>
           </div>
-          <p className="text-xs text-green-600 mt-1">
-            Download results from the Download Center tab
-          </p>
+          
+          <DownloadStatusDisplay 
+            jobId={job.id}
+            onRefresh={onRefresh}
+          />
         </div>
       )}
     </div>

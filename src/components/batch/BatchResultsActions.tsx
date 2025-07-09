@@ -126,14 +126,11 @@ const BatchResultsActions = ({
         </Button>
       </div>
       
-      <DownloadStatusDisplay
-        hasPreGeneratedFiles={hasPreGeneratedFiles}
-        isProcessing={isProcessing}
-        processingSummary={processingSummary}
-        fileSizeBytes={fileStatus.fileSizeBytes}
-        fileGeneratedAt={fileStatus.fileGeneratedAt}
-        jobId={jobId}
-      />
+      {jobId && (
+        <DownloadStatusDisplay
+          jobId={jobId}
+        />
+      )}
     </>
   );
 };
