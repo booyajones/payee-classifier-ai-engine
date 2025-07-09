@@ -31,17 +31,39 @@ export const useBatchJobManager = () => {
   const { isHealthy: networkHealthy } = useNetworkStatus();
   const { isStable: performanceStable } = useStablePerformanceMonitor();
 
-  // Optimized job update handler with network awareness
-  const debouncedUpdateJob = useCallback((job: any) => {
+  // Optimized job update handler with network awareness and automatic result processing
+  const debouncedUpdateJob = useCallback(async (job: any) => {
     // Skip updates if network is unhealthy
     if (!networkHealthy) {
       console.warn('[BATCH JOB MANAGER] Network unhealthy, deferring job update');
       return;
     }
 
+    const existingJob = jobs.find(j => j.id === job.id);
+    
+    // Check if job just completed and trigger result processing
+    if (job.status === 'completed' && existingJob?.status !== 'completed' && job.output_file_id) {
+      console.log(`[BATCH JOB MANAGER] Job ${job.id} just completed, triggering automatic result processing...`);
+      
+      // Import and trigger automatic result processing
+      try {
+        const { AutomaticResultProcessor } = await import('@/lib/services/automaticResultProcessor');
+        AutomaticResultProcessor.processCompletedBatch(job).then(success => {
+          if (success) {
+            console.log(`[BATCH JOB MANAGER] Successfully processed results for job ${job.id}`);
+          } else {
+            console.warn(`[BATCH JOB MANAGER] Failed to process results for job ${job.id}`);
+          }
+        }).catch(error => {
+          console.error(`[BATCH JOB MANAGER] Error processing results for job ${job.id}:`, error);
+        });
+      } catch (error) {
+        console.error(`[BATCH JOB MANAGER] Failed to load AutomaticResultProcessor:`, error);
+      }
+    }
+
     // Skip redundant updates for completed jobs
     if (['completed', 'failed', 'cancelled', 'expired'].includes(job.status)) {
-      const existingJob = jobs.find(j => j.id === job.id);
       if (existingJob && existingJob.status === job.status && 
           existingJob.request_counts?.completed === job.request_counts?.completed) {
         return;

@@ -5,6 +5,7 @@ import { FileText, Upload, Play, TestTube, Users, Eye, Activity, BarChart3, Down
 import SingleClassificationForm from "@/components/SingleClassificationForm";
 import HealthCheckPanel from "@/components/testing/HealthCheckPanel";
 import ImplementationSummary from "@/components/testing/ImplementationSummary";
+import { EmergencyRecoveryPanel } from "@/components/debug/EmergencyRecoveryPanel";
 import BreadcrumbNavigation from "@/components/ui/breadcrumb-navigation";
 import LoadingSpinner from "@/components/ui/loading-spinner";
 import { useEnhancedNotifications } from "@/components/ui/enhanced-notifications";
@@ -309,6 +310,7 @@ const MainTabs = ({ allResults, onBatchClassify, onComplete, onJobDelete }: Main
               <div className="space-y-6">
                 <ImplementationSummary />
                 <HealthCheckPanel />
+                <EmergencyRecoveryPanel />
               </div>
             </TabsContent>
 
