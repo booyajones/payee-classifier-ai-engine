@@ -149,13 +149,22 @@ export const useBatchJobStore = create<BatchJobState & BatchJobActions>()(
     })),
     clearAllJobs: () => {
       console.log('[STORE] Clearing all jobs and resetting store state');
+      
+      // Force clear browser storage for phantom jobs
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('batch-job-store');
+        sessionStorage.removeItem('batch-job-store');
+        console.log('[STORE] Cleared browser storage for phantom jobs');
+      }
+      
       set({
         jobs: [],
         payeeDataMap: {},
         processing: new Set(),
         errors: {},
         selectedJobId: null,
-        isLoaded: false
+        isLoaded: false,
+        autoPollingJobs: new Set()
       });
     },
 
