@@ -32,4 +32,11 @@ export interface PayeeRowData {
       processing_time_ms: number;
     };
   };
+  // Additional properties for enhanced batch operations
+  selectedPayeeColumn?: string;
+  fileName?: string;
+  fileSizeBytes?: number;
+  fileHeaders?: string[];
+  fileData?: any[];
+  originalRecordCount?: number;
 }

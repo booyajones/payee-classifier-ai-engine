@@ -114,8 +114,9 @@ const MainTabs = React.memo(({ allResults, onBatchClassify, onComplete, onJobDel
       addJob(newBatchJob);
       setPayeeData(newBatchJob.id, payeeRowData);
       
-      // Save to database
-      await saveBatchJob(newBatchJob, payeeRowData);
+      // Save to database using enhanced operations
+      const { EnhancedBatchJobOperations } = await import('@/lib/database/enhancedBatchJobOperations');
+      await EnhancedBatchJobOperations.saveBatchJobIntelligently(newBatchJob, payeeRowData);
       
       showSuccess(
         "Batch Job Created Successfully!",
