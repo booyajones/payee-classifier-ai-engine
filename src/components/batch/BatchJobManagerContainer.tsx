@@ -2,6 +2,7 @@ import React from 'react';
 import { useBatchJobManager } from '@/hooks/useBatchJobManager';
 import BatchJobContainer from './BatchJobContainer';
 import { ProgressiveLoader } from '@/components/ui/progressive-loader';
+import { JobSystemStatus } from './JobSystemStatus';
 
 const BatchJobManagerContainer = () => {
   const {
@@ -29,6 +30,9 @@ const BatchJobManagerContainer = () => {
       <TimeoutManager jobs={jobs} onJobCancel={handleCancelJob} />
       
       <ProgressiveLoader delay={300}>
+        {/* Job System Status and Controls */}
+        <JobSystemStatus />
+        
         <BatchJobContainer
           jobs={jobs}
           payeeRowDataMap={payeeDataMap}

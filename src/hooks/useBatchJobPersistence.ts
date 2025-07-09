@@ -79,43 +79,67 @@ export const useBatchJobPersistence = () => {
     loadBatchJobs();
   }, [setJobs, setPayeeDataMap, setLoaded]);
 
-  // Save batch job to database
+  // Enhanced save batch job with validation
   const saveBatchJob = async (batchJob: BatchJob, payeeData?: PayeeRowData) => {
     try {
+      console.log(`[PERSISTENCE] Starting save for batch job ${batchJob.id}`);
+      
+      // Pre-save validation
+      if (!batchJob.id || !batchJob.status) {
+        throw new Error('Invalid batch job: missing required fields');
+      }
+
+      // Ensure required data is present
+      const jobData = {
+        id: batchJob.id,
+        status: batchJob.status,
+        created_at_timestamp: batchJob.created_at,
+        completed_at_timestamp: batchJob.completed_at || null,
+        failed_at_timestamp: batchJob.failed_at || null,
+        expired_at_timestamp: batchJob.expired_at || null,
+        finalizing_at_timestamp: batchJob.finalizing_at || null,
+        in_progress_at_timestamp: batchJob.in_progress_at || null,
+        cancelled_at_timestamp: batchJob.cancelled_at || null,
+        output_file_id: batchJob.output_file_id || null,
+        errors: batchJob.errors || null,
+        request_counts_total: batchJob.request_counts.total,
+        request_counts_completed: batchJob.request_counts.completed,
+        request_counts_failed: batchJob.request_counts.failed,
+        metadata: batchJob.metadata || null,
+        unique_payee_names: payeeData?.uniquePayeeNames || [],
+        original_file_data: JSON.parse(JSON.stringify(payeeData?.originalFileData || [])),
+        row_mappings: JSON.parse(JSON.stringify(payeeData?.rowMappings || [])),
+        selected_payee_column: null,
+        file_name: null,
+        file_headers: null
+      };
+
+      // Atomic database operation
       const { error } = await supabase
         .from('batch_jobs')
-        .upsert({
-          id: batchJob.id,
-          status: batchJob.status,
-          created_at_timestamp: batchJob.created_at,
-          completed_at_timestamp: batchJob.completed_at || null,
-          failed_at_timestamp: batchJob.failed_at || null,
-          expired_at_timestamp: batchJob.expired_at || null,
-          finalizing_at_timestamp: batchJob.finalizing_at || null,
-          in_progress_at_timestamp: batchJob.in_progress_at || null,
-          cancelled_at_timestamp: batchJob.cancelled_at || null,
-          output_file_id: batchJob.output_file_id || null,
-          errors: batchJob.errors || null,
-          request_counts_total: batchJob.request_counts.total,
-          request_counts_completed: batchJob.request_counts.completed,
-          request_counts_failed: batchJob.request_counts.failed,
-          metadata: batchJob.metadata || null,
-          unique_payee_names: payeeData?.uniquePayeeNames || [],
-          original_file_data: JSON.parse(JSON.stringify(payeeData?.originalFileData || [])),
-          row_mappings: JSON.parse(JSON.stringify(payeeData?.rowMappings || [])),
-          selected_payee_column: null,
-          file_name: null,
-          file_headers: null
-        } as any);
+        .upsert(jobData as any);
 
       if (error) {
-        console.error('Failed to save batch job to database:', error);
+        console.error(`[PERSISTENCE] Database error saving job ${batchJob.id}:`, error);
         throw error;
       }
-      
-      console.log(`Saved batch job ${batchJob.id} to database`);
+
+      // Post-save verification
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('batch_jobs')
+        .select('id, status')
+        .eq('id', batchJob.id)
+        .single();
+
+      if (verifyError || !verifyData) {
+        console.error(`[PERSISTENCE] Verification failed for job ${batchJob.id}:`, verifyError);
+        throw new Error('Job save verification failed');
+      }
+
+      console.log(`[PERSISTENCE] Successfully saved and verified batch job ${batchJob.id}`);
+      return true;
     } catch (error) {
-      console.error('Error saving batch job:', error);
+      console.error(`[PERSISTENCE] Error saving batch job ${batchJob.id}:`, error);
       throw error;
     }
   };

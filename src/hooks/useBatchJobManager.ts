@@ -11,6 +11,7 @@ import { useUnifiedCleanup } from '@/hooks/useUnifiedCleanup';
 import { useUnifiedAutoRefresh } from '@/hooks/useUnifiedAutoRefresh';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useStablePerformanceMonitor } from '@/hooks/useStablePerformanceMonitor';
+import { PhantomJobDetector } from '@/lib/utils/phantomJobDetector';
 
 export const useBatchJobManager = () => {
   const {
@@ -29,11 +30,18 @@ export const useBatchJobManager = () => {
   const { isHealthy: networkHealthy } = useNetworkStatus();
   const { isStable: performanceStable } = useStablePerformanceMonitor();
 
-  // Optimized job update handler with network awareness and automatic result processing
+  // Enhanced job update handler with phantom job validation
   const debouncedUpdateJob = useCallback(async (job: any) => {
     // Skip updates if network is unhealthy
     if (!networkHealthy) {
       console.warn('[BATCH JOB MANAGER] Network unhealthy, deferring job update');
+      return;
+    }
+
+    // Pre-display validation: Verify job exists in database before updating UI
+    const jobExists = await PhantomJobDetector.validateSingleJob(job.id);
+    if (!jobExists) {
+      console.warn(`[BATCH JOB MANAGER] Blocking update for phantom job: ${job.id}`);
       return;
     }
 

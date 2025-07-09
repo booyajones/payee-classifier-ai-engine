@@ -22,6 +22,11 @@ interface BatchJobActions {
   removeJob: (jobId: string) => void;
   clearAllJobs: () => void;
   
+  // Enhanced job management with validation
+  addJobWithValidation: (job: BatchJob) => boolean;
+  removeJobsById: (jobIds: string[]) => void;
+  validateJobIntegrity: () => string[];
+  
   // Payee data management
   setPayeeDataMap: (map: Record<string, PayeeRowData>) => void;
   setPayeeData: (jobId: string, data: PayeeRowData) => void;
@@ -149,6 +154,79 @@ export const useBatchJobStore = create<BatchJobState & BatchJobActions>()(
       errors: {},
       selectedJobId: null
     }),
+
+    // Enhanced job management with validation
+    addJobWithValidation: (job) => {
+      const state = get();
+      
+      // Validation guards
+      if (!job.id || !job.status) {
+        console.warn(`[STORE] Rejected invalid job: missing id or status`);
+        return false;
+      }
+
+      // Check for duplicates
+      if (state.jobs.find(j => j.id === job.id)) {
+        console.warn(`[STORE] Job ${job.id} already exists, updating instead`);
+        state.updateJob(job);
+        return true;
+      }
+
+      // Age validation (don't add very old jobs)
+      const jobAge = Date.now() - new Date(job.created_at * 1000).getTime();
+      if (jobAge > 7 * 24 * 60 * 60 * 1000) { // 7 days
+        console.warn(`[STORE] Rejected very old job ${job.id} (age: ${Math.round(jobAge/86400000)} days)`);
+        return false;
+      }
+
+      console.log(`[STORE] Adding validated job ${job.id.substring(0, 8)} with status: ${job.status}`);
+      set((state) => ({ jobs: [...state.jobs, job] }));
+      return true;
+    },
+
+    removeJobsById: (jobIds) => set((state) => {
+      console.log(`[STORE] Removing jobs: ${jobIds.map(id => id.substring(0, 8)).join(', ')}`);
+      return {
+        jobs: state.jobs.filter(j => !jobIds.includes(j.id)),
+        payeeDataMap: Object.fromEntries(
+          Object.entries(state.payeeDataMap).filter(([key]) => !jobIds.includes(key))
+        ),
+        processing: new Set(Array.from(state.processing).filter(id => !jobIds.includes(id))),
+        errors: Object.fromEntries(
+          Object.entries(state.errors).filter(([key]) => !jobIds.includes(key))
+        )
+      };
+    }),
+
+    validateJobIntegrity: () => {
+      const state = get();
+      const issues: string[] = [];
+
+      state.jobs.forEach(job => {
+        // Check required fields
+        if (!job.id) issues.push(`Job missing ID`);
+        if (!job.status) issues.push(`Job ${job.id} missing status`);
+        if (!job.created_at) issues.push(`Job ${job.id} missing created_at`);
+        
+        // Check for orphaned processing states
+        if (state.processing.has(job.id) && ['completed', 'failed', 'cancelled', 'expired'].includes(job.status)) {
+          issues.push(`Job ${job.id} has orphaned processing state`);
+        }
+      });
+
+      // Check for orphaned payee data
+      Object.keys(state.payeeDataMap).forEach(jobId => {
+        if (!state.jobs.find(j => j.id === jobId)) {
+          issues.push(`Orphaned payee data for job ${jobId}`);
+        }
+      });
+
+      if (issues.length > 0) {
+        console.warn(`[STORE] Integrity issues found:`, issues);
+      }
+      
+      return issues;
+    },
 
     // Payee data management
     setPayeeDataMap: (map) => set({ payeeDataMap: map }),
