@@ -82,12 +82,16 @@ export class EnhancedBatchJobOperations {
       app_created_at: new Date().toISOString(),
       app_updated_at: new Date().toISOString(),
       unique_payee_names: payeeRowData.uniquePayeeNames,
-      selected_payee_column: payeeRowData.selectedPayeeColumn,
-      file_name: payeeRowData.fileName,
-      file_size_bytes: payeeRowData.fileSizeBytes,
-      file_headers: payeeRowData.fileHeaders,
-      original_file_data: payeeRowData.fileData,
-      row_mappings: payeeRowData.rowMappings || {},
+      selected_payee_column: null, // PayeeRowData doesn't have this property
+      file_name: null, // PayeeRowData doesn't have this property
+      file_size_bytes: null, // PayeeRowData doesn't have this property
+      file_headers: null, // PayeeRowData doesn't have this property
+      original_file_data: payeeRowData.originalFileData.length > 0 
+        ? JSON.parse(JSON.stringify(payeeRowData.originalFileData))
+        : [{ placeholder: "No data" }],
+      row_mappings: payeeRowData.rowMappings.length > 0 
+        ? JSON.parse(JSON.stringify(payeeRowData.rowMappings))
+        : [{ placeholder: "No mappings" }],
       request_counts_total: payeeRowData.uniquePayeeNames.length,
       request_counts_completed: 0,
       request_counts_failed: 0,
@@ -123,12 +127,16 @@ export class EnhancedBatchJobOperations {
       app_created_at: new Date().toISOString(),
       app_updated_at: new Date().toISOString(),
       unique_payee_names: sampledData.uniquePayeeNames,
-      selected_payee_column: sampledData.selectedPayeeColumn,
-      file_name: sampledData.fileName,
-      file_size_bytes: sampledData.fileSizeBytes,
-      file_headers: sampledData.fileHeaders,
-      original_file_data: sampledData.fileData, // Sampled data only
-      row_mappings: sampledData.rowMappings || {},
+      selected_payee_column: null, // PayeeRowData doesn't have this property
+      file_name: null, // PayeeRowData doesn't have this property
+      file_size_bytes: null, // PayeeRowData doesn't have this property
+      file_headers: null, // PayeeRowData doesn't have this property
+      original_file_data: sampledData.originalFileData.length > 0 
+        ? JSON.parse(JSON.stringify(sampledData.originalFileData))
+        : [{ placeholder: "No data" }],
+      row_mappings: sampledData.rowMappings.length > 0 
+        ? JSON.parse(JSON.stringify(sampledData.rowMappings))
+        : [{ placeholder: "No mappings" }],
       request_counts_total: sampledData.uniquePayeeNames.length,
       request_counts_completed: 0,
       request_counts_failed: 0,
