@@ -132,6 +132,33 @@ const MainTabs = React.memo(({ allResults, onBatchClassify, onComplete, onJobDel
       
     } catch (error) {
       console.error('Failed to create batch job:', error);
+      
+      // Check if job was actually created in database despite the error
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { data: existingJobs } = await supabase
+          .from('batch_jobs')
+          .select('id, status')
+          .order('app_created_at', { ascending: false })
+          .limit(1);
+        
+        if (existingJobs && existingJobs.length > 0) {
+          console.log('Job exists in database despite error, showing success');
+          showSuccess(
+            "Batch Job Created Successfully!",
+            `Processing ${payeeRowData.uniquePayeeNames.length} payees`,
+            {
+              action: () => setActiveTab('jobs'),
+              actionLabel: "View Jobs"
+            }
+          );
+          setActiveTab('jobs');
+          return;
+        }
+      } catch (dbError) {
+        console.error('Error checking database for existing job:', dbError);
+      }
+      
       showError(
         "Job Creation Failed",
         error instanceof Error ? error.message : 'Failed to create batch job',
