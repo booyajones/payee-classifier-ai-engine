@@ -22,8 +22,12 @@ export class BatchJobDatabaseOperations {
       request_counts_completed: batchJob.request_counts.completed,
       request_counts_failed: batchJob.request_counts.failed,
       unique_payee_names: payeeRowData.uniquePayeeNames.slice(0, 100), // First 100 for immediate display
-      original_file_data: [{ preview: true, total_rows: payeeRowData.originalFileData.length }],
-      row_mappings: [{ preview: true, total_mappings: payeeRowData.rowMappings.length }],
+      original_file_data: payeeRowData.originalFileData && payeeRowData.originalFileData.length > 0 
+        ? [{ preview: true, total_rows: payeeRowData.originalFileData.length }]
+        : [{ placeholder: "No data" }],
+      row_mappings: payeeRowData.rowMappings && payeeRowData.rowMappings.length > 0
+        ? [{ preview: true, total_mappings: payeeRowData.rowMappings.length }]
+        : [{ placeholder: "No mappings" }],
       metadata: JSON.parse(JSON.stringify({
         preview_mode: true,
         full_data_loading: true,
@@ -86,8 +90,12 @@ export class BatchJobDatabaseOperations {
       errors: batchJob.errors ? JSON.parse(JSON.stringify(batchJob.errors)) : null,
       output_file_id: batchJob.output_file_id || null,
       unique_payee_names: payeeRowData.uniquePayeeNames,
-      original_file_data: JSON.parse(JSON.stringify(payeeRowData.originalFileData)),
-      row_mappings: JSON.parse(JSON.stringify(payeeRowData.rowMappings)),
+      original_file_data: payeeRowData.originalFileData && payeeRowData.originalFileData.length > 0
+        ? JSON.parse(JSON.stringify(payeeRowData.originalFileData))
+        : [{ placeholder: "No data" }],
+      row_mappings: payeeRowData.rowMappings && payeeRowData.rowMappings.length > 0
+        ? JSON.parse(JSON.stringify(payeeRowData.rowMappings))
+        : [{ placeholder: "No mappings" }],
       file_name: (payeeRowData as any).fileName || null,
       file_headers: (payeeRowData as any).fileHeaders || null,
       selected_payee_column: (payeeRowData as any).selectedPayeeColumn || null,

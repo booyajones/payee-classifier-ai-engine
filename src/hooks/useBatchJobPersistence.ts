@@ -3,14 +3,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { useBatchJobStore } from '@/stores/batchJobStore';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
+import { resetAllApplicationState } from '@/lib/utils/systemReset';
 
 export const useBatchJobPersistence = () => {
-  const { setJobs, setPayeeDataMap, setLoaded } = useBatchJobStore();
+  const { setJobs, setPayeeDataMap, setLoaded, clearAllJobs } = useBatchJobStore();
 
   // Load batch jobs from database on mount
   useEffect(() => {
     const loadBatchJobs = async () => {
       try {
+        // Reset application state first
+        resetAllApplicationState();
+        clearAllJobs();
         const { data, error } = await supabase
           .from('batch_jobs')
           .select('*')
@@ -77,7 +81,7 @@ export const useBatchJobPersistence = () => {
     };
 
     loadBatchJobs();
-  }, [setJobs, setPayeeDataMap, setLoaded]);
+  }, [setJobs, setPayeeDataMap, setLoaded, clearAllJobs]);
 
   // Enhanced save batch job with validation
   const saveBatchJob = async (batchJob: BatchJob, payeeData?: PayeeRowData) => {
@@ -107,8 +111,12 @@ export const useBatchJobPersistence = () => {
         request_counts_failed: batchJob.request_counts.failed,
         metadata: batchJob.metadata || null,
         unique_payee_names: payeeData?.uniquePayeeNames || [],
-        original_file_data: JSON.parse(JSON.stringify(payeeData?.originalFileData || [])),
-        row_mappings: JSON.parse(JSON.stringify(payeeData?.rowMappings || [])),
+        original_file_data: payeeData?.originalFileData && payeeData.originalFileData.length > 0 
+          ? JSON.parse(JSON.stringify(payeeData.originalFileData))
+          : [{ placeholder: "No data" }],
+        row_mappings: payeeData?.rowMappings && payeeData.rowMappings.length > 0
+          ? JSON.parse(JSON.stringify(payeeData.rowMappings))
+          : [{ placeholder: "No mappings" }],
         selected_payee_column: null,
         file_name: null,
         file_headers: null

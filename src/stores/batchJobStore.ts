@@ -147,13 +147,17 @@ export const useBatchJobStore = create<BatchJobState & BatchJobActions>()(
         Object.entries(state.errors).filter(([key]) => key !== jobId)
       )
     })),
-    clearAllJobs: () => set({
-      jobs: [],
-      payeeDataMap: {},
-      processing: new Set(),
-      errors: {},
-      selectedJobId: null
-    }),
+    clearAllJobs: () => {
+      console.log('[STORE] Clearing all jobs and resetting store state');
+      set({
+        jobs: [],
+        payeeDataMap: {},
+        processing: new Set(),
+        errors: {},
+        selectedJobId: null,
+        isLoaded: false
+      });
+    },
 
     // Enhanced job management with validation
     addJobWithValidation: (job) => {
