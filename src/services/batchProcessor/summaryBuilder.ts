@@ -5,7 +5,7 @@ import { BatchProcessorStats } from './types';
 export function buildBatchSummary(
   processedResults: PayeeClassification[],
   stats: BatchProcessorStats,
-  originalFileData: any[]
+  originalFileData: Record<string, unknown>[]
 ): BatchProcessingResult {
   const summary: BatchProcessingResult = {
     results: processedResults,

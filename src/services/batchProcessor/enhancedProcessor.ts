@@ -2,9 +2,19 @@
 import { processInChunks } from '@/lib/performance/chunkProcessor';
 import { processIndividualResult } from './resultProcessor';
 import { buildBatchSummary, logProcessingStats } from './summaryBuilder';
-import { ProcessBatchResultsParams, ProcessBatchResultsReturn, BatchProcessorStats } from './types';
+import {
+  ProcessBatchResultsParams,
+  ProcessBatchResultsReturn,
+  BatchProcessorStats,
+  RawBatchResult,
+  DuplicateData
+} from './types';
 import { detectDuplicates } from '@/lib/services/duplicate';
-import { DEFAULT_DUPLICATE_CONFIG } from '@/lib/services/duplicateDetectionTypes';
+import {
+  DEFAULT_DUPLICATE_CONFIG,
+  type DuplicateDetectionOutput
+} from '@/lib/services/duplicateDetectionTypes';
+import { PayeeClassification } from '@/lib/types';
 
 /**
  * Enhanced batch result processor with chunked processing and keyword exclusion
@@ -19,7 +29,7 @@ export async function processEnhancedBatchResults({
 }: ProcessBatchResultsParams): Promise<ProcessBatchResultsReturn> {
   console.log(`[ENHANCED BATCH PROCESSOR] Processing ${rawResults.length} results with chunked keyword exclusion`);
 
-  const processedResults: any[] = [];
+  const processedResults: PayeeClassification[] = [];
   const stats: BatchProcessorStats = {
     businessCount: 0,
     individualCount: 0,
@@ -56,11 +66,11 @@ export async function processEnhancedBatchResults({
   // Process results in chunks to prevent browser blocking with ORIGINAL DATA + DUPLICATE DATA PRESERVATION
   const { results } = await processInChunks(
     rawResults,
-    async (result, index) => {
+    async (result: RawBatchResult, index) => {
       const payeeName = uniquePayeeNames[index] || `Unknown_${index}`;
-      
+
       // CRITICAL: Find and preserve original row data for each result
-      let originalRowData = {};
+      let originalRowData: Record<string, unknown> = {};
       
       // Find the matching original row(s) for this payee name
       const matchingRows = payeeData.rowMappings.filter(mapping => 
@@ -70,22 +80,24 @@ export async function processEnhancedBatchResults({
       if (matchingRows.length > 0) {
         // Use the first matching row's original data
         const firstMatch = matchingRows[0];
-        originalRowData = payeeData.originalFileData[firstMatch.originalRowIndex] || {};
+        originalRowData =
+          (payeeData.originalFileData[firstMatch.originalRowIndex] as Record<string, unknown>) || {};
         console.log(`[ENHANCED PROCESSOR] Found original data for "${payeeName}" with ${Object.keys(originalRowData).length} columns`);
       } else {
         console.warn(`[ENHANCED PROCESSOR] No original data found for "${payeeName}" at index ${index}`);
       }
 
       // CRITICAL: Find and attach duplicate detection data for this payee
-      let duplicateData = {};
+      let duplicateData: DuplicateData | undefined;
       if (payeeData.duplicateDetectionResults) {
         const duplicateRecord = payeeData.duplicateDetectionResults.processed_records.find(
-          (record: any) => {
-            const recordIndex = parseInt(record.payee_id.replace('payee_', ''));
+          (record) => {
+            const rec = record as DuplicateDetectionOutput;
+            const recordIndex = parseInt(rec.payee_id.replace('payee_', ''));
             return recordIndex === index;
           }
-        );
-        
+        ) as (DuplicateDetectionOutput & { ai_judgment?: { reasoning: string } }) | undefined;
+
         if (duplicateRecord) {
           duplicateData = {
             is_potential_duplicate: duplicateRecord.is_potential_duplicate,
@@ -93,13 +105,27 @@ export async function processEnhancedBatchResults({
             duplicate_confidence_score: duplicateRecord.final_duplicate_score || 0,
             duplicate_detection_method: duplicateRecord.judgement_method || 'Algorithmic Analysis',
             duplicate_group_id: duplicateRecord.duplicate_group_id,
-            ai_duplicate_reasoning: duplicateRecord.ai_judgment?.reasoning || duplicateRecord.ai_judgement_reasoning || ''
+            ai_duplicate_reasoning:
+              duplicateRecord.ai_judgment?.reasoning ||
+              duplicateRecord.ai_judgement_reasoning ||
+              ''
           };
-          console.log(`[ENHANCED PROCESSOR] ✅ Found duplicate data for "${payeeName}" (index ${index}):`, duplicateData);
+          console.log(
+            `[ENHANCED PROCESSOR] ✅ Found duplicate data for "${payeeName}" (index ${index}):`,
+            duplicateData
+          );
         }
       }
-      
-      return await processIndividualResult(result, index, payeeName, job.id, stats, originalRowData, duplicateData);
+
+      return await processIndividualResult(
+        result,
+        index,
+        payeeName,
+        job.id,
+        stats,
+        originalRowData,
+        duplicateData
+      );
     },
     {
       chunkSize: rawResults.length > 5000 ? 100 : 50,

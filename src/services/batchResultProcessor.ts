@@ -2,18 +2,13 @@
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
-import { processEnhancedBatchResults } from './batchProcessor';
-
-interface TrueBatchClassificationResult {
-  classification: 'Business' | 'Individual';
-  confidence: number;
-  reasoning: string;
-  sicCode?: string;
-  sicDescription?: string;
-}
+import {
+  processEnhancedBatchResults,
+  type BatchClassificationResult
+} from './batchProcessor';
 
 export async function processBatchResults(
-  processedResults: TrueBatchClassificationResult[],
+  processedResults: BatchClassificationResult[],
   uniquePayeeNames: string[],
   payeeData: PayeeRowData,
   job: BatchJob
