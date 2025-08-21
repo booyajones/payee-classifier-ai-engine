@@ -42,7 +42,7 @@ export class AutomaticResultProcessor {
       }
       
       // Process the results (this downloads from OpenAI and processes classifications)
-      const { finalClassifications } = await processDownloadResults(
+      const downloadResult = await processDownloadResults(
         {
           job: batchJob,
           payeeData,
@@ -53,7 +53,14 @@ export class AutomaticResultProcessor {
           console.log(`[AUTO PROCESSOR] Processing job ${batchJob.id}: ${processed}/${total} (${percentage}%)`);
         }
       );
-      
+
+      if (downloadResult.error) {
+        console.error(`[AUTO PROCESSOR] Download processing failed for job ${batchJob.id}:`, downloadResult.error);
+        return false;
+      }
+
+      const { finalClassifications } = downloadResult;
+
       // Save results to database
       const saveResult = await saveProcessedResults(finalClassifications, batchJob.id);
       
