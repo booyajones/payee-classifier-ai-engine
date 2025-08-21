@@ -21,6 +21,7 @@ interface BatchJobCardProps {
   isAutoPolling?: boolean; // Separate auto-polling state
   pollingState?: any;
   stalledJobActions?: any;
+  autoRefreshHealthy?: boolean;
   onRefresh: () => void;
   onForceRefresh?: () => void; // FORCE REFRESH: Debug capability
   onForceSync?: () => Promise<BatchJob>; // EMERGENCY FIX
@@ -37,6 +38,7 @@ const BatchJobCard = ({
   isAutoPolling = false,
   pollingState,
   stalledJobActions,
+  autoRefreshHealthy = true,
   onRefresh,
   onForceRefresh,
   onForceSync,
@@ -81,7 +83,7 @@ const BatchJobCard = ({
           <div className="flex justify-between items-center mb-3">
             <BatchJobAutoRefreshIndicator
               isPolling={isRefreshing || isPolling}
-              isHealthy={true} // TODO: Connect to actual health status from useUnifiedAutoRefresh
+              isHealthy={autoRefreshHealthy}
               lastPoll={pollingState?.lastPoll}
               pollCount={pollingState?.pollCount}
             />

@@ -20,6 +20,7 @@ interface BatchJobContainerProps {
   autoPollingJobs: Set<string>; // Track auto-polling jobs
   stalledJobActions?: Record<string, any>;
   largeJobOptimization?: any;
+  autoRefreshHealthy?: boolean;
   onRefresh: (jobId: string, silent?: boolean) => Promise<void>;
   onForceRefresh?: (jobId: string) => Promise<void>; // FORCE REFRESH: Debug capability
   onForceSync?: (jobId: string) => Promise<BatchJob>; // EMERGENCY FIX
@@ -38,6 +39,7 @@ const BatchJobContainer = React.memo(({
   autoPollingJobs,
   stalledJobActions = {},
   largeJobOptimization,
+  autoRefreshHealthy,
   onRefresh,
   onForceRefresh,
   onForceSync,
@@ -168,6 +170,7 @@ const BatchJobContainer = React.memo(({
           pollingStates={pollingStates}
           autoPollingJobs={autoPollingJobs}
           stalledJobActions={stalledJobActions}
+          autoRefreshHealthy={autoRefreshHealthy}
           onRefresh={onRefresh}
           onForceRefresh={onForceRefresh}
           onForceSync={onForceSync}

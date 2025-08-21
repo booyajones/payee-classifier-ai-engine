@@ -10,6 +10,7 @@ interface OptimizedBatchJobListProps {
   pollingStates: Record<string, any>;
   autoPollingJobs: Set<string>;
   stalledJobActions: Record<string, any>;
+  autoRefreshHealthy?: boolean;
   onRefresh: (jobId: string, silent?: boolean) => Promise<void>;
   onForceRefresh?: (jobId: string) => Promise<void>;
   onForceSync?: (jobId: string) => Promise<BatchJob>;
@@ -25,6 +26,7 @@ const OptimizedBatchJobList = React.memo(({
   pollingStates,
   autoPollingJobs,
   stalledJobActions,
+  autoRefreshHealthy,
   onRefresh,
   onForceRefresh,
   onForceSync,
@@ -85,6 +87,7 @@ const OptimizedBatchJobList = React.memo(({
             pollingState={job.pollingState}
             isAutoPolling={job.isAutoPolling}
             stalledJobActions={job.stalledAction}
+            autoRefreshHealthy={autoRefreshHealthy}
             onRefresh={handlers.onRefresh}
             onForceRefresh={handlers.onForceRefresh}
             onForceSync={handlers.onForceSync}

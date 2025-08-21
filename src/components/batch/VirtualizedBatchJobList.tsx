@@ -11,6 +11,7 @@ interface VirtualizedBatchJobListProps {
   pollingStates: Record<string, any>;
   autoPollingJobs: Set<string>; // Track auto-polling jobs
   stalledJobActions?: Record<string, any>;
+  autoRefreshHealthy?: boolean;
   onRefresh: (jobId: string, silent?: boolean) => Promise<void>;
   onForceRefresh?: (jobId: string) => Promise<void>; // FORCE REFRESH: Debug capability
   onForceSync?: (jobId: string) => Promise<BatchJob>; // EMERGENCY FIX
@@ -26,6 +27,7 @@ const VirtualizedBatchJobList = ({
   pollingStates,
   autoPollingJobs,
   stalledJobActions = {},
+  autoRefreshHealthy,
   onRefresh,
   onForceRefresh,
   onForceSync,
@@ -71,6 +73,7 @@ const VirtualizedBatchJobList = ({
             isAutoPolling={isAutoPolling}
             pollingState={pollingState}
             stalledJobActions={stalledJobAction}
+            autoRefreshHealthy={autoRefreshHealthy}
             onRefresh={() => onRefresh(job.id)}
             onForceRefresh={onForceRefresh ? () => onForceRefresh(job.id) : undefined}
             onForceSync={onForceSync ? () => onForceSync(job.id) : undefined}
@@ -117,6 +120,7 @@ const VirtualizedBatchJobList = ({
               isAutoPolling={isAutoPolling}
               pollingState={pollingState}
               stalledJobActions={stalledJobAction}
+              autoRefreshHealthy={autoRefreshHealthy}
               onRefresh={() => onRefresh(job.id)}
               onForceRefresh={onForceRefresh ? () => onForceRefresh(job.id) : undefined}
               onForceSync={onForceSync ? () => onForceSync(job.id) : undefined}

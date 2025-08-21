@@ -11,6 +11,7 @@ interface BatchJobListProps {
   pollingStates: Record<string, { isPolling: boolean }>;
   autoPollingJobs: Set<string>; // Track auto-polling jobs
   stalledJobActions?: Record<string, any>;
+  autoRefreshHealthy?: boolean;
   onRefresh: (jobId: string) => Promise<void>;
   onForceRefresh?: (jobId: string) => Promise<void>; // FORCE REFRESH: Debug capability
   onForceSync?: (jobId: string) => Promise<BatchJob>; // EMERGENCY FIX
