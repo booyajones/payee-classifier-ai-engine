@@ -189,7 +189,7 @@ export const useBatchJobDownload = ({
         total: totalPayees 
       });
 
-      const { finalClassifications, summary } = await processDownloadResults(
+      const downloadResult = await processDownloadResults(
         {
           job,
           payeeData,
@@ -200,19 +200,35 @@ export const useBatchJobDownload = ({
           console.log(`[BATCH DOWNLOAD] Progress: ${processed}/${total} (${percentage}%)`);
           updateDownload(downloadId, {
             stage: percentage < 50 ? 'Processing classifications' : 'Applying keyword exclusions',
-            progress: Math.min(70, 20 + (percentage * 0.5)), // Progress from 20% to 70%
+            progress: Math.min(70, 20 + percentage * 0.5), // Progress from 20% to 70%
             processed,
             total
           });
         }
       );
 
+      if (downloadResult.error) {
+        updateDownload(downloadId, {
+          error: downloadResult.error,
+          isActive: false,
+          canCancel: false
+        });
+        toast({
+          title: 'Error',
+          description: downloadResult.error,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const { finalClassifications, summary } = downloadResult;
+
       // Update progress for database save
-      updateDownload(downloadId, { 
-        stage: 'Saving to database', 
+      updateDownload(downloadId, {
+        stage: 'Saving to database',
         progress: 75,
         processed: finalClassifications.length,
-        total: totalPayees 
+        total: totalPayees
       });
 
       // Save results to database
