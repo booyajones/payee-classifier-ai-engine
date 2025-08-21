@@ -30,6 +30,15 @@ interface AdvancedSearchFiltersProps {
   className?: string;
 }
 
+export const updateFilterValue = <K extends keyof FilterCriteria>(
+  currentFilters: FilterCriteria,
+  key: K,
+  value: FilterCriteria[K]
+): FilterCriteria => ({
+  ...currentFilters,
+  [key]: value
+});
+
 const AdvancedSearchFilters = ({
   filters,
   onFiltersChange,
@@ -40,11 +49,11 @@ const AdvancedSearchFilters = ({
 }: AdvancedSearchFiltersProps) => {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
-  const updateFilter = (key: keyof FilterCriteria, value: any) => {
-    onFiltersChange({
-      ...filters,
-      [key]: value
-    });
+  const updateFilter = <K extends keyof FilterCriteria>(
+    key: K,
+    value: FilterCriteria[K]
+  ) => {
+    onFiltersChange(updateFilterValue(filters, key, value));
   };
 
   const getActiveFilterCount = () => {
