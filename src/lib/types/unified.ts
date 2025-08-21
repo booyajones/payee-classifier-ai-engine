@@ -108,6 +108,7 @@ export interface ClassificationConfig {
   maxTokens: number;
   enableKeywordExclusion: boolean;
   enableSICCodes: boolean;
+  enableSimilarityScores?: boolean;
   timeout: number;
   retryAttempts: number;
 }

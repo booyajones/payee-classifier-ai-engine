@@ -3,6 +3,7 @@ import { ClassificationResult, ClassificationConfig, PayeeClassification } from 
 import { logger } from '@/lib/logging/logger';
 import { enhancedClassifyPayeeWithAI } from '@/lib/openai/enhancedClassification';
 import { checkKeywordExclusion } from './enhancedKeywordExclusion';
+import { jaroWinklerSimilarity } from './stringMatching';
 
 /**
  * Unified Classification Engine
@@ -34,6 +35,22 @@ export class UnifiedClassificationEngine {
   }
 
   /**
+   * Calculate similarity scores between the payee name and matching rules
+   */
+  private calculateSimilarityScores(payeeName: string, rules?: string[]): Record<string, number> | undefined {
+    if (!rules || rules.length === 0) {
+      return undefined;
+    }
+
+    const scores: Record<string, number> = {};
+    for (const rule of rules) {
+      const score = jaroWinklerSimilarity(payeeName.toLowerCase(), rule.toLowerCase()) * 100;
+      scores[rule] = Math.round(score * 100) / 100; // Round to 2 decimals
+    }
+    return scores;
+  }
+
+  /**
    * Classify a single payee with full feature set
    */
   async classifyPayee(payeeName: string): Promise<ClassificationResult> {
@@ -51,6 +68,10 @@ export class UnifiedClassificationEngine {
         keywordExclusion = await checkKeywordExclusion(payeeName);
       }
 
+      const similarityScores = this.config.enableSimilarityScores
+        ? this.calculateSimilarityScores(payeeName, aiResult.matchingRules)
+        : undefined;
+
       const result: ClassificationResult = {
         classification: this.normalizeClassification(aiResult.classification),
         confidence: aiResult.confidence,
@@ -61,7 +82,7 @@ export class UnifiedClassificationEngine {
         sicDescription: this.config.enableSICCodes ? aiResult.sicDescription : undefined,
         keywordExclusion,
         matchingRules: aiResult.matchingRules,
-        similarityScores: undefined // TODO: Implement if needed
+        similarityScores
       };
 
       logger.timeEnd(`classify-${payeeName}`, this.context);
@@ -150,6 +171,7 @@ export function createUnifiedEngine(config?: Partial<ClassificationConfig>): Uni
     maxTokens: 1000,
     enableKeywordExclusion: true,
     enableSICCodes: true,
+    enableSimilarityScores: true,
     timeout: 30000,
     retryAttempts: 3
   };
