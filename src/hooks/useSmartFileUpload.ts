@@ -3,6 +3,7 @@ import { useState, useRef } from 'react';
 import { parseUploadedFile } from '@/lib/utils';
 import { useWebWorkerFileProcessor } from './useWebWorkerFileProcessor';
 import { createPayeeRowMapping, PayeeRowData } from '@/lib/rowMapping';
+import type { FileDataRow } from '@/lib/workers/fileProcessingWorker';
 import { useUnifiedProgress } from '@/contexts/UnifiedProgressContext';
 import { useEnhancedFileValidation } from './useEnhancedFileValidation';
 
@@ -16,7 +17,7 @@ export interface FileProcessingInfo {
   uniquePayees?: number;
   duplicates?: number;
   duplicateDetectionEnabled?: boolean;
-  duplicateDetectionResults?: any;
+  duplicateDetectionResults?: unknown;
   fileInfo?: {
     size: number;
     type: string;
@@ -32,7 +33,7 @@ export const useSmartFileUpload = () => {
   const [uploadState, setUploadState] = useState<UploadState>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [fileData, setFileData] = useState<any[] | null>(null);
+  const [fileData, setFileData] = useState<FileDataRow[] | null>(null);
   const [fileHeaders, setFileHeaders] = useState<string[]>([]);
   const [selectedPayeeColumn, setSelectedPayeeColumn] = useState<string>('');
   const [fileName, setFileName] = useState('');
@@ -47,7 +48,7 @@ export const useSmartFileUpload = () => {
   const UPLOAD_ID = 'file-upload';
 
   // Debug logging utility
-  const debugLog = (message: string, data?: any) => {
+  const debugLog = (message: string, data?: unknown) => {
     console.log(`[SMART UPLOAD DEBUG] ${message}`, data || '');
   };
 
@@ -132,7 +133,7 @@ export const useSmartFileUpload = () => {
 
       debugLog('Starting memory-aware file processing');
 
-      let data: any[] = [];
+      let data: FileDataRow[] = [];
       try {
         const workerResult = await parseFileWithWorker(file, (p) => {
           updateProgress(UPLOAD_ID, 'Reading file contents...', 30 + (p / 100) * 30);
@@ -141,7 +142,7 @@ export const useSmartFileUpload = () => {
       } catch (workerError) {
         debugLog('Worker parsing failed, falling back to main thread', workerError);
         const fallbackData = await parseUploadedFile(file);
-        data = Array.isArray(fallbackData) ? fallbackData : [];
+        data = Array.isArray(fallbackData) ? (fallbackData as FileDataRow[]) : [];
       }
 
       debugLog('File parsing completed', {
@@ -230,7 +231,7 @@ export const useSmartFileUpload = () => {
     try {
       // Direct payee validation processing
       const payeeNames = fileData
-        .map((row: any) => {
+        .map((row: FileDataRow) => {
           const value = row[selectedPayeeColumn];
           return typeof value === 'string' ? value.trim() : String(value || '').trim();
         })

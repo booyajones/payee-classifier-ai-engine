@@ -1,20 +1,43 @@
 
 // Web Worker for heavy file processing operations
 import { parseUploadedFile } from '../utils';
-import { createPayeeRowMapping } from '../rowMapping';
+import { createPayeeRowMapping, type PayeeRowData } from '../rowMapping';
 
-export interface WorkerMessage {
-  type: 'PARSE_FILE' | 'CREATE_MAPPINGS' | 'PROCESS_CHUNK';
-  payload: any;
-  taskId: string;
+// Basic representation of a row from the uploaded file
+export interface FileDataRow {
+  [key: string]: unknown;
 }
 
-export interface WorkerResponse {
-  type: 'PROGRESS' | 'SUCCESS' | 'ERROR';
-  taskId: string;
-  data?: any;
-  error?: string;
-  progress?: number;
+// Payload structures for different worker tasks
+export interface ParseFilePayload {
+  file: File;
+}
+
+export interface CreateMappingsPayload {
+  fileData: FileDataRow[];
+  column: string;
+}
+
+export interface ProcessChunkPayload {
+  chunk: FileDataRow[];
+  processor: string;
+}
+
+export type WorkerMessage =
+  | { type: 'PARSE_FILE'; payload: ParseFilePayload; taskId: string }
+  | { type: 'CREATE_MAPPINGS'; payload: CreateMappingsPayload; taskId: string }
+  | { type: 'PROCESS_CHUNK'; payload: ProcessChunkPayload; taskId: string };
+
+export type WorkerResponse<T = unknown> =
+  | { type: 'PROGRESS'; taskId: string; progress: number }
+  | { type: 'SUCCESS'; taskId: string; data: T }
+  | { type: 'ERROR'; taskId: string; error: string };
+
+// Mapping between task types, their payloads and expected results
+export interface WorkerTaskMap {
+  PARSE_FILE: { payload: ParseFilePayload; response: FileDataRow[] };
+  CREATE_MAPPINGS: { payload: CreateMappingsPayload; response: PayeeRowData };
+  PROCESS_CHUNK: { payload: ProcessChunkPayload; response: FileDataRow[] };
 }
 
 class FileProcessingWorker {
@@ -27,10 +50,10 @@ class FileProcessingWorker {
       switch (type) {
         case 'PARSE_FILE':
           return await this.parseFile(payload.file, taskId);
-        
+
         case 'CREATE_MAPPINGS':
           return await this.createMappings(payload.fileData, payload.column, taskId);
-        
+
         case 'PROCESS_CHUNK':
           return await this.processChunk(payload.chunk, payload.processor, taskId);
         
@@ -46,7 +69,7 @@ class FileProcessingWorker {
     }
   }
 
-  private async parseFile(file: File, taskId: string): Promise<WorkerResponse> {
+  private async parseFile(file: File, taskId: string): Promise<WorkerResponse<FileDataRow[]>> {
     const controller = new AbortController();
     this.processingTasks.set(taskId, controller);
 
@@ -68,7 +91,7 @@ class FileProcessingWorker {
     }
   }
 
-  private async createMappings(fileData: any[], column: string, taskId: string): Promise<WorkerResponse> {
+  private async createMappings(fileData: FileDataRow[], column: string, taskId: string): Promise<WorkerResponse<PayeeRowData>> {
     const controller = new AbortController();
     this.processingTasks.set(taskId, controller);
 
@@ -89,7 +112,7 @@ class FileProcessingWorker {
     }
   }
 
-  private async processChunk(chunk: any[], processor: string, taskId: string): Promise<WorkerResponse> {
+  private async processChunk(chunk: FileDataRow[], processor: string, taskId: string): Promise<WorkerResponse<FileDataRow[]>> {
     const controller = new AbortController();
     this.processingTasks.set(taskId, controller);
 

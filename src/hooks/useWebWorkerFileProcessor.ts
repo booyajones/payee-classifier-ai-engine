@@ -1,11 +1,25 @@
 
 import { useCallback, useRef } from 'react';
-import { WorkerMessage, WorkerResponse } from '@/lib/workers/fileProcessingWorker';
+import type {
+  WorkerMessage,
+  WorkerResponse,
+  WorkerTaskMap,
+  FileDataRow,
+} from '@/lib/workers/fileProcessingWorker';
 import { useToast } from '@/hooks/use-toast';
 
 export const useWebWorkerFileProcessor = () => {
   const workerRef = useRef<Worker | null>(null);
-  const taskCallbacks = useRef<Map<string, { resolve: (data: any) => void; reject: (error: Error) => void; onProgress?: (progress: number) => void }>>(new Map());
+  const taskCallbacks = useRef<
+    Map<
+      string,
+      {
+        resolve: (data: unknown) => void;
+        reject: (error: Error) => void;
+        onProgress?: (progress: number) => void;
+      }
+    >
+  >(new Map());
   const { toast } = useToast();
 
   const initializeWorker = useCallback(() => {
@@ -59,31 +73,38 @@ export const useWebWorkerFileProcessor = () => {
     }
   }, [toast]);
 
-  const processWithWorker = useCallback(async <T>(
-    type: 'PARSE_FILE' | 'CREATE_MAPPINGS' | 'PROCESS_CHUNK',
-    payload: any,
-    onProgress?: (progress: number) => void
-  ): Promise<T> => {
-    initializeWorker();
+  const processWithWorker = useCallback(
+    async <T extends keyof WorkerTaskMap>(
+      type: T,
+      payload: WorkerTaskMap[T]['payload'],
+      onProgress?: (progress: number) => void
+    ): Promise<WorkerTaskMap[T]['response']> => {
+      initializeWorker();
 
-    if (!workerRef.current) {
-      throw new Error('Worker not available');
-    }
+      if (!workerRef.current) {
+        throw new Error('Worker not available');
+      }
 
-    const taskId = `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const taskId = `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    return new Promise((resolve, reject) => {
-      taskCallbacks.current.set(taskId, { resolve, reject, onProgress });
+      return new Promise<WorkerTaskMap[T]['response']>((resolve, reject) => {
+        taskCallbacks.current.set(taskId, {
+          resolve: resolve as (data: unknown) => void,
+          reject,
+          onProgress,
+        });
 
-      const message: WorkerMessage = {
-        type,
-        payload,
-        taskId
-      };
+        const message: WorkerMessage = {
+          type,
+          payload,
+          taskId,
+        };
 
-      workerRef.current!.postMessage(message);
-    });
-  }, [initializeWorker]);
+        workerRef.current!.postMessage(message);
+      });
+    },
+    [initializeWorker]
+  );
 
   const parseFileWithWorker = useCallback(async (
     file: File,
@@ -92,21 +113,27 @@ export const useWebWorkerFileProcessor = () => {
     return processWithWorker('PARSE_FILE', { file }, onProgress);
   }, [processWithWorker]);
 
-  const createMappingsWithWorker = useCallback(async (
-    fileData: any[],
-    column: string,
-    onProgress?: (progress: number) => void
-  ) => {
-    return processWithWorker('CREATE_MAPPINGS', { fileData, column }, onProgress);
-  }, [processWithWorker]);
+  const createMappingsWithWorker = useCallback(
+    async (
+      fileData: FileDataRow[],
+      column: string,
+      onProgress?: (progress: number) => void
+    ) => {
+      return processWithWorker('CREATE_MAPPINGS', { fileData, column }, onProgress);
+    },
+    [processWithWorker]
+  );
 
-  const processChunkWithWorker = useCallback(async (
-    chunk: any[],
-    processor: string,
-    onProgress?: (progress: number) => void
-  ) => {
-    return processWithWorker('PROCESS_CHUNK', { chunk, processor }, onProgress);
-  }, [processWithWorker]);
+  const processChunkWithWorker = useCallback(
+    async (
+      chunk: FileDataRow[],
+      processor: string,
+      onProgress?: (progress: number) => void
+    ) => {
+      return processWithWorker('PROCESS_CHUNK', { chunk, processor }, onProgress);
+    },
+    [processWithWorker]
+  );
 
   const terminateWorker = useCallback(() => {
     if (workerRef.current) {
