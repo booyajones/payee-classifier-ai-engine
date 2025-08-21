@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw, X } from 'lucide-react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
+import { AutoRefreshState } from '@/hooks/useUnifiedAutoRefresh';
 import BatchJobHeader from './BatchJobHeader';
 import BatchJobCardContent from './BatchJobCardContent';
 import BatchJobActions from './BatchJobActions';
@@ -13,14 +14,21 @@ import LargeJobStatusIndicator from './LargeJobStatusIndicator';
 import LargeJobManagementPanel from './LargeJobManagementPanel';
 import { BatchJobAutoRefreshIndicator } from './BatchJobAutoRefreshIndicator';
 
+interface StalledJobAction {
+  isStalled?: boolean;
+  suggestions?: string[];
+  canCancel?: boolean;
+}
+
 interface BatchJobCardProps {
   job: BatchJob;
   payeeRowData?: PayeeRowData;
   isRefreshing?: boolean;
   isPolling?: boolean;
   isAutoPolling?: boolean; // Separate auto-polling state
-  pollingState?: any;
-  stalledJobActions?: any;
+  pollingState?: AutoRefreshState;
+  stalledJobActions?: StalledJobAction;
+  autoRefreshHealthy?: boolean;
   onRefresh: () => void;
   onForceRefresh?: () => void; // FORCE REFRESH: Debug capability
   onForceSync?: () => Promise<BatchJob>; // EMERGENCY FIX
@@ -37,6 +45,7 @@ const BatchJobCard = ({
   isAutoPolling = false,
   pollingState,
   stalledJobActions,
+  autoRefreshHealthy = true,
   onRefresh,
   onForceRefresh,
   onForceSync,
@@ -81,7 +90,7 @@ const BatchJobCard = ({
           <div className="flex justify-between items-center mb-3">
             <BatchJobAutoRefreshIndicator
               isPolling={isRefreshing || isPolling}
-              isHealthy={true} // TODO: Connect to actual health status from useUnifiedAutoRefresh
+              isHealthy={autoRefreshHealthy}
               lastPoll={pollingState?.lastPoll}
               pollCount={pollingState?.pollCount}
             />

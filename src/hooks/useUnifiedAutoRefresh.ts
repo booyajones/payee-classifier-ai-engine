@@ -4,7 +4,7 @@ import { connectionManager } from '@/lib/network/connectionManager';
 import { useToast } from '@/hooks/use-toast';
 import { useBatchJobRealtime } from '@/hooks/useBatchJobRealtime';
 
-interface AutoRefreshState {
+export interface AutoRefreshState {
   isPolling: boolean;
   lastPoll: number;
   pollCount: number;
