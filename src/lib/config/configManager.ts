@@ -26,6 +26,7 @@ export class ConfigManager {
       maxTokens: 1000,
       enableKeywordExclusion: true,
       enableSICCodes: true,
+      enableSimilarityScores: true,
       timeout: 30000,
       retryAttempts: 3
     };
