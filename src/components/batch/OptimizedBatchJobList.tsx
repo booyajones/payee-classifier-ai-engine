@@ -1,21 +1,29 @@
 import React, { useMemo, useState } from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
+import { AutoRefreshState } from '@/hooks/useUnifiedAutoRefresh';
 import BatchJobCard from './BatchJobCard';
+
+interface StalledJobAction {
+  isStalled?: boolean;
+  suggestions?: string[];
+  canCancel?: boolean;
+}
 
 interface OptimizedBatchJobListProps {
   jobs: BatchJob[];
   payeeRowDataMap: Record<string, PayeeRowData>;
   refreshingJobs: Set<string>;
-  pollingStates: Record<string, any>;
+  pollingStates: Record<string, AutoRefreshState>;
   autoPollingJobs: Set<string>;
-  stalledJobActions: Record<string, any>;
+  stalledJobActions: Record<string, StalledJobAction>;
   onRefresh: (jobId: string, silent?: boolean) => Promise<void>;
   onForceRefresh?: (jobId: string) => Promise<void>;
   onForceSync?: (jobId: string) => Promise<BatchJob>;
   onDownload: (job: BatchJob) => Promise<void>;
   onCancel: (jobId: string) => void;
   onJobDelete: (jobId: string) => void;
+  autoRefreshHealthy?: boolean;
 }
 
 const OptimizedBatchJobList = React.memo(({
@@ -30,7 +38,8 @@ const OptimizedBatchJobList = React.memo(({
   onForceSync,
   onDownload,
   onCancel,
-  onJobDelete
+  onJobDelete,
+  autoRefreshHealthy = true
 }: OptimizedBatchJobListProps) => {
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
 
@@ -85,6 +94,7 @@ const OptimizedBatchJobList = React.memo(({
             pollingState={job.pollingState}
             isAutoPolling={job.isAutoPolling}
             stalledJobActions={job.stalledAction}
+            autoRefreshHealthy={autoRefreshHealthy}
             onRefresh={handlers.onRefresh}
             onForceRefresh={handlers.onForceRefresh}
             onForceSync={handlers.onForceSync}

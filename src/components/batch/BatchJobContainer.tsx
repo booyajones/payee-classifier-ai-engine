@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw, Zap, RotateCcw } from 'lucide-react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
+import { AutoRefreshState } from '@/hooks/useUnifiedAutoRefresh';
 import OptimizedBatchJobList from './OptimizedBatchJobList';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -11,15 +12,21 @@ import { PerformanceCircuitBreaker } from '@/components/performance/PerformanceC
 import { useMemoryManager } from '@/lib/performance/memoryManager';
 import { useJobRecovery } from '@/hooks/useJobRecovery';
 
+interface StalledJobAction {
+  isStalled?: boolean;
+  suggestions?: string[];
+  canCancel?: boolean;
+}
+
 
 interface BatchJobContainerProps {
   jobs: BatchJob[];
   payeeRowDataMap: Record<string, PayeeRowData>;
   refreshingJobs: Set<string>;
-  pollingStates: Record<string, any>;
+  pollingStates: Record<string, AutoRefreshState>;
   autoPollingJobs: Set<string>; // Track auto-polling jobs
-  stalledJobActions?: Record<string, any>;
-  largeJobOptimization?: any;
+  stalledJobActions?: Record<string, StalledJobAction>;
+  largeJobOptimization?: unknown;
   onRefresh: (jobId: string, silent?: boolean) => Promise<void>;
   onForceRefresh?: (jobId: string) => Promise<void>; // FORCE REFRESH: Debug capability
   onForceSync?: (jobId: string) => Promise<BatchJob>; // EMERGENCY FIX
@@ -28,6 +35,7 @@ interface BatchJobContainerProps {
   onJobDelete: (jobId: string) => void;
   onCleanup?: () => void; // Automatic cleanup function
   onForceCleanup?: () => void; // Force performance cleanup function
+  autoRefreshHealthy?: boolean;
 }
 
 const BatchJobContainer = React.memo(({
@@ -45,7 +53,8 @@ const BatchJobContainer = React.memo(({
   onCancel,
   onJobDelete,
   onCleanup,
-  onForceCleanup
+  onForceCleanup,
+  autoRefreshHealthy = true
 }: BatchJobContainerProps) => {
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
   const { toast } = useToast();
@@ -174,6 +183,7 @@ const BatchJobContainer = React.memo(({
           onDownload={onDownload}
           onCancel={onCancel}
           onJobDelete={onJobDelete}
+          autoRefreshHealthy={autoRefreshHealthy}
         />
       </PerformanceCircuitBreaker>
     </div>

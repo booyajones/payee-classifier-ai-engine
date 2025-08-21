@@ -21,7 +21,8 @@ const BatchJobManagerContainer = () => {
     largeJobOptimization,
     performCleanup,
     forceCleanup,
-    TimeoutManager
+    TimeoutManager,
+    autoRefreshHealthy
   } = useBatchJobManager();
 
   return (
@@ -49,6 +50,7 @@ const BatchJobManagerContainer = () => {
           onJobDelete={handleJobDelete}
           onCleanup={performCleanup}
           onForceCleanup={forceCleanup}
+          autoRefreshHealthy={autoRefreshHealthy}
         />
       </ProgressiveLoader>
     </>
