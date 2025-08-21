@@ -1,6 +1,7 @@
 
 import { BatchProcessingResult, PayeeClassification } from '@/lib/types';
 import { BatchProcessorStats } from './types';
+import { productionLogger } from '@/lib/logging';
 
 export function buildBatchSummary(
   processedResults: PayeeClassification[],
@@ -22,6 +23,14 @@ export function logProcessingStats(
   processedCount: number,
   stats: BatchProcessorStats
 ): void {
-  console.log(`[ENHANCED BATCH PROCESSOR] Complete: ${processedCount} results processed`);
-  console.log(`[ENHANCED BATCH PROCESSOR] Business: ${stats.businessCount}, Individual: ${stats.individualCount}, Excluded: ${stats.excludedCount}, SIC: ${stats.sicCodeCount}`);
+  productionLogger.info(
+    `Complete: ${processedCount} results processed`,
+    undefined,
+    'ENHANCED_BATCH_PROCESSOR'
+  );
+  productionLogger.info(
+    `Business: ${stats.businessCount}, Individual: ${stats.individualCount}, Excluded: ${stats.excludedCount}, SIC: ${stats.sicCodeCount}`,
+    undefined,
+    'ENHANCED_BATCH_PROCESSOR'
+  );
 }
