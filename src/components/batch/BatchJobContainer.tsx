@@ -10,15 +10,16 @@ import { useToast } from '@/hooks/use-toast';
 import { PerformanceCircuitBreaker } from '@/components/performance/PerformanceCircuitBreaker';
 import { useMemoryManager } from '@/lib/performance/memoryManager';
 import { useJobRecovery } from '@/hooks/useJobRecovery';
+import { PollingState, StalledJobActions } from '@/types/batch';
 
 
 interface BatchJobContainerProps {
   jobs: BatchJob[];
   payeeRowDataMap: Record<string, PayeeRowData>;
   refreshingJobs: Set<string>;
-  pollingStates: Record<string, any>;
+  pollingStates: Record<string, PollingState | undefined>;
   autoPollingJobs: Set<string>; // Track auto-polling jobs
-  stalledJobActions?: Record<string, any>;
+  stalledJobActions?: Record<string, StalledJobActions | undefined>;
   largeJobOptimization?: any;
   onRefresh: (jobId: string, silent?: boolean) => Promise<void>;
   onForceRefresh?: (jobId: string) => Promise<void>; // FORCE REFRESH: Debug capability

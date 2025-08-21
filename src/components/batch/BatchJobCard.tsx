@@ -12,6 +12,7 @@ import BatchJobStatusIndicator from './BatchJobStatusIndicator';
 import LargeJobStatusIndicator from './LargeJobStatusIndicator';
 import LargeJobManagementPanel from './LargeJobManagementPanel';
 import { BatchJobAutoRefreshIndicator } from './BatchJobAutoRefreshIndicator';
+import { PollingState, StalledJobActions } from '@/types/batch';
 
 interface BatchJobCardProps {
   job: BatchJob;
@@ -19,8 +20,8 @@ interface BatchJobCardProps {
   isRefreshing?: boolean;
   isPolling?: boolean;
   isAutoPolling?: boolean; // Separate auto-polling state
-  pollingState?: any;
-  stalledJobActions?: any;
+  pollingState?: PollingState;
+  stalledJobActions?: StalledJobActions;
   onRefresh: () => void;
   onForceRefresh?: () => void; // FORCE REFRESH: Debug capability
   onForceSync?: () => Promise<BatchJob>; // EMERGENCY FIX

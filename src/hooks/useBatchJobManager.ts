@@ -12,6 +12,7 @@ import { useUnifiedAutoRefresh } from '@/hooks/useUnifiedAutoRefresh';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useStablePerformanceMonitor } from '@/hooks/useStablePerformanceMonitor';
 import { PhantomJobDetector } from '@/lib/utils/phantomJobDetector';
+import { PollingState, StalledJobActions } from '@/types/batch';
 
 export const useBatchJobManager = () => {
   const {
@@ -162,7 +163,7 @@ export const useBatchJobManager = () => {
         console.warn(`[BATCH JOB MANAGER] Error detecting stalled job ${job.id}:`, error);
       }
       return acc;
-    }, {} as Record<string, any>);
+    }, {} as Record<string, StalledJobActions>);
   }, [stableJobs, batchJobActions.getStalledJobActions, networkHealthy, performanceStable]);
 
   // Memoized return object with health status
@@ -170,7 +171,7 @@ export const useBatchJobManager = () => {
     jobs: stableJobs,
     payeeDataMap,
     refreshingJobs: new Set<string>(), // Simplified - use unified polling state
-    pollingStates: refreshStates,
+    pollingStates: refreshStates as Record<string, PollingState>,
     autoPollingJobs: new Set(Object.keys(refreshStates).filter(jobId => refreshStates[jobId]?.isPolling)),
     stalledJobActions,
     handleRefreshJob,

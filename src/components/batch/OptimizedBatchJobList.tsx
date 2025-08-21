@@ -2,14 +2,15 @@ import React, { useMemo, useState } from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import BatchJobCard from './BatchJobCard';
+import { PollingState, StalledJobActions } from '@/types/batch';
 
 interface OptimizedBatchJobListProps {
   jobs: BatchJob[];
   payeeRowDataMap: Record<string, PayeeRowData>;
   refreshingJobs: Set<string>;
-  pollingStates: Record<string, any>;
+  pollingStates: Record<string, PollingState | undefined>;
   autoPollingJobs: Set<string>;
-  stalledJobActions: Record<string, any>;
+  stalledJobActions: Record<string, StalledJobActions | undefined>;
   onRefresh: (jobId: string, silent?: boolean) => Promise<void>;
   onForceRefresh?: (jobId: string) => Promise<void>;
   onForceSync?: (jobId: string) => Promise<BatchJob>;

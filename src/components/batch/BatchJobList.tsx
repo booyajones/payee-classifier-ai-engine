@@ -3,14 +3,15 @@ import React from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { PayeeRowData } from '@/lib/rowMapping';
 import VirtualizedBatchJobList from './VirtualizedBatchJobList';
+import { PollingState, StalledJobActions } from '@/types/batch';
 
 interface BatchJobListProps {
   jobs: BatchJob[];
   payeeRowDataMap: Record<string, PayeeRowData>;
   refreshingJobs: Set<string>;
-  pollingStates: Record<string, { isPolling: boolean }>;
+  pollingStates: Record<string, PollingState | undefined>;
   autoPollingJobs: Set<string>; // Track auto-polling jobs
-  stalledJobActions?: Record<string, any>;
+  stalledJobActions?: Record<string, StalledJobActions | undefined>;
   onRefresh: (jobId: string) => Promise<void>;
   onForceRefresh?: (jobId: string) => Promise<void>; // FORCE REFRESH: Debug capability
   onForceSync?: (jobId: string) => Promise<BatchJob>; // EMERGENCY FIX
