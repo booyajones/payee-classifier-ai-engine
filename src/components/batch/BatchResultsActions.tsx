@@ -82,10 +82,11 @@ const BatchResultsActions = ({
       }
     } catch (error) {
       console.error('Download failed:', error);
+      const message = error instanceof Error ? error.message : 'Failed to download results';
       toast({
-        title: "Download Failed",
-        description: error instanceof Error ? error.message : 'Failed to download results',
-        variant: "destructive"
+        title: 'Download Failed',
+        description: `${message} Check your API key or try regenerating the files.`,
+        variant: 'destructive',
       });
     } finally {
       setIsGenerating(false);
