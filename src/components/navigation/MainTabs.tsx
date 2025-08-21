@@ -30,12 +30,11 @@ import { useBatchJobPersistence } from "@/hooks/useBatchJobPersistence";
 
 interface MainTabsProps {
   allResults: PayeeClassification[];
-  onBatchClassify: (results: PayeeClassification[]) => void;
   onComplete: (results: PayeeClassification[], summary: BatchProcessingResult) => void;
   onJobDelete: () => void;
 }
 
-const MainTabs = React.memo(({ allResults, onBatchClassify, onComplete, onJobDelete }: MainTabsProps) => {
+const MainTabs = React.memo(({ allResults, onComplete, onJobDelete }: MainTabsProps) => {
   console.log('MainTabs rendering, props:', { allResultsLength: allResults.length });
   const { activeTab, setActiveTab } = useAppStore();
   const { addJob, setPayeeData, jobs, payeeDataMap } = useBatchJobStore();
