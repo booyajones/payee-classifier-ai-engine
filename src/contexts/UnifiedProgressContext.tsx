@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 
 interface ProgressState {
   stage: string;
@@ -21,6 +21,7 @@ const UnifiedProgressContext = createContext<UnifiedProgressContextType | undefi
 export const UnifiedProgressProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [progressMap, setProgressMap] = useState<Record<string, ProgressState>>({});
   const lastUpdateRef = useRef<Record<string, number>>({});
+  const timeoutIdsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const updateProgress = useCallback((
     id: string, 
@@ -62,13 +63,17 @@ export const UnifiedProgressProvider: React.FC<{ children: React.ReactNode }> = 
     }));
     
     // Auto-clear completed progress after 30 seconds
-    setTimeout(() => {
+    if (timeoutIdsRef.current[id]) {
+      clearTimeout(timeoutIdsRef.current[id]);
+    }
+    timeoutIdsRef.current[id] = setTimeout(() => {
       setProgressMap(prev => {
         const newMap = { ...prev };
         delete newMap[id];
         return newMap;
       });
       delete lastUpdateRef.current[id];
+      delete timeoutIdsRef.current[id];
     }, 30000);
   }, []);
 
@@ -79,11 +84,17 @@ export const UnifiedProgressProvider: React.FC<{ children: React.ReactNode }> = 
       return newMap;
     });
     delete lastUpdateRef.current[id];
+    if (timeoutIdsRef.current[id]) {
+      clearTimeout(timeoutIdsRef.current[id]);
+      delete timeoutIdsRef.current[id];
+    }
   }, []);
 
   const clearAllProgress = useCallback(() => {
     setProgressMap({});
     lastUpdateRef.current = {};
+    Object.values(timeoutIdsRef.current).forEach(clearTimeout);
+    timeoutIdsRef.current = {};
   }, []);
 
   const getProgress = useCallback((id: string) => {
@@ -97,6 +108,13 @@ export const UnifiedProgressProvider: React.FC<{ children: React.ReactNode }> = 
     clearProgress,
     clearAllProgress
   };
+
+  useEffect(() => {
+    return () => {
+      Object.values(timeoutIdsRef.current).forEach(clearTimeout);
+      timeoutIdsRef.current = {};
+    };
+  }, []);
 
   return (
     <UnifiedProgressContext.Provider value={value}>
